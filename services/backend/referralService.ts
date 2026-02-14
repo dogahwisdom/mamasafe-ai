@@ -48,7 +48,7 @@ export class ReferralService {
         .single();
       patientName = data?.name || "Unknown";
     } else {
-      const patients = storage.get<Patient[]>(KEYS.PATIENTS, DEFAULT_PATIENTS);
+      const patients = storage.get<Patient[]>(KEYS.PATIENTS, []);
       const patient = patients.find((p) => p.id === patientId);
       patientName = patient?.name || "Unknown";
     }

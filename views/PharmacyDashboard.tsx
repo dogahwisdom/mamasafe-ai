@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { UserProfile, RefillRequest, InventoryItem } from '../types';
+import { UserProfile, RefillRequest, InventoryItem, Patient } from '../types';
 import { backend } from '../services/backend';
 import { ActionCard } from '../components/ActionCard';
 import { Pill, Users, AlertTriangle, CheckSquare, Search, CheckCircle, Clock, Package, UserPlus, X, Loader2 } from 'lucide-react';
@@ -13,6 +13,7 @@ interface PharmacyDashboardProps {
 export const PharmacyDashboard: React.FC<PharmacyDashboardProps> = ({ user, onNavigate }) => {
   const [refills, setRefills] = useState<RefillRequest[]>([]);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [dispensingId, setDispensingId] = useState<string | null>(null);
@@ -23,12 +24,14 @@ export const PharmacyDashboard: React.FC<PharmacyDashboardProps> = ({ user, onNa
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [refillData, inventoryData] = await Promise.all([
+        const [refillData, inventoryData, patientData] = await Promise.all([
           backend.pharmacy.getRefills(),
-          backend.pharmacy.getInventory()
+          backend.pharmacy.getInventory(),
+          backend.patients.getAll()
         ]);
         setRefills(refillData);
         setInventory(inventoryData);
+        setPatients(patientData);
       } catch (e) {
         console.error("Failed to load pharmacy data", e);
       } finally {
@@ -40,7 +43,18 @@ export const PharmacyDashboard: React.FC<PharmacyDashboardProps> = ({ user, onNa
 
   const lowStockItems = inventory.filter(item => item.stock <= item.minLevel);
   const pendingCount = refills.filter(r => r.status === 'pending').length;
-  const dispensedToday = refills.filter(r => r.status === 'dispensed').length;
+  
+  // Calculate dispensed today (filter by today's date)
+  const today = new Date().toISOString().split('T')[0];
+  const dispensedToday = refills.filter(r => {
+    if (r.status !== 'dispensed') return false;
+    // If refill has a dispensed_at date, use it; otherwise check requestTime
+    const dispensedDate = (r as any).dispensed_at || r.requestTime;
+    if (typeof dispensedDate === 'string') {
+      return dispensedDate.startsWith(today);
+    }
+    return false;
+  }).length;
 
   const handleDispense = async (id: string) => {
     setDispensingId(id);
@@ -183,10 +197,10 @@ export const PharmacyDashboard: React.FC<PharmacyDashboardProps> = ({ user, onNa
               />
               <ActionCard 
                  title="Assigned Patients" 
-                 value={156} 
+                 value={patients.length} 
                  icon={Users} 
                  variant="default"
-                 subtitle="Active prescriptions"
+                 subtitle={patients.length > 0 ? "Active prescriptions" : "No patients enrolled"}
                  onClick={() => onNavigate('patients')}
               />
               <ActionCard 

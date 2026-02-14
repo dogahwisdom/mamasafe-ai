@@ -438,7 +438,7 @@ export class AuthService {
     }
 
     if (user.role === "patient") {
-      const patients = storage.get<Patient[]>(KEYS.PATIENTS, DEFAULT_PATIENTS);
+      const patients = storage.get<Patient[]>(KEYS.PATIENTS, []);
       const patientRecord = patients.find((p) => p.id === user.id);
       if (patientRecord && user.patientData) {
         user.patientData.medications = patientRecord.medications || [];

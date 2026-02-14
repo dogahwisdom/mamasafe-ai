@@ -22,7 +22,7 @@ export class PatientService {
 
       if (error) {
         console.error('Error fetching patients:', error);
-        return DEFAULT_PATIENTS;
+        return [];
       }
 
       return (data || []).map((p: any) => ({
@@ -51,7 +51,7 @@ export class PatientService {
     }
 
     // Fallback to localStorage
-    return storage.get<Patient[]>(KEYS.PATIENTS, DEFAULT_PATIENTS);
+    return storage.get<Patient[]>(KEYS.PATIENTS, []);
   }
 
   public async add(patient: Patient): Promise<Patient> {
@@ -208,7 +208,7 @@ export class PatientService {
     }
 
     // Fallback to localStorage
-    const patients = storage.get<Patient[]>(KEYS.PATIENTS, DEFAULT_PATIENTS);
+    const patients = storage.get<Patient[]>(KEYS.PATIENTS, []);
     const existingIndex = patients.findIndex(
       (p) => normalizePhone(p.phone) === cleanPhone
     );
@@ -276,7 +276,7 @@ export class PatientService {
     medicationId: string,
     taken: boolean
   ): Promise<UserProfile | null> {
-    const patients = storage.get<Patient[]>(KEYS.PATIENTS, DEFAULT_PATIENTS);
+    const patients = storage.get<Patient[]>(KEYS.PATIENTS, []);
     const pIndex = patients.findIndex((p) => p.id === patientId);
 
     if (pIndex > -1) {

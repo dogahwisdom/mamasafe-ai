@@ -136,7 +136,7 @@ export class ReminderService {
         }));
       }
     } else {
-      patients = storage.get<Patient[]>(KEYS.PATIENTS, DEFAULT_PATIENTS);
+      patients = storage.get<Patient[]>(KEYS.PATIENTS, []);
     }
 
     const existing = await this.getAll();
