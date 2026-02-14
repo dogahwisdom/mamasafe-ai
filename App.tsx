@@ -12,6 +12,7 @@ import { EducationView } from './views/Education';
 import { ReferralsView } from './views/Referrals';
 import { MedicationsView } from './views/Medications';
 import { SettingsView } from './views/Settings';
+import { SuperadminDashboard } from './views/SuperadminDashboard';
 import { backend } from './services/backend';
 import { ViewState, Alert, Patient, UserProfile } from './types';
 import { LayoutDashboard, UserPlus, Stethoscope, Sun, Moon, Bell, LogOut, Users, X, HelpCircle, Book, ExternalLink, MessageSquare, Phone, Clock, FileText, Settings, Loader2, CheckCircle } from 'lucide-react';
@@ -151,7 +152,11 @@ export const App: React.FC = () => {
   const getNavItems = () => {
     if (!currentUser) return [];
     
-    if (currentUser.role === 'patient') {
+    if (currentUser.role === 'superadmin') {
+      return [
+        { id: 'dashboard', label: 'System Overview', icon: LayoutDashboard },
+      ];
+    } else if (currentUser.role === 'patient') {
       return [
         { id: 'dashboard', label: 'My Health', icon: LayoutDashboard },
         { id: 'triage', label: 'Check Symptoms', icon: Stethoscope },
@@ -274,6 +279,7 @@ export const App: React.FC = () => {
               {currentUser?.role === 'patient' && <span className="text-xs font-bold text-brand-600 ml-3 bg-brand-50 border border-brand-100 px-2.5 py-0.5 rounded-full self-center">Patient Portal</span>}
               {currentUser?.role === 'pharmacy' && <span className="text-xs font-bold text-purple-600 ml-3 bg-purple-50 border border-purple-100 px-2.5 py-0.5 rounded-full self-center">Pharmacy</span>}
               {currentUser?.role === 'clinic' && <span className="text-xs font-bold text-blue-600 ml-3 bg-blue-50 border border-blue-100 px-2.5 py-0.5 rounded-full self-center">Clinic Portal</span>}
+              {currentUser?.role === 'superadmin' && <span className="text-xs font-bold text-indigo-600 ml-3 bg-indigo-50 border border-indigo-100 px-2.5 py-0.5 rounded-full self-center">Superadmin</span>}
             </div>
           </div>
 
@@ -422,6 +428,10 @@ export const App: React.FC = () => {
 
          {currentView === 'dashboard' && currentUser?.role === 'pharmacy' && (
            <PharmacyDashboard user={currentUser} onNavigate={setCurrentView} />
+         )}
+
+         {currentView === 'dashboard' && currentUser?.role === 'superadmin' && (
+           <SuperadminDashboard user={currentUser} onNavigate={setCurrentView} />
          )}
 
          {currentView === 'dashboard' && (!currentUser?.role || currentUser.role === 'clinic') && (

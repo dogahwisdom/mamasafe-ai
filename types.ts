@@ -1,5 +1,5 @@
 
-export type UserRole = 'patient' | 'clinic' | 'pharmacy';
+export type UserRole = 'patient' | 'clinic' | 'pharmacy' | 'superadmin';
 
 export enum RiskLevel {
   LOW = 'Low',
@@ -151,4 +151,5 @@ export type ViewState =
   | 'education'
   | 'medications'
   | 'settings'
-  | 'referrals';
+  | 'referrals'
+  | 'superadmin';

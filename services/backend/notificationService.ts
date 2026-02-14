@@ -1,7 +1,6 @@
 import { Alert, UserProfile, Patient, Task, RefillRequest, Reminder, RiskLevel } from '../../types';
 import { backend } from '../backend';
-import { isSupabaseConfigured } from '../../supabaseClient';
-import { supabase } from '../../supabaseClient';
+import { isSupabaseConfigured, supabase } from '../supabaseClient';
 
 export class NotificationService {
   /**

@@ -4,6 +4,8 @@ import { PharmacyService } from "./backend/pharmacyService";
 import { ClinicService } from "./backend/clinicService";
 import { ReminderService } from "./backend/reminderService";
 import { ReferralService } from "./backend/referralService";
+import { NotificationService } from "./backend/notificationService";
+import { SuperadminService } from "./backend/superadminService";
 
 class BackendFacade {
   public readonly auth: AuthService;
@@ -12,6 +14,8 @@ class BackendFacade {
   public readonly clinic: ClinicService;
   public readonly reminders: ReminderService;
   public readonly referrals: ReferralService;
+  public readonly notifications: NotificationService;
+  public readonly superadmin: SuperadminService;
 
   constructor() {
     this.auth = new AuthService();
@@ -21,6 +25,7 @@ class BackendFacade {
     this.reminders = new ReminderService();
     this.referrals = new ReferralService();
     this.notifications = new NotificationService();
+    this.superadmin = new SuperadminService();
   }
 }
 

@@ -9,7 +9,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- ============================================
 CREATE TABLE IF NOT EXISTS users (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  role TEXT NOT NULL CHECK (role IN ('patient', 'clinic', 'pharmacy')),
+  role TEXT NOT NULL CHECK (role IN ('patient', 'clinic', 'pharmacy', 'superadmin')),
   name TEXT NOT NULL,
   phone TEXT NOT NULL,
   email TEXT,

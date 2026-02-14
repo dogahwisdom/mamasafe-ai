@@ -17,6 +17,22 @@ export class AuthService {
   public async loginAsDemo(role: UserRole): Promise<{ user: UserProfile }> {
     await delay(200);
 
+    if (role === "superadmin") {
+      const superadmin: UserProfile = {
+        id: "superadmin",
+        role: "superadmin",
+        name: "MamaSafe AI Team",
+        phone: "+254700000000",
+        email: "admin@mamasafe.ai",
+        location: "Nairobi",
+        countryCode: "KE",
+        avatar: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80",
+      };
+      storage.set(KEYS.CURRENT_USER, superadmin);
+      storage.set(KEYS.SESSION, "true");
+      return { user: superadmin };
+    }
+
     if (role === "clinic") {
       const admin: UserProfile = {
         id: "admin",
