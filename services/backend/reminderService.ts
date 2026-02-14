@@ -1,5 +1,5 @@
 import { Reminder, Patient, Medication } from "../../types";
-import { KEYS, storage, DEFAULT_PATIENTS } from "./shared";
+import { KEYS, storage } from "./shared";
 import { supabase, isSupabaseConfigured } from "../supabaseClient";
 
 const HOURS_24 = 24 * 60 * 60 * 1000;

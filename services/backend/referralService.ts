@@ -1,5 +1,5 @@
 import { Referral, Patient } from "../../types";
-import { KEYS, storage, DEFAULT_PATIENTS } from "./shared";
+import { KEYS, storage } from "./shared";
 import { supabase, isSupabaseConfigured } from "../supabaseClient";
 
 export class ReferralService {
