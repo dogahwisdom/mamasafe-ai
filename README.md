@@ -79,6 +79,14 @@ See `NETLIFY_DEPLOYMENT.md` for details.
 
 ## Documentation
 
+### User Documentation
+- **[User Guide](./docs/USER_GUIDE.md)** - Complete user manual (Apple-style)
+- **[Quick Start Guide](./docs/QUICK_START.md)** - Get started in 5 minutes
+- **[Patient Guide](./docs/ROLES/PATIENT.md)** - Patient portal guide
+- **[Clinic Guide](./docs/ROLES/CLINIC.md)** - Clinic portal guide
+- **[Pharmacy Guide](./docs/ROLES/PHARMACY.md)** - Pharmacy portal guide
+
+### Technical Documentation
 - `SUPABASE_SETUP.md` - Database setup guide
 - `NETLIFY_DEPLOYMENT.md` - Deployment instructions
 - `META_WHATSAPP_SETUP.md` - WhatsApp API setup
