@@ -186,30 +186,59 @@ export class SuperadminService {
         // Process clinics
         for (const clinic of clinics) {
           // Get actual patient count for this clinic from database
+          // Patients are linked to clinics via location matching (no direct clinic_id foreign key)
+          // Using location-based matching to count patients for this clinic
           const { data: clinicPatientsData } = await supabase
             .from('patients')
-            .select('id, created_at, updated_at')
-            .eq('user_id', clinic.id);
+            .select('id, created_at, updated_at, location')
+            .ilike('location', `%${clinic.location || ''}%`);
 
           const clinicPatientCount = clinicPatientsData?.length || 0;
 
-          // Get tasks for patients belonging to this clinic
-          const clinicPatientIds = clinicPatientsData?.map(p => p.id) || [];
-          const clinicTasks = clinicPatientIds.length > 0
-            ? tasks.filter(t => clinicPatientIds.includes(t.patientId) && !t.resolved)
-            : [];
+          // Get tasks for patients belonging to this clinic directly from database
+          const clinicPatientIds = clinicPatientsData?.map((p: any) => p.id) || [];
+          let clinicTaskCount = 0;
+          
+          if (clinicPatientIds.length > 0) {
+            const { data: clinicTasksData } = await supabase
+              .from('tasks')
+              .select('id, updated_at, created_at')
+              .in('patient_id', clinicPatientIds)
+              .eq('resolved', false);
+            
+            clinicTaskCount = clinicTasksData?.length || 0;
+          }
 
-          // Get last activity from most recent patient update or task
+          // Get last activity from most recent patient update, task, or clinic update
           let lastActivity = clinic.updated_at || clinic.created_at || new Date().toISOString();
+          
           if (clinicPatientsData && clinicPatientsData.length > 0) {
             const mostRecentPatient = clinicPatientsData
-              .sort((a: any, b: any) => 
-                new Date(b.updated_at || b.created_at).getTime() - 
-                new Date(a.updated_at || a.created_at).getTime()
-              )[0];
+              .sort((a: any, b: any) => {
+                const dateA = new Date(a.updated_at || a.created_at || 0).getTime();
+                const dateB = new Date(b.updated_at || b.created_at || 0).getTime();
+                return dateB - dateA;
+              })[0];
             const patientLastActivity = mostRecentPatient.updated_at || mostRecentPatient.created_at;
-            if (new Date(patientLastActivity) > new Date(lastActivity)) {
+            if (patientLastActivity && new Date(patientLastActivity) > new Date(lastActivity)) {
               lastActivity = patientLastActivity;
+            }
+          }
+
+          // Also check tasks for more recent activity
+          if (clinicPatientIds.length > 0) {
+            const { data: recentTasks } = await supabase
+              .from('tasks')
+              .select('updated_at, created_at')
+              .in('patient_id', clinicPatientIds)
+              .order('updated_at', { ascending: false })
+              .limit(1);
+            
+            if (recentTasks && recentTasks.length > 0) {
+              const taskActivity = recentTasks[0].updated_at || recentTasks[0].created_at;
+              if (taskActivity && new Date(taskActivity) > new Date(lastActivity)) {
+                lastActivity = taskActivity;
+              }
             }
           }
 
@@ -235,8 +264,15 @@ export class SuperadminService {
             .order('updated_at', { ascending: false })
             .limit(1);
 
-          const lastActivity = pharmacy.updated_at || pharmacy.created_at || 
-            (refillData && refillData.length > 0 ? refillData[0].updated_at || refillData[0].created_at : new Date().toISOString());
+          // Get last activity from pharmacy update or most recent refill request
+          let lastActivity = pharmacy.updated_at || pharmacy.created_at || new Date().toISOString();
+          
+          if (refillData && refillData.length > 0) {
+            const refillActivity = refillData[0].updated_at || refillData[0].created_at;
+            if (refillActivity && new Date(refillActivity) > new Date(lastActivity)) {
+              lastActivity = refillActivity;
+            }
+          }
 
           facilities.push({
             id: pharmacy.id,
