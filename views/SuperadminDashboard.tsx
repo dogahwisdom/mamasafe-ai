@@ -205,10 +205,10 @@ export const SuperadminDashboard: React.FC<SuperadminDashboardProps> = ({ user, 
               icon={Users}
               subtitle="Enrolled mothers"
               variant="primary"
-              trend={{
-                value: '+12%',
+              trend={metrics.enrollmentsThisWeek > 0 ? {
+                value: `${Math.round((metrics.enrollmentsThisWeek / Math.max(metrics.totalPatients - metrics.enrollmentsThisWeek, 1)) * 100)}%`,
                 direction: 'up',
-              }}
+              } : undefined}
             />
             <MetricCard
               title="Active Facilities"

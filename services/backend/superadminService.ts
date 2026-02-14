@@ -185,33 +185,67 @@ export class SuperadminService {
 
         // Process clinics
         for (const clinic of clinics) {
-          const clinicPatients = patients.filter(p => 
-            p.location.toLowerCase().includes(clinic.location?.toLowerCase() || '')
-          );
-          const clinicTasks = tasks.filter(t => !t.resolved);
+          // Get actual patient count for this clinic from database
+          const { data: clinicPatientsData } = await supabase
+            .from('patients')
+            .select('id, created_at, updated_at')
+            .eq('user_id', clinic.id);
+
+          const clinicPatientCount = clinicPatientsData?.length || 0;
+
+          // Get tasks for patients belonging to this clinic
+          const clinicPatientIds = clinicPatientsData?.map(p => p.id) || [];
+          const clinicTasks = clinicPatientIds.length > 0
+            ? tasks.filter(t => clinicPatientIds.includes(t.patientId) && !t.resolved)
+            : [];
+
+          // Get last activity from most recent patient update or task
+          let lastActivity = clinic.updated_at || clinic.created_at || new Date().toISOString();
+          if (clinicPatientsData && clinicPatientsData.length > 0) {
+            const mostRecentPatient = clinicPatientsData
+              .sort((a: any, b: any) => 
+                new Date(b.updated_at || b.created_at).getTime() - 
+                new Date(a.updated_at || a.created_at).getTime()
+              )[0];
+            const patientLastActivity = mostRecentPatient.updated_at || mostRecentPatient.created_at;
+            if (new Date(patientLastActivity) > new Date(lastActivity)) {
+              lastActivity = patientLastActivity;
+            }
+          }
 
           facilities.push({
             id: clinic.id,
             name: clinic.name,
             type: 'clinic',
             location: clinic.location || 'Unknown',
-            patientCount: clinicPatients.length,
-            activeTasks: clinicTasks.length,
-            lastActivity: new Date().toISOString(), // Would get from activity log
+            patientCount: clinicPatientCount,
+            activeTasks: clinicTaskCount,
+            lastActivity,
             status: 'active',
           });
         }
 
         // Process pharmacies
         for (const pharmacy of pharmacies) {
+          // Get refill requests for this pharmacy (if we had pharmacy_id, for now use all pending refills)
+          const { data: refillData } = await supabase
+            .from('refill_requests')
+            .select('created_at, updated_at')
+            .eq('status', 'pending')
+            .order('updated_at', { ascending: false })
+            .limit(1);
+
+          const lastActivity = pharmacy.updated_at || pharmacy.created_at || 
+            (refillData && refillData.length > 0 ? refillData[0].updated_at || refillData[0].created_at : new Date().toISOString());
+
           facilities.push({
             id: pharmacy.id,
             name: pharmacy.name,
             type: 'pharmacy',
             location: pharmacy.location || 'Unknown',
-            patientCount: 0,
+            patientCount: 0, // Pharmacies don't have direct patient relationships
             activeTasks: 0,
-            lastActivity: new Date().toISOString(),
+            lastActivity,
             status: 'active',
           });
         }
