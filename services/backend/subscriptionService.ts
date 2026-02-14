@@ -93,7 +93,7 @@ export class SubscriptionService {
         .select('*')
         .eq('facility_id', facilityId)
         .eq('status', 'active')
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error('Error fetching subscription:', error);

@@ -11,6 +11,7 @@ export const SubscriptionManagement: React.FC<SubscriptionManagementProps> = ({ 
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [metrics, setMetrics] = useState<SubscriptionMetrics | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlan | null>(null);
 
   const service = new SubscriptionService();
@@ -21,6 +22,7 @@ export const SubscriptionManagement: React.FC<SubscriptionManagementProps> = ({ 
 
   const loadData = async () => {
     setLoading(true);
+    setError(null);
     try {
       const [subsData, metricsData] = await Promise.all([
         service.getAllSubscriptions(),
@@ -28,8 +30,9 @@ export const SubscriptionManagement: React.FC<SubscriptionManagementProps> = ({ 
       ]);
       setSubscriptions(subsData);
       setMetrics(metricsData);
-    } catch (error) {
-      console.error('Error loading subscription data:', error);
+    } catch (err: any) {
+      console.error('Error loading subscription data:', err);
+      setError(err.message || 'Failed to load subscription data. Please ensure the database tables are created.');
     } finally {
       setLoading(false);
     }
@@ -75,6 +78,27 @@ export const SubscriptionManagement: React.FC<SubscriptionManagementProps> = ({ 
         <div className="text-center">
           <RefreshCw className="animate-spin text-brand-600 mx-auto mb-4" size={32} />
           <p className="text-slate-500 dark:text-slate-400">Loading subscription data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="text-center max-w-md">
+          <AlertCircle className="text-red-500 mx-auto mb-4" size={48} />
+          <p className="text-slate-900 dark:text-white font-semibold mb-2">Error Loading Data</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">{error}</p>
+          <p className="text-xs text-slate-400 dark:text-slate-500 mb-4">
+            Please ensure you have run the SQL migration script: <code className="bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">supabase/add-management-tables.sql</code>
+          </p>
+          <button
+            onClick={loadData}
+            className="px-4 py-2 bg-brand-600 text-white rounded-xl font-semibold hover:bg-brand-700 transition-colors"
+          >
+            Retry
+          </button>
         </div>
       </div>
     );

@@ -12,6 +12,9 @@ import { FacilityCard } from '../components/admin/FacilityCard';
 import { SystemHealthCard } from '../components/admin/SystemHealthCard';
 import { PatientSearchModal } from '../components/admin/PatientSearchModal';
 import { FacilityDetailsModal } from '../components/admin/FacilityDetailsModal';
+import { SubscriptionManagement } from '../components/admin/SubscriptionManagement';
+import { SupportManagement } from '../components/admin/SupportManagement';
+import { SOPsManagement } from '../components/admin/SOPsManagement';
 
 interface SuperadminDashboardProps {
   user: UserProfile;

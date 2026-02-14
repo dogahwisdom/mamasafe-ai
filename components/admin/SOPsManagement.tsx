@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Eye, Download, CheckCircle, Plus, Edit, Trash2, BarChart3, Users, RefreshCw, Search } from 'lucide-react';
+import { FileText, Eye, Download, CheckCircle, Plus, Edit, Trash2, BarChart3, Users, RefreshCw, Search, AlertCircle } from 'lucide-react';
 import { SOPService, SOP, SOPMetrics } from '../../services/backend/sopService';
 import { MetricCard } from './MetricCard';
 
@@ -11,6 +11,7 @@ export const SOPsManagement: React.FC<SOPsManagementProps> = ({ onNavigate }) =>
   const [sops, setSOPs] = useState<SOP[]>([]);
   const [metrics, setMetrics] = useState<SOPMetrics | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -22,6 +23,7 @@ export const SOPsManagement: React.FC<SOPsManagementProps> = ({ onNavigate }) =>
 
   const loadData = async () => {
     setLoading(true);
+    setError(null);
     try {
       const [sopsData, metricsData] = await Promise.all([
         service.getAllSOPs(),
@@ -29,8 +31,9 @@ export const SOPsManagement: React.FC<SOPsManagementProps> = ({ onNavigate }) =>
       ]);
       setSOPs(sopsData);
       setMetrics(metricsData);
-    } catch (error) {
-      console.error('Error loading SOPs data:', error);
+    } catch (err: any) {
+      console.error('Error loading SOPs data:', err);
+      setError(err.message || 'Failed to load SOPs data. Please ensure the database tables are created.');
     } finally {
       setLoading(false);
     }
@@ -63,6 +66,27 @@ export const SOPsManagement: React.FC<SOPsManagementProps> = ({ onNavigate }) =>
         <div className="text-center">
           <RefreshCw className="animate-spin text-brand-600 mx-auto mb-4" size={32} />
           <p className="text-slate-500 dark:text-slate-400">Loading SOPs data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="text-center max-w-md">
+          <AlertCircle className="text-red-500 mx-auto mb-4" size={48} />
+          <p className="text-slate-900 dark:text-white font-semibold mb-2">Error Loading Data</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">{error}</p>
+          <p className="text-xs text-slate-400 dark:text-slate-500 mb-4">
+            Please ensure you have run the SQL migration script: <code className="bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">supabase/add-management-tables.sql</code>
+          </p>
+          <button
+            onClick={loadData}
+            className="px-4 py-2 bg-brand-600 text-white rounded-xl font-semibold hover:bg-brand-700 transition-colors"
+          >
+            Retry
+          </button>
         </div>
       </div>
     );
