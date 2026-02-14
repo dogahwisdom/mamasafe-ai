@@ -1,0 +1,9 @@
+# Files to ignore during Netlify build
+node_modules
+.env.local
+.env
+*.log
+.DS_Store
+dist
+.vite
+.cache
