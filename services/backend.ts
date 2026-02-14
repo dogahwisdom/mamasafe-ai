@@ -6,6 +6,9 @@ import { ReminderService } from "./backend/reminderService";
 import { ReferralService } from "./backend/referralService";
 import { NotificationService } from "./backend/notificationService";
 import { SuperadminService } from "./backend/superadminService";
+import { SubscriptionService } from "./backend/subscriptionService";
+import { SupportService } from "./backend/supportService";
+import { SOPService } from "./backend/sopService";
 
 class BackendFacade {
   public readonly auth: AuthService;
@@ -16,6 +19,9 @@ class BackendFacade {
   public readonly referrals: ReferralService;
   public readonly notifications: NotificationService;
   public readonly superadmin: SuperadminService;
+  public readonly subscriptions: SubscriptionService;
+  public readonly support: SupportService;
+  public readonly sops: SOPService;
 
   constructor() {
     this.auth = new AuthService();
@@ -26,6 +32,9 @@ class BackendFacade {
     this.referrals = new ReferralService();
     this.notifications = new NotificationService();
     this.superadmin = new SuperadminService();
+    this.subscriptions = new SubscriptionService();
+    this.support = new SupportService();
+    this.sops = new SOPService();
   }
 }
 
