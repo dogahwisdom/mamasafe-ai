@@ -12,4 +12,6 @@
 
 import { handler } from '../reminder-sender';
 
-export default handler;
+export default async function(req: any, res: any) {
+  return handler(req, res);
+}

@@ -4,10 +4,11 @@
   "description": "Automated reminder sender service for MamaSafe AI",
   "main": "reminder-sender.ts",
   "scripts": {
-    "start": "tsx reminder-sender.ts",
+    "start": "CONTINUOUS=true tsx start-cron.js",
     "dev": "tsx watch reminder-sender.ts",
     "build": "tsc",
-    "cron": "node dist/reminder-sender.js"
+    "cron": "node dist/reminder-sender.js",
+    "test": "tsx reminder-sender.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.95.3"
