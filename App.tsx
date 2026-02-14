@@ -78,27 +78,27 @@ export const App: React.FC = () => {
     fetchPatients();
   }, [isAuthenticated, currentUser?.role]);
 
-  // Set Role-Based Notifications
+  // Load Real Notifications
   useEffect(() => {
-    if (currentUser) {
-      if (currentUser.role === 'patient') {
-        setNotifications([
-          { id: '1', type: 'system', message: 'Your next ANC visit is tomorrow at 9:00 AM.', timestamp: '1h ago', severity: 'info', resolved: false },
-          { id: '2', type: 'medication', message: 'Time to take your Iron supplement.', timestamp: '30m ago', severity: 'warning', resolved: false },
-        ]);
-      } else if (currentUser.role === 'pharmacy') {
-        setNotifications([
-           { id: '1', type: 'system', message: 'New prescription request from Sarah M.', timestamp: '5m ago', severity: 'info', resolved: false },
-           { id: '2', type: 'system', message: 'Low stock alert: Folic Acid.', timestamp: '2h ago', severity: 'warning', resolved: false },
-        ]);
+    const loadNotifications = async () => {
+      if (currentUser) {
+        try {
+          const realNotifications = await backend.notifications.getNotifications(currentUser);
+          setNotifications(realNotifications);
+        } catch (error) {
+          console.error('Error loading notifications:', error);
+          setNotifications([]);
+        }
       } else {
-        // Clinic defaults
-        setNotifications([
-          { id: '1', type: 'symptom', message: 'Sarah O. reported severe headache.', timestamp: '10m ago', severity: 'critical', resolved: false },
-          { id: '2', type: 'missed_appointment', message: 'Mary K. missed ANC visit.', timestamp: '2h ago', severity: 'warning', resolved: false },
-        ]);
+        setNotifications([]);
       }
-    }
+    };
+
+    loadNotifications();
+
+    // Refresh notifications every 30 seconds
+    const interval = setInterval(loadNotifications, 30000);
+    return () => clearInterval(interval);
   }, [currentUser]);
 
   useEffect(() => {
