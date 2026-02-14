@@ -11,6 +11,7 @@ import { ChartCard } from '../components/admin/ChartCard';
 import { FacilityCard } from '../components/admin/FacilityCard';
 import { SystemHealthCard } from '../components/admin/SystemHealthCard';
 import { PatientSearchModal } from '../components/admin/PatientSearchModal';
+import { FacilityDetailsModal } from '../components/admin/FacilityDetailsModal';
 
 interface SuperadminDashboardProps {
   user: UserProfile;
@@ -27,6 +28,8 @@ export const SuperadminDashboard: React.FC<SuperadminDashboardProps> = ({ user, 
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'facilities' | 'analytics'>('overview');
   const [showPatientSearch, setShowPatientSearch] = useState(false);
+  const [selectedFacility, setSelectedFacility] = useState<FacilityMetrics | null>(null);
+  const [showFacilityDetails, setShowFacilityDetails] = useState(false);
   const [facilitySearchQuery, setFacilitySearchQuery] = useState('');
   const [facilityFilter, setFacilityFilter] = useState<'all' | 'clinic' | 'pharmacy'>('all');
 
@@ -397,14 +400,14 @@ export const SuperadminDashboard: React.FC<SuperadminDashboardProps> = ({ user, 
                 return matchesSearch && matchesFilter;
               })
               .map((facility) => (
-                <FacilityCard
-                  key={facility.id}
-                  facility={facility}
-                  onClick={() => {
-                    // Navigate to facility details
-                    console.log('View facility:', facility.id);
-                  }}
-                />
+              <FacilityCard
+                key={facility.id}
+                facility={facility}
+                onClick={() => {
+                  setSelectedFacility(facility);
+                  setShowFacilityDetails(true);
+                }}
+              />
               ))}
           </div>
 
@@ -489,6 +492,16 @@ export const SuperadminDashboard: React.FC<SuperadminDashboardProps> = ({ user, 
         onSelectPatient={(patient) => {
           console.log('Selected patient:', patient);
           setShowPatientSearch(false);
+        }}
+      />
+
+      {/* Facility Details Modal */}
+      <FacilityDetailsModal
+        isOpen={showFacilityDetails}
+        facility={selectedFacility}
+        onClose={() => {
+          setShowFacilityDetails(false);
+          setSelectedFacility(null);
         }}
       />
     </div>

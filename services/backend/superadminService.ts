@@ -420,7 +420,7 @@ export class SuperadminService {
   /**
    * Get all patients
    */
-  private async getAllPatients(): Promise<Patient[]> {
+  public async getAllPatients(): Promise<Patient[]> {
     if (isSupabaseConfigured()) {
       const { data, error } = await supabase
         .from('patients')
@@ -528,7 +528,7 @@ export class SuperadminService {
   /**
    * Get all tasks
    */
-  private async getAllTasks(): Promise<Task[]> {
+  public async getAllTasks(): Promise<Task[]> {
     if (isSupabaseConfigured()) {
       const { data, error } = await supabase
         .from('tasks')
