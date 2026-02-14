@@ -1,8 +1,8 @@
-# ✅ MamaSafe AI Feature Checklist
+# Feature Checklist
 
 ## Core Features Status
 
-### 🔐 Authentication & User Management
+### Authentication & User Management
 - [x] **Login** - Works with Supabase
 - [x] **Registration** - Works with Supabase (after RLS fix)
 - [x] **Session Management** - Persistent sessions
