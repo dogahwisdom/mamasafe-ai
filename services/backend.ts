@@ -20,7 +20,8 @@ class BackendFacade {
     this.clinic = new ClinicService();
     this.reminders = new ReminderService();
     this.referrals = new ReferralService();
-          }
+    this.notifications = new NotificationService();
+  }
 }
 
 export const backend = new BackendFacade();

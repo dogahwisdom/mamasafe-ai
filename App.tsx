@@ -136,7 +136,14 @@ export const App: React.FC = () => {
     setCurrentView('patients');
   };
 
-  const markAllRead = () => {
+  const markAllRead = async () => {
+    if (currentUser) {
+      try {
+        await backend.notifications.markAllAsResolved(currentUser);
+      } catch (error) {
+        console.error('Error marking notifications as read:', error);
+      }
+    }
     setNotifications(prev => prev.map(n => ({ ...n, resolved: true })));
     setTimeout(() => setShowNotifications(false), 300);
   };
@@ -317,19 +324,50 @@ export const App: React.FC = () => {
                     </div>
                     <div className="max-h-[400px] overflow-y-auto">
                        {notifications.length > 0 ? (
-                         notifications.map(n => (
-                           <div key={n.id} className={`p-4 border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors ${n.resolved ? 'opacity-50 grayscale' : 'bg-brand-50/30 dark:bg-brand-900/5'}`}>
-                              <div className="flex gap-3">
-                                 <div className={`mt-1.5 w-2.5 h-2.5 rounded-full shrink-0 ${n.severity === 'critical' ? 'bg-red-500 shadow-red-500/50 shadow-sm' : n.severity === 'warning' ? 'bg-orange-500 shadow-orange-500/50 shadow-sm' : 'bg-brand-500 shadow-brand-500/50 shadow-sm'}`} />
-                                 <div>
-                                    <p className="text-sm font-bold text-slate-900 dark:text-white leading-snug">{n.message}</p>
-                                    <p className="text-xs text-slate-500 mt-1.5 font-medium flex items-center gap-1">
-                                      <Clock size={10} /> {n.timestamp}
-                                    </p>
-                                 </div>
-                              </div>
-                           </div>
-                         ))
+                         notifications.map(n => {
+                           // Format timestamp for display
+                           const formatTimestamp = (timestamp: string): string => {
+                             try {
+                               const date = new Date(timestamp);
+                               const now = new Date();
+                               const diffMs = now.getTime() - date.getTime();
+                               const diffMins = Math.floor(diffMs / 60000);
+                               const diffHours = Math.floor(diffMs / 3600000);
+                               const diffDays = Math.floor(diffMs / 86400000);
+
+                               if (diffMins < 1) return 'Just now';
+                               if (diffMins < 60) return `${diffMins}m ago`;
+                               if (diffHours < 24) return `${diffHours}h ago`;
+                               if (diffDays < 7) return `${diffDays}d ago`;
+                               return date.toLocaleDateString();
+                             } catch {
+                               return timestamp;
+                             }
+                           };
+
+                           return (
+                             <div 
+                               key={n.id} 
+                               className={`p-4 border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer ${n.resolved ? 'opacity-50 grayscale' : 'bg-brand-50/30 dark:bg-brand-900/5'}`}
+                               onClick={async () => {
+                                 if (currentUser?.role === 'patient' && currentUser.id) {
+                                   await backend.notifications.markAsResolved(n.id, currentUser.id);
+                                 }
+                                 setNotifications(prev => prev.map(notif => notif.id === n.id ? { ...notif, resolved: true } : notif));
+                               }}
+                             >
+                                <div className="flex gap-3">
+                                   <div className={`mt-1.5 w-2.5 h-2.5 rounded-full shrink-0 ${n.severity === 'critical' ? 'bg-red-500 shadow-red-500/50 shadow-sm' : n.severity === 'warning' ? 'bg-orange-500 shadow-orange-500/50 shadow-sm' : 'bg-brand-500 shadow-brand-500/50 shadow-sm'}`} />
+                                   <div className="flex-1">
+                                      <p className="text-sm font-bold text-slate-900 dark:text-white leading-snug">{n.message}</p>
+                                      <p className="text-xs text-slate-500 mt-1.5 font-medium flex items-center gap-1">
+                                        <Clock size={10} /> {formatTimestamp(n.timestamp)}
+                                      </p>
+                                   </div>
+                                </div>
+                             </div>
+                           );
+                         })
                        ) : (
                          <div className="p-12 text-center text-slate-400">
                             <div className="w-16 h-16 bg-slate-50 dark:bg-slate-800/50 rounded-full flex items-center justify-center mx-auto mb-3">
