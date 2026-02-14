@@ -9,7 +9,7 @@
 - [x] **Role-based Access** - Clinic, Pharmacy, Patient roles
 - [x] **Profile Management** - Update user profiles
 
-### 📊 Dashboard & KPIs
+###  Dashboard & KPIs
 - [x] **Clinic Dashboard** - Real-time KPIs
 - [x] **ANC < 16 Weeks Rate** - Calculated from real data
 - [x] **24h Follow-up Rate** - Calculated from task resolution
@@ -17,7 +17,7 @@
 - [x] **Task Tracking** - Active tasks with deadlines
 - [x] **Analytics Charts** - Weekly visit trends
 
-### 👥 Patient Management
+###  Patient Management
 - [x] **Patient Enrollment** - Add new patients
 - [x] **Patient List** - View all patients
 - [x] **Patient Details** - View patient information
@@ -25,20 +25,20 @@
 - [x] **Risk Status** - Low/Medium/High/Critical
 - [x] **Appointment Scheduling** - Next appointment tracking
 
-### 🏥 Clinic Features
+###  Clinic Features
 - [x] **Task Management** - Create, view, resolve tasks
 - [x] **Triage System** - AI-powered symptom analysis
 - [x] **Referral Tracking** - Create and track referrals
 - [x] **High-Risk Alerts** - Automatic task creation
 - [x] **Missed Visit Tracking** - Automatic task creation
 
-### 💊 Pharmacy Features
+###  Pharmacy Features
 - [x] **Refill Requests** - View and process refills
 - [x] **Inventory Management** - Track stock levels
 - [x] **Low Stock Alerts** - Visual indicators
 - [x] **Dispense Medications** - Update inventory automatically
 
-### 🔔 Reminders System
+###  Reminders System
 - [x] **Generate Daily Reminders** - Automatic generation
 - [x] **Appointment Reminders** - 24h before appointment
 - [x] **Medication Reminders** - Daily medication reminders
@@ -46,14 +46,14 @@
 - [x] **Mark as Sent** - Update reminder status
 - [x] **Supabase Integration** - Stores in database
 
-### 📋 Referrals
+###  Referrals
 - [x] **Create Referrals** - From triage results
 - [x] **View All Referrals** - List with filters
 - [x] **Update Status** - Pending → In Progress → Completed
 - [x] **Track History** - Created/updated timestamps
 - [x] **Supabase Integration** - Persistent storage
 
-### 🔔 Notifications
+###  Notifications
 - [x] **Notification Bell** - Header notification icon
 - [x] **Notification Dropdown** - View all notifications
 - [x] **Mark as Read** - Update notification status
@@ -70,7 +70,7 @@
 - [x] **Notification Preferences** - Enable/disable
 - [x] **Language Settings** - English/Swahili
 
-### 🤖 AI Triage
+###  AI Triage
 - [x] **Symptom Analysis** - AI-powered risk assessment
 - [x] **Risk Level Classification** - Low/Medium/High/Critical
 - [x] **Clinical Reasoning** - WHO guideline-based
@@ -79,7 +79,7 @@
 
 ---
 
-## 🚀 WhatsApp Integration (Ready for Credentials)
+##  WhatsApp Integration (Ready for Credentials)
 
 ### Backend Structure
 - [x] **Webhook Handler** - `backend/whatsapp-webhook.ts`
@@ -181,7 +181,7 @@
 
 ---
 
-## 📝 Next Steps
+##  Next Steps
 
 1. **Run SQL Scripts** (if not done):
    - `supabase/fix-rls-policies.sql` - Fix RLS
@@ -203,6 +203,6 @@
 
 ---
 
-## ✅ All Features Working!
+## All Features Working!
 
-Everything is ready and working. Just need WhatsApp credentials to complete the integration! 🎉
+Everything is ready and working. Just need WhatsApp credentials to complete the integration! 

@@ -1,4 +1,4 @@
-# 🔐 Google Sign-In Setup Guide
+#  Google Sign-In Setup Guide
 
 ## Overview
 
@@ -111,9 +111,9 @@ export const AuthCallback = () => {
 
 ## Current Status
 
-✅ **Code is ready** - Google sign-in is implemented
-⏳ **Needs configuration** - Enable Google OAuth in Supabase
-⏳ **Needs Google credentials** - Create OAuth app in Google Cloud
+**Code is ready** - Google sign-in is implemented
+**Needs configuration** - Enable Google OAuth in Supabase
+**Needs Google credentials** - Create OAuth app in Google Cloud
 
 ---
 
@@ -127,4 +127,4 @@ export const AuthCallback = () => {
 
 ---
 
-**Once configured, Google sign-in will work automatically!** 🚀
+**Once configured, Google sign-in will work automatically!** 

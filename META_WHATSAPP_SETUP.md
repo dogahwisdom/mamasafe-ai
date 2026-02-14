@@ -105,7 +105,7 @@ After setup, you'll have:
 
 ---
 
-## 📋 Quick Links
+##  Quick Links
 
 - **Meta Business Suite:** https://business.facebook.com/
 - **Meta Developers:** https://developers.facebook.com/
@@ -114,7 +114,7 @@ After setup, you'll have:
 
 ---
 
-## ⚠️ Important Notes
+## Important Notes
 
 1. **Phone Number:** You can start with your personal number for testing, but you'll need a dedicated business number for production
 2. **Verification:** Business verification is required for production use (not needed for initial testing)
@@ -123,12 +123,12 @@ After setup, you'll have:
 
 ---
 
-## 🚀 After You Get Access
+##  After You Get Access
 
 Once you have:
-- ✅ Access Token
-- ✅ Phone Number ID
-- ✅ Business Account ID
+- Access Token
+- Phone Number ID
+- Business Account ID
 
 **Let me know and I'll:**
 1. Create the backend webhook server
@@ -138,7 +138,7 @@ Once you have:
 
 ---
 
-## 💡 Pro Tips
+##  Pro Tips
 
 1. **Start with Sandbox:** Meta provides a sandbox for testing (no verification needed)
 2. **Use Test Numbers:** You can add test phone numbers for development
@@ -158,4 +158,4 @@ If you get stuck at any step:
 
 **Start here:** https://business.facebook.com/
 
-Good luck! 🎉
+Good luck! 

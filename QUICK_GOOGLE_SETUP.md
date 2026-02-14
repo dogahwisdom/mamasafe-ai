@@ -1,4 +1,4 @@
-# 🚀 Quick Google OAuth Setup - Step by Step
+#  Quick Google OAuth Setup - Step by Step
 
 ## Step 1: Go to Google Cloud Console
 
@@ -76,7 +76,7 @@
 6. **IMPORTANT:** Copy these immediately:
    - **Client ID** (long string)
    - **Client Secret** (click "Show" to reveal)
-   - ⚠️ **Save these securely!** You'll need them for Supabase
+   - **Save these securely!** You'll need them for Supabase
 
 ---
 
@@ -113,7 +113,7 @@
 
 ---
 
-## ⚠️ Important Notes
+## Important Notes
 
 1. **Client Secret** - Keep it secure! Never commit to git
 2. **Redirect URI** - Must match exactly (including https://)
@@ -122,7 +122,7 @@
 
 ---
 
-## ✅ Checklist
+## Checklist
 
 - [ ] Project created: `mamasafe-ai-auth`
 - [ ] Google+ API enabled
@@ -135,4 +135,4 @@
 
 ---
 
-**That's it! You're ready to use Google sign-in!** 🎉
+**That's it! You're ready to use Google sign-in!** 

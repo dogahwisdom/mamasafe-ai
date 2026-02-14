@@ -38,8 +38,8 @@ This will create the admin user with:
 **Step 2:** Then run `supabase/seed-admin.sql`
 
 After running both scripts:
-- ✅ Registration will work
-- ✅ Login with `admin` / `1234` will work
+- Registration will work
+- Login with `admin` / `1234` will work
 
 ---
 

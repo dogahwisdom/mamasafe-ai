@@ -1,4 +1,4 @@
-# 🔐 MamaSafe AI Login Credentials
+#  MamaSafe AI Login Credentials
 
 ## Standard Test Accounts
 
@@ -22,7 +22,7 @@
 
 ---
 
-## 🚀 Setup Instructions
+##  Setup Instructions
 
 ### Step 1: Run the Seed Script
 
@@ -55,12 +55,12 @@ You should see a table with 3 users listed.
 
 ---
 
-## ✅ What Works
+## What Works
 
-- ✅ Login with username/email/phone
-- ✅ Login with password `1234`
-- ✅ All three roles (clinic, patient, pharmacy)
-- ✅ Data stored in Supabase (not localStorage)
+- Login with username/email/phone
+- Login with password `1234`
+- All three roles (clinic, patient, pharmacy)
+- Data stored in Supabase (not localStorage)
 
 ---
 

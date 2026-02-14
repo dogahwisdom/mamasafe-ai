@@ -1,13 +1,13 @@
-# 🚀 Supabase Setup Instructions
+#  Supabase Setup Instructions
 
-## ✅ What's Been Done
+## What's Been Done
 
-1. ✅ Supabase client library installed (`@supabase/supabase-js`)
-2. ✅ Database schema created (`supabase/schema.sql`)
-3. ✅ Supabase client configured (`services/supabaseClient.ts`)
-4. ✅ TypeScript types defined (`types/supabase.ts`)
+1. Supabase client library installed (`@supabase/supabase-js`)
+2. Database schema created (`supabase/schema.sql`)
+3. Supabase client configured (`services/supabaseClient.ts`)
+4. TypeScript types defined (`types/supabase.ts`)
 
-## 📋 Next Steps (Do These Now)
+##  Next Steps (Do These Now)
 
 ### Step 1: Get Your Supabase Credentials
 
@@ -39,20 +39,20 @@ TRIAGE_ENGINE_API_KEY=your-existing-key-here
 5. Paste into Supabase SQL Editor
 6. Click **Run** (or press `Ctrl+Enter` / `Cmd+Enter`)
 
-You should see: ✅ "Success. No rows returned"
+You should see: "Success. No rows returned"
 
 ### Step 4: Verify Tables Created
 
 1. In Supabase dashboard, click **Table Editor** (left sidebar)
 2. You should see these tables:
-   - ✅ `users`
-   - ✅ `patients`
-   - ✅ `medications`
-   - ✅ `tasks`
-   - ✅ `referrals`
-   - ✅ `reminders`
-   - ✅ `refill_requests`
-   - ✅ `inventory`
+   - `users`
+   - `patients`
+   - `medications`
+   - `tasks`
+   - `referrals`
+   - `reminders`
+   - `refill_requests`
+   - `inventory`
 
 ### Step 5: Test the Connection
 
@@ -62,9 +62,9 @@ Restart your dev server:
 npm run dev
 ```
 
-The app will now connect to Supabase! 🎉
+The app will now connect to Supabase! 
 
-## 🔐 Security Notes
+##  Security Notes
 
 - **anon key**: Safe to use in frontend (it's public)
 - **service_role key**: NEVER put in frontend! Only use in backend/server code
@@ -84,7 +84,7 @@ The app will now connect to Supabase! 🎉
 - Verify your Project URL is correct (no trailing slash)
 - Check that your anon key is the full string (starts with `eyJ`)
 
-## 📚 What's Next?
+##  What's Next?
 
 After setup, we'll:
 1. Migrate backend services to use Supabase instead of localStorage
