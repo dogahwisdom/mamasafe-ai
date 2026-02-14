@@ -256,8 +256,8 @@ export const App: React.FC = () => {
                     <div className="p-5 bg-brand-50 dark:bg-brand-900/10 rounded-2xl border border-brand-100 dark:border-brand-900/20">
                        <h4 className="font-bold text-brand-700 dark:text-brand-300 mb-2">Helpdesk Hotline</h4>
                        <p className="text-sm text-brand-600/80 dark:text-brand-400/80 mb-4">Available Mon-Fri, 8am - 5pm</p>
-                       <a href="tel:+254700000000" className="flex items-center gap-2 font-bold text-lg text-slate-900 dark:text-white">
-                          <Phone size={20} /> 0700 123 456
+                       <a href="tel:+254792356818" className="flex items-center gap-2 font-bold text-lg text-slate-900 dark:text-white">
+                          <Phone size={20} /> +254 792 35 6818
                        </a>
                     </div>
                     <button className="w-full py-4 bg-slate-900 dark:bg-white text-white dark:text-black rounded-2xl font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity">
