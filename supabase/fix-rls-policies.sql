@@ -1,4 +1,4 @@
--- Fix Row Level Security Policies for MamaSafe AI
+-- Row Level Security Policies Configuration
 -- Run this in Supabase SQL Editor to allow registration and login
 
 -- Drop ALL existing policies first

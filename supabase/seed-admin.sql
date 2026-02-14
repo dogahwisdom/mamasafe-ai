@@ -1,4 +1,4 @@
--- Seed Default MamaSafe AI Admin User
+-- Seed Default Admin User
 -- Run this in Supabase SQL Editor after running schema.sql
 
 -- Insert default admin user (clinic role)

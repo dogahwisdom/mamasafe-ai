@@ -47,19 +47,19 @@ vercel
 
 ### 4. Test
 
-Send a test message to your WhatsApp number and verify it works!
+Send a test message to your WhatsApp number and verify the integration works.
 
 ---
 
 ## Features
 
-✅ Receives WhatsApp messages
-✅ Processes with AI triage
-✅ Sends responses
-✅ Creates referrals for high-risk cases
-✅ Creates tasks for clinic
-✅ Sends reminders automatically
-✅ Stores everything in Supabase
+- Receives WhatsApp messages
+- Processes with AI triage
+- Sends automated responses
+- Creates referrals for high-risk cases
+- Creates tasks for clinic staff
+- Sends reminders automatically
+- Stores all data in Supabase
 
 ---
 
@@ -68,17 +68,5 @@ Send a test message to your WhatsApp number and verify it works!
 ```
 backend/
   ├── whatsapp-webhook.ts    # Main webhook handler
-  └── README.md              # This file
+  └── README.md              # Documentation
 ```
-
----
-
-## Next Steps
-
-Once you get your Meta WhatsApp credentials, I'll help you:
-1. Deploy this backend
-2. Configure the webhook
-3. Test end-to-end
-4. Set up automated reminders
-
-**Just send me the credentials when ready!** 🚀

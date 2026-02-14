@@ -1,27 +1,27 @@
-# 🏥 MamaSafe AI - Maternal Healthcare Platform
+# MamaSafe AI
 
-AI-driven maternal healthcare platform with WhatsApp integration, AI triage, patient management, and clinic workflows.
+Maternal healthcare platform with AI-powered triage, WhatsApp integration, patient management, and clinic workflows.
 
-## 🚀 Features
+## Features
 
-- **AI-Powered Triage** - Symptom analysis with risk assessment
-- **WhatsApp Integration** - Automated reminders and symptom check-ins
-- **Patient Management** - Enrollment, tracking, medication adherence
-- **Clinic Dashboard** - KPIs, task management, referral tracking
-- **Pharmacy Integration** - Refill requests and inventory management
-- **Role-Based Access** - Patient, Clinic, and Pharmacy portals
-- **Supabase Backend** - Secure, scalable database
-- **Google Sign-In** - OAuth authentication
+- AI-Powered Triage - Symptom analysis with risk assessment
+- WhatsApp Integration - Automated reminders and symptom check-ins
+- Patient Management - Enrollment, tracking, medication adherence
+- Clinic Dashboard - KPIs, task management, referral tracking
+- Pharmacy Integration - Refill requests and inventory management
+- Role-Based Access - Patient, Clinic, and Pharmacy portals
+- Supabase Backend - Secure, scalable database
+- Google Sign-In - OAuth authentication
 
-## 🛠️ Tech Stack
+## Tech Stack
 
-- **Frontend:** React + TypeScript + Vite
-- **Styling:** Tailwind CSS
-- **Backend:** Supabase (PostgreSQL)
-- **AI:** Custom triage engine
-- **Deployment:** Netlify ready
+- Frontend: React + TypeScript + Vite
+- Styling: Tailwind CSS
+- Backend: Supabase (PostgreSQL)
+- AI: Custom triage engine
+- Deployment: Netlify
 
-## 📋 Quick Start
+## Quick Start
 
 ### Prerequisites
 
@@ -57,7 +57,7 @@ VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 TRIAGE_ENGINE_API_KEY=your_triage_engine_key
 ```
 
-## 🗄️ Database Setup
+## Database Setup
 
 1. Create a Supabase project
 2. Run `supabase/schema.sql` in SQL Editor
@@ -66,7 +66,7 @@ TRIAGE_ENGINE_API_KEY=your_triage_engine_key
 
 See `SUPABASE_SETUP.md` for detailed instructions.
 
-## 🚀 Deployment
+## Deployment
 
 ### Netlify
 
@@ -77,7 +77,7 @@ See `SUPABASE_SETUP.md` for detailed instructions.
 
 See `NETLIFY_DEPLOYMENT.md` for details.
 
-## 📚 Documentation
+## Documentation
 
 - `SUPABASE_SETUP.md` - Database setup guide
 - `NETLIFY_DEPLOYMENT.md` - Deployment instructions
@@ -85,20 +85,12 @@ See `NETLIFY_DEPLOYMENT.md` for details.
 - `GOOGLE_SIGNIN_SETUP.md` - Google OAuth setup
 - `CREDENTIALS.md` - Default login credentials
 
-## 🔐 Default Credentials
+## Default Credentials
 
-- **Admin:** `admin` / `1234`
-- **Patient:** `patient@demo.mamasafe.ai` / `1234`
-- **Pharmacy:** `pharmacy@demo.mamasafe.ai` / `1234`
+- Admin: `admin` / `1234`
+- Patient: `patient@demo.mamasafe.ai` / `1234`
+- Pharmacy: `pharmacy@demo.mamasafe.ai` / `1234`
 
-## 📝 License
+## License
 
 Private - All rights reserved
-
-## 🤝 Contributing
-
-This is a private project. For access, contact the repository owner.
-
----
-
-**Built with ❤️ for maternal healthcare in Kenya**

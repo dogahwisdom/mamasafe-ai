@@ -1,19 +1,18 @@
 /**
- * WhatsApp Webhook Backend for MamaSafe AI
+ * WhatsApp Webhook Backend
  * 
- * This file will be used when you get your Meta WhatsApp Cloud API credentials.
+ * Handles incoming WhatsApp messages from Meta WhatsApp Cloud API.
+ * Processes messages through AI triage, sends responses, and manages
+ * referrals and tasks for high-risk cases.
  * 
- * To use:
- * 1. Deploy this as a serverless function (Vercel/Railway/Render)
- * 2. Set environment variables (see .env.example)
- * 3. Configure webhook URL in Meta Business Suite
+ * Deployment: Deploy as serverless function (Vercel/Railway/Render)
  * 
- * Environment Variables Needed:
- * - WHATSAPP_ACCESS_TOKEN (from Meta)
- * - WHATSAPP_PHONE_NUMBER_ID (from Meta)
- * - WHATSAPP_VERIFY_TOKEN (your custom token)
+ * Required Environment Variables:
+ * - WHATSAPP_ACCESS_TOKEN
+ * - WHATSAPP_PHONE_NUMBER_ID
+ * - WHATSAPP_VERIFY_TOKEN
  * - SUPABASE_URL
- * - SUPABASE_SERVICE_ROLE_KEY (for backend operations)
+ * - SUPABASE_SERVICE_ROLE_KEY
  * - TRIAGE_ENGINE_API_KEY
  */
 
@@ -128,7 +127,7 @@ async function processIncomingMessage(from: string, messageBody: string): Promis
     const patient = await findPatientByPhone(phone);
 
     if (!patient) {
-      await sendWhatsAppMessage(phone, 'Habari! Welcome to MamaSafe AI. We are setting up your profile. Please wait...');
+      await sendWhatsAppMessage(phone, 'Habari. Welcome to MamaSafe AI. We are setting up your profile. Please wait...');
       return;
     }
 
@@ -174,7 +173,7 @@ async function processIncomingMessage(from: string, messageBody: string): Promis
     console.error('Error processing message:', error);
     // Send error message to user
     try {
-      await sendWhatsAppMessage(from, 'Pole sana, kuna tatizo la kiufundi. Tafadhali jaribu tena baadaye.');
+      await sendWhatsAppMessage(from, 'Pole sana. Kuna tatizo la kiufundi. Tafadhali jaribu tena baadaye.');
     } catch (e) {
       console.error('Failed to send error message:', e);
     }

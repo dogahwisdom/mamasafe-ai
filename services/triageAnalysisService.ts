@@ -52,7 +52,7 @@ class TriageAnalysisService {
                 "Demo Mode: Secure triage engine key missing. Simulating analysis. Please add your triage engine key to environment variables.",
               recommendedAction: "Check system configuration.",
               draftResponse:
-                "Hello mama! *Please note:* This is a simulated response because the automated assessment system is offline. Ideally, I would advise you based on your symptoms. Please visit the clinic if you are unwell.",
+                "System notification: The automated assessment system is currently unavailable. Please contact your healthcare provider or visit the clinic if you are experiencing symptoms.",
             }),
           1000
         )
@@ -61,7 +61,7 @@ class TriageAnalysisService {
 
     try {
       const prompt = `
-      Act as MamaSafe's Chief Medical Officer for rural and peri-urban Kenya.
+      Act as a Chief Medical Officer for maternal healthcare in Kenya.
 
       PATIENT PROFILE:
       - Gestational Age: ${gestationalAge} weeks
@@ -76,7 +76,7 @@ class TriageAnalysisService {
          - **MEDIUM:** Non-urgent but requires medical attention (e.g., UTI symptoms, mild anemia).
          - **LOW:** Normal physiological changes or minor ailments manageable at home.
       3. **Draft Response Tone & Format:** 
-         - Empathetic, sisterly ("Mama"), clear, and reassuring. 
+         - Professional, clear, and reassuring tone. 
          - Avoid medical jargon. 
          - Use Swahili/Sheng terms of endearment where appropriate (e.g., "Pole sana", "Sawa").
          - **CRITICAL:** Use WhatsApp formatting. Use single asterisks (*) for bold text (e.g., *Go to the hospital*). Do NOT use double asterisks (**).
@@ -109,7 +109,7 @@ class TriageAnalysisService {
           "The automated assessment service encountered an interruption. Defaulting to High Risk for patient safety.",
         recommendedAction: "Conduct manual triage immediately.",
         draftResponse:
-          "Pole sana mama. We are having technical trouble. Please come to the clinic immediately for a check-up. *Safety first!*",
+          "System notification: We are experiencing technical difficulties. Please contact your healthcare provider or visit the clinic immediately for a check-up.",
       };
     }
   }

@@ -161,7 +161,7 @@ export class ReminderService {
               phone: p.phone,
               channel: "whatsapp",
               type: "appointment",
-              message: `Habari ${p.name.split(" ")[0]} 👋. Hii ni kumbukumbu yako ya miadi ya ANC kesho. Tafadhali fika kwa kliniki kama ilivyopangwa.`,
+              message: `Habari ${p.name.split(" ")[0]}. Hii ni kumbukumbu yako ya miadi ya ANC kesho. Tafadhali fika kwa kliniki kama ilivyopangwa.`,
               scheduledFor: new Date(apptTime - 2 * 60 * 60 * 1000).toISOString(),
               sent: false,
             });
@@ -180,7 +180,7 @@ export class ReminderService {
             phone: p.phone,
             channel: "whatsapp",
             type: "medication",
-            message: `Habari ${p.name.split(" ")[0]} 💊. Tafadhali kumbuka kuchukua ${m.name} (${m.dosage}) kama ilivyoelekezwa.`,
+            message: `Habari ${p.name.split(" ")[0]}. Tafadhali kumbuka kuchukua ${m.name} (${m.dosage}) kama ilivyoelekezwa.`,
             scheduledFor: new Date().toISOString(),
             sent: false,
           });
