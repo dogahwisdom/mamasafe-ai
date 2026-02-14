@@ -3,9 +3,11 @@
  * 
  * Runs reminder sender every 15 minutes
  * Use this for Railway/Render deployments
+ * 
+ * This file is executed via tsx, which handles TypeScript compilation
  */
 
-const { processPendingReminders } = require('./reminder-sender');
+import { processPendingReminders } from './reminder-sender';
 
 const INTERVAL_MINUTES = 15;
 const INTERVAL_MS = INTERVAL_MINUTES * 60 * 1000;
