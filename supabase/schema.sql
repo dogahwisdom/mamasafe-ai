@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS patients (
   risk_status TEXT NOT NULL CHECK (risk_status IN ('Low', 'Medium', 'High', 'Critical')),
   next_appointment DATE,
   alerts JSONB DEFAULT '[]'::jsonb,
+  preferred_channel TEXT DEFAULT 'both' CHECK (preferred_channel IN ('whatsapp', 'sms', 'both')),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );

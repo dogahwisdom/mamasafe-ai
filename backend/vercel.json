@@ -1,0 +1,13 @@
+{
+  "crons": [
+    {
+      "path": "/api/reminder-cron",
+      "schedule": "*/15 * * * *"
+    }
+  ],
+  "functions": {
+    "api/reminder-cron.ts": {
+      "maxDuration": 60
+    }
+  }
+}

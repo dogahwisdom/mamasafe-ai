@@ -169,21 +169,54 @@ export class ReminderService {
         }
       }
 
-      // Medication reminders for today
+      // Medication reminders for today - scheduled at medication time
       (p.medications || []).forEach((m: Medication) => {
         const id = `${baseIdPrefix}_med_${m.id}`;
         if (!existing.find((r) => r.id === id)) {
-          newReminders.push({
-            id,
-            patientId: p.id,
-            patientName: p.name,
-            phone: p.phone,
-            channel: "whatsapp",
-            type: "medication",
-            message: `Habari ${p.name.split(" ")[0]}. Tafadhali kumbuka kuchukua ${m.name} (${m.dosage}) kama ilivyoelekezwa.`,
-            scheduledFor: new Date().toISOString(),
-            sent: false,
-          });
+          // Parse medication time (e.g., "08:00 AM" or use type for default times)
+          let scheduledTime = new Date();
+          
+          if (m.time) {
+            // Parse time string (e.g., "08:00 AM", "2:00 PM")
+            const timeMatch = m.time.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+            if (timeMatch) {
+              let hours = parseInt(timeMatch[1]);
+              const minutes = parseInt(timeMatch[2]);
+              const period = timeMatch[3].toUpperCase();
+              
+              if (period === 'PM' && hours !== 12) hours += 12;
+              if (period === 'AM' && hours === 12) hours = 0;
+              
+              scheduledTime.setHours(hours, minutes, 0, 0);
+            } else {
+              // Fallback to type-based times
+              if (m.type === 'morning') scheduledTime.setHours(8, 0, 0, 0);
+              else if (m.type === 'afternoon') scheduledTime.setHours(14, 0, 0, 0);
+              else if (m.type === 'evening') scheduledTime.setHours(19, 0, 0, 0);
+              else scheduledTime.setHours(9, 0, 0, 0); // Default 9 AM
+            }
+          } else {
+            // Use type for default times
+            if (m.type === 'morning') scheduledTime.setHours(8, 0, 0, 0);
+            else if (m.type === 'afternoon') scheduledTime.setHours(14, 0, 0, 0);
+            else if (m.type === 'evening') scheduledTime.setHours(19, 0, 0, 0);
+            else scheduledTime.setHours(9, 0, 0, 0); // Default 9 AM
+          }
+
+          // Only schedule if time hasn't passed today
+          if (scheduledTime.getTime() > now.getTime()) {
+            newReminders.push({
+              id,
+              patientId: p.id,
+              patientName: p.name,
+              phone: p.phone,
+              channel: "whatsapp",
+              type: "medication",
+              message: `Habari ${p.name.split(" ")[0]}. Tafadhali kumbuka kuchukua ${m.name} (${m.dosage}) kama ilivyoelekezwa.`,
+              scheduledFor: scheduledTime.toISOString(),
+              sent: false,
+            });
+          }
         }
       });
     });
