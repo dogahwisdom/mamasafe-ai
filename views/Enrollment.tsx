@@ -345,7 +345,16 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({ onAddPatient }) 
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                <InputGroup label="Gestational Age (Weeks)" icon={Activity}>
-                  <input type="number" readOnly className={`${inputClasses} bg-slate-100 dark:bg-slate-800 cursor-not-allowed text-slate-500`} value={formData.gestationalWeeks} />
+                  <input 
+                     type="number" 
+                     min="0" 
+                     max="45" 
+                     required
+                     className={inputClasses} 
+                     placeholder="Auto-calculated from LMP"
+                     value={formData.gestationalWeeks} 
+                     onChange={e => setFormData({...formData, gestationalWeeks: e.target.value})}
+                  />
                </InputGroup>
                <InputGroup label="ANC Profile Status" icon={FileText}>
                   <select className={inputClasses} value={formData.ancProfile} onChange={e => setFormData({...formData, ancProfile: e.target.value})}>
