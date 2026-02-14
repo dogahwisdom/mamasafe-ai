@@ -4,7 +4,6 @@ import {
   normalizePhone,
   storage,
   Security,
-  DEFAULT_PATIENTS,
 } from "./shared";
 import { supabase, isSupabaseConfigured } from "../supabaseClient";
 
