@@ -6,6 +6,7 @@ import {
   Security,
 } from "./shared";
 import { supabase, isSupabaseConfigured } from "../supabaseClient";
+import { MessagingService } from "./messagingService";
 
 export class PatientService {
   public async getAll(): Promise<Patient[]> {
@@ -157,6 +158,7 @@ export class PatientService {
         })),
       };
 
+      let isNewUser = false;
       if (existingUser) {
         await supabase
           .from('users')
