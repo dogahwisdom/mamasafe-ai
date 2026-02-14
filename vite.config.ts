@@ -14,6 +14,10 @@ export default defineConfig(({ mode }) => {
         'process.env.TRIAGE_ENGINE_API_KEY': JSON.stringify(env.TRIAGE_ENGINE_API_KEY),
         'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(env.VITE_SUPABASE_URL),
         'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(env.VITE_SUPABASE_ANON_KEY),
+        'import.meta.env.VITE_WHATSAPP_ACCESS_TOKEN': JSON.stringify(env.VITE_WHATSAPP_ACCESS_TOKEN || ''),
+        'import.meta.env.VITE_WHATSAPP_PHONE_NUMBER_ID': JSON.stringify(env.VITE_WHATSAPP_PHONE_NUMBER_ID || ''),
+        'import.meta.env.VITE_AFRICAS_TALKING_API_KEY': JSON.stringify(env.VITE_AFRICAS_TALKING_API_KEY || ''),
+        'import.meta.env.VITE_AFRICAS_TALKING_USERNAME': JSON.stringify(env.VITE_AFRICAS_TALKING_USERNAME || ''),
       },
       resolve: {
         alias: {

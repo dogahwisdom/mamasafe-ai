@@ -65,8 +65,11 @@ Asante!`;
    * Send WhatsApp message
    */
   public async sendWhatsApp(phone: string, message: string): Promise<boolean> {
-    const accessToken = import.meta.env.VITE_WHATSAPP_ACCESS_TOKEN || '';
-    const phoneNumberId = import.meta.env.VITE_WHATSAPP_PHONE_NUMBER_ID || '';
+    // Try to get from environment variables (for frontend)
+    const accessToken = (import.meta.env.VITE_WHATSAPP_ACCESS_TOKEN as string) || 
+                       (typeof process !== 'undefined' && process.env?.WHATSAPP_ACCESS_TOKEN) || '';
+    const phoneNumberId = (import.meta.env.VITE_WHATSAPP_PHONE_NUMBER_ID as string) || 
+                         (typeof process !== 'undefined' && process.env?.WHATSAPP_PHONE_NUMBER_ID) || '';
 
     if (!accessToken || !phoneNumberId) {
       console.warn('WhatsApp credentials not configured');
@@ -109,8 +112,11 @@ Asante!`;
    * Send SMS via Africa's Talking
    */
   public async sendSMS(phone: string, message: string): Promise<boolean> {
-    const apiKey = import.meta.env.VITE_AFRICAS_TALKING_API_KEY || '';
-    const username = import.meta.env.VITE_AFRICAS_TALKING_USERNAME || '';
+    // Try to get from environment variables (for frontend)
+    const apiKey = (import.meta.env.VITE_AFRICAS_TALKING_API_KEY as string) || 
+                  (typeof process !== 'undefined' && process.env?.AFRICAS_TALKING_API_KEY) || '';
+    const username = (import.meta.env.VITE_AFRICAS_TALKING_USERNAME as string) || 
+                    (typeof process !== 'undefined' && process.env?.AFRICAS_TALKING_USERNAME) || '';
 
     if (!apiKey || !username) {
       console.warn('Africa\'s Talking credentials not configured');

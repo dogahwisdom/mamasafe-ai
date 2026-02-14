@@ -165,12 +165,30 @@ export class PatientService {
           .update(userData)
           .eq('id', existingUser.id);
       } else {
+        isNewUser = true;
         await supabase
           .from('users')
           .insert({
             ...userData,
             id: finalPatientId,
           });
+      }
+
+      // Send credentials via SMS and WhatsApp for new enrollments
+      if (isNewUser) {
+        try {
+          const messagingService = new MessagingService();
+          const portalUrl = typeof window !== 'undefined' ? window.location.origin : 'https://mamasafe.ai';
+          await messagingService.sendEnrollmentCredentials(
+            cleanPhone,
+            patient.name,
+            defaultPassword,
+            portalUrl
+          );
+        } catch (error) {
+          console.error('Error sending enrollment credentials:', error);
+          // Don't throw - enrollment should succeed even if messaging fails
+        }
       }
 
       // Return the patient with medications
@@ -269,6 +287,24 @@ export class PatientService {
     }
 
     storage.set(KEYS.USERS, users);
+
+    // Send credentials via SMS and WhatsApp for new enrollments
+    if (isNewUser) {
+      try {
+        const messagingService = new MessagingService();
+        const portalUrl = typeof window !== 'undefined' ? window.location.origin : 'https://mamasafe.ai';
+        await messagingService.sendEnrollmentCredentials(
+          cleanPhone,
+          patient.name,
+          defaultPassword,
+          portalUrl
+        );
+      } catch (error) {
+        console.error('Error sending enrollment credentials:', error);
+        // Don't throw - enrollment should succeed even if messaging fails
+      }
+    }
+
     return finalPatient;
   }
 
