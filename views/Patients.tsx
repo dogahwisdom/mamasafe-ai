@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { Search, Phone, Filter, ChevronRight, User, X, Calendar, MapPin, Activity, Clock } from 'lucide-react';
+import { Search, Phone, Filter, ChevronRight, User, X, Calendar, MapPin, Activity, Clock, Pill } from 'lucide-react';
 import { Patient, RiskLevel } from '../types';
+import { MedicationPrescription } from '../components/MedicationPrescription';
+import { backend } from '../services/backend';
 
 interface PatientsViewProps {
   onNavigate: (view: string) => void;
@@ -130,19 +132,22 @@ export const PatientsView: React.FC<PatientsViewProps> = ({ onNavigate, patients
 
       {/* Patient Details Modal */}
       {selectedPatient && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-md animate-fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-md animate-fade-in overflow-y-auto">
           <div 
-            className="bg-white dark:bg-[#1c1c1e] w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl relative animate-scale-in border border-slate-100 dark:border-slate-800"
+            className="bg-white dark:bg-[#1c1c1e] w-full max-w-2xl rounded-[2.5rem] p-8 shadow-2xl relative animate-scale-in border border-slate-100 dark:border-slate-800 my-8 max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <button 
-              onClick={() => setSelectedPatient(null)} 
-              className="absolute top-6 right-6 p-2 bg-slate-100 dark:bg-[#2c2c2e] rounded-full text-slate-500 hover:bg-slate-200 dark:hover:bg-[#3a3a3c] transition-colors"
+              onClick={() => {
+                setSelectedPatient(null);
+                setActiveTab('details');
+              }} 
+              className="absolute top-6 right-6 p-2 bg-slate-100 dark:bg-[#2c2c2e] rounded-full text-slate-500 hover:bg-slate-200 dark:hover:bg-[#3a3a3c] transition-colors z-10"
             >
               <X size={20} />
             </button>
 
-            <div className="flex flex-col items-center text-center mb-8">
+            <div className="flex flex-col items-center text-center mb-6">
                <div className={`
                   w-24 h-24 rounded-full flex items-center justify-center text-3xl font-bold text-white shadow-xl mb-4
                   ${selectedPatient.riskStatus === RiskLevel.HIGH ? 'bg-red-500 shadow-red-500/30' : 
@@ -157,72 +162,127 @@ export const PatientsView: React.FC<PatientsViewProps> = ({ onNavigate, patients
                </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 mb-8">
-               <div className="p-4 bg-slate-50 dark:bg-[#2c2c2e] rounded-2xl">
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Pregnancy</p>
-                  <div className="flex items-center gap-2">
-                     <Activity size={18} className="text-brand-500" />
-                     <span className="font-bold text-slate-900 dark:text-white">{selectedPatient.gestationalWeeks} Weeks</span>
-                  </div>
-               </div>
-               <div className="p-4 bg-slate-50 dark:bg-[#2c2c2e] rounded-2xl">
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Age</p>
-                  <div className="flex items-center gap-2">
-                     <User size={18} className="text-blue-500" />
-                     <span className="font-bold text-slate-900 dark:text-white">{selectedPatient.age} Yrs</span>
-                  </div>
-               </div>
-               <div className="p-4 bg-slate-50 dark:bg-[#2c2c2e] rounded-2xl">
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Next Visit</p>
-                  <div className="flex items-center gap-2">
-                     <Calendar size={18} className="text-purple-500" />
-                     <span className="font-bold text-slate-900 dark:text-white">
-                        {new Date(selectedPatient.nextAppointment).toLocaleDateString(undefined, {day: 'numeric', month: 'short'})}
-                     </span>
-                  </div>
-               </div>
-               <div className="p-4 bg-slate-50 dark:bg-[#2c2c2e] rounded-2xl">
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Status</p>
-                  <div className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold ${
-                     selectedPatient.riskStatus === RiskLevel.HIGH ? 'bg-red-100 text-red-600' : 
-                     selectedPatient.riskStatus === RiskLevel.MEDIUM ? 'bg-orange-100 text-orange-600' : 'bg-green-100 text-green-600'
-                  }`}>
-                     {selectedPatient.riskStatus}
-                  </div>
-               </div>
+            {/* Tab Navigation */}
+            <div className="flex gap-2 mb-6 bg-slate-100 dark:bg-[#2c2c2e] p-1 rounded-2xl">
+              <button
+                onClick={() => setActiveTab('details')}
+                className={`flex-1 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all ${
+                  activeTab === 'details'
+                    ? 'bg-white dark:bg-[#1c1c1e] text-slate-900 dark:text-white shadow-sm'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
+                }`}
+              >
+                Details
+              </button>
+              <button
+                onClick={() => setActiveTab('medications')}
+                className={`flex-1 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all flex items-center justify-center gap-2 ${
+                  activeTab === 'medications'
+                    ? 'bg-white dark:bg-[#1c1c1e] text-slate-900 dark:text-white shadow-sm'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
+                }`}
+              >
+                <Pill size={16} />
+                Medications
+                {selectedPatient.medications && selectedPatient.medications.length > 0 && (
+                  <span className="px-1.5 py-0.5 bg-brand-500 text-white text-xs rounded-full font-bold">
+                    {selectedPatient.medications.length}
+                  </span>
+                )}
+              </button>
             </div>
 
-            <div className="space-y-3">
-               <div className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                     <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-full text-slate-600 dark:text-slate-300">
+            {/* Tab Content */}
+            {activeTab === 'details' ? (
+              <>
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                  <div className="p-4 bg-slate-50 dark:bg-[#2c2c2e] rounded-2xl">
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Pregnancy</p>
+                    <div className="flex items-center gap-2">
+                      <Activity size={18} className="text-brand-500" />
+                      <span className="font-bold text-slate-900 dark:text-white">{selectedPatient.gestationalWeeks} Weeks</span>
+                    </div>
+                  </div>
+                  <div className="p-4 bg-slate-50 dark:bg-[#2c2c2e] rounded-2xl">
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Age</p>
+                    <div className="flex items-center gap-2">
+                      <User size={18} className="text-blue-500" />
+                      <span className="font-bold text-slate-900 dark:text-white">{selectedPatient.age} Yrs</span>
+                    </div>
+                  </div>
+                  <div className="p-4 bg-slate-50 dark:bg-[#2c2c2e] rounded-2xl">
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Next Visit</p>
+                    <div className="flex items-center gap-2">
+                      <Calendar size={18} className="text-purple-500" />
+                      <span className="font-bold text-slate-900 dark:text-white">
+                        {new Date(selectedPatient.nextAppointment).toLocaleDateString(undefined, {day: 'numeric', month: 'short'})}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="p-4 bg-slate-50 dark:bg-[#2c2c2e] rounded-2xl">
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Status</p>
+                    <div className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold ${
+                      selectedPatient.riskStatus === RiskLevel.HIGH ? 'bg-red-100 text-red-600' : 
+                      selectedPatient.riskStatus === RiskLevel.MEDIUM ? 'bg-orange-100 text-orange-600' : 'bg-green-100 text-green-600'
+                    }`}>
+                      {selectedPatient.riskStatus}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-full text-slate-600 dark:text-slate-300">
                         <Phone size={20} />
-                     </div>
-                     <div>
+                      </div>
+                      <div>
                         <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Phone Number</p>
                         <p className="font-semibold text-slate-900 dark:text-white">{selectedPatient.phone}</p>
-                     </div>
+                      </div>
+                    </div>
+                    <a 
+                      href={`tel:${selectedPatient.phone.replace(/\s+/g, '')}`}
+                      className="px-4 py-2 bg-slate-900 dark:bg-white text-white dark:text-black rounded-full font-bold text-sm shadow-md hover:scale-105 active:scale-95 transition-all"
+                    >
+                      Call
+                    </a>
                   </div>
-                  <a 
-                     href={`tel:${selectedPatient.phone.replace(/\s+/g, '')}`}
-                     className="px-4 py-2 bg-slate-900 dark:bg-white text-white dark:text-black rounded-full font-bold text-sm shadow-md hover:scale-105 active:scale-95 transition-all"
-                  >
-                     Call
-                  </a>
-               </div>
 
-               <div className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                     <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-full text-slate-600 dark:text-slate-300">
+                  <div className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-full text-slate-600 dark:text-slate-300">
                         <Clock size={20} />
-                     </div>
-                     <div>
+                      </div>
+                      <div>
                         <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Last Check-in</p>
                         <p className="font-semibold text-slate-900 dark:text-white">{selectedPatient.lastCheckIn}</p>
-                     </div>
+                      </div>
+                    </div>
                   </div>
-               </div>
-            </div>
+                </div>
+              </>
+            ) : (
+              <div className="min-h-[400px]">
+                <MedicationPrescription
+                  patient={selectedPatient}
+                  onUpdate={async () => {
+                    setRefreshing(true);
+                    try {
+                      const updatedPatients = await backend.patients.getAll();
+                      const updated = updatedPatients.find(p => p.id === selectedPatient.id);
+                      if (updated) {
+                        setSelectedPatient(updated);
+                      }
+                    } catch (error) {
+                      console.error('Error refreshing patient:', error);
+                    } finally {
+                      setRefreshing(false);
+                    }
+                  }}
+                />
+              </div>
+            )}
           </div>
         </div>
       )}
