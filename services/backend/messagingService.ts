@@ -22,8 +22,14 @@ export class MessagingService {
     phone: string,
     patientName: string,
     pin: string,
-    portalUrl: string = window.location.origin
+    portalUrl?: string
   ): Promise<{ sms: boolean; whatsapp: boolean }> {
+    // Get portal URL from window if not provided
+    if (!portalUrl && typeof window !== 'undefined') {
+      portalUrl = window.location.origin;
+    } else if (!portalUrl) {
+      portalUrl = 'https://mamasafe.ai'; // Default fallback
+    }
     const firstName = patientName.split(' ')[0];
     
     const message = `Habari ${firstName}! Karibu kwenye MamaSafe.
