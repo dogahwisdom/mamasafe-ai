@@ -105,7 +105,7 @@ export class SupportService {
         .from('support_tickets')
         .select('*')
         .eq('id', ticketId)
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error('Error fetching ticket:', error);

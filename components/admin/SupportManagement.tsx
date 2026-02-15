@@ -15,6 +15,9 @@ export const SupportManagement: React.FC<SupportManagementProps> = ({ onNavigate
   const [filterStatus, setFilterStatus] = useState<'all' | 'open' | 'in_progress' | 'resolved' | 'closed'>('all');
   const [filterPriority, setFilterPriority] = useState<'all' | 'low' | 'medium' | 'high' | 'urgent'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showNewTicketModal, setShowNewTicketModal] = useState(false);
+  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
+  const [showTicketDetails, setShowTicketDetails] = useState(false);
 
   const service = new SupportService();
 
@@ -178,7 +181,10 @@ export const SupportManagement: React.FC<SupportManagementProps> = ({ onNavigate
               <option value="low">Low</option>
             </select>
           </div>
-          <button className="flex items-center gap-2 px-4 py-2.5 bg-brand-600 text-white rounded-xl font-semibold hover:bg-brand-700 transition-colors">
+          <button
+            onClick={() => setShowNewTicketModal(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-brand-600 text-white rounded-xl font-semibold hover:bg-brand-700 transition-colors"
+          >
             <Plus size={18} />
             New Ticket
           </button>
@@ -198,8 +204,8 @@ export const SupportManagement: React.FC<SupportManagementProps> = ({ onNavigate
                 key={ticket.id}
                 className="p-5 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-brand-300 dark:hover:border-brand-700 hover:shadow-lg transition-all bg-slate-50 dark:bg-[#2c2c2e] cursor-pointer"
                 onClick={() => {
-                  // Open ticket details
-                  console.log('View ticket:', ticket.id);
+                  setSelectedTicketId(ticket.id);
+                  setShowTicketDetails(true);
                 }}
               >
                 <div className="flex items-start justify-between">
@@ -263,6 +269,28 @@ export const SupportManagement: React.FC<SupportManagementProps> = ({ onNavigate
           )}
         </div>
       </div>
+
+      {/* New Ticket Modal */}
+      <NewTicketModal
+        isOpen={showNewTicketModal}
+        onClose={() => setShowNewTicketModal(false)}
+        onSuccess={() => {
+          loadData();
+        }}
+      />
+
+      {/* Ticket Details Modal */}
+      <TicketDetailsModal
+        isOpen={showTicketDetails}
+        ticketId={selectedTicketId}
+        onClose={() => {
+          setShowTicketDetails(false);
+          setSelectedTicketId(null);
+        }}
+        onUpdate={() => {
+          loadData();
+        }}
+      />
     </div>
   );
 };

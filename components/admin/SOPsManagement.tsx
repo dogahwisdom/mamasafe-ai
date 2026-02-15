@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { FileText, Eye, Download, CheckCircle, Plus, Edit, Trash2, BarChart3, Users, RefreshCw, Search, AlertCircle } from 'lucide-react';
 import { SOPService, SOP, SOPMetrics } from '../../services/backend/sopService';
 import { MetricCard } from './MetricCard';
+import { NewSOPModal } from './NewSOPModal';
 
 interface SOPsManagementProps {
   onNavigate?: (view: string) => void;
@@ -14,6 +15,8 @@ export const SOPsManagement: React.FC<SOPsManagementProps> = ({ onNavigate }) =>
   const [error, setError] = useState<string | null>(null);
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showNewSOPModal, setShowNewSOPModal] = useState(false);
+  const [editingSOP, setEditingSOP] = useState<SOP | null>(null);
 
   const service = new SOPService();
 
@@ -152,7 +155,13 @@ export const SOPsManagement: React.FC<SOPsManagementProps> = ({ onNavigate }) =>
             <option value="training">Training</option>
             <option value="other">Other</option>
           </select>
-          <button className="flex items-center gap-2 px-4 py-2.5 bg-brand-600 text-white rounded-xl font-semibold hover:bg-brand-700 transition-colors">
+          <button
+            onClick={() => {
+              setEditingSOP(null);
+              setShowNewSOPModal(true);
+            }}
+            className="flex items-center gap-2 px-4 py-2.5 bg-brand-600 text-white rounded-xl font-semibold hover:bg-brand-700 transition-colors"
+          >
             <Plus size={18} />
             New SOP
           </button>
@@ -214,10 +223,31 @@ export const SOPsManagement: React.FC<SOPsManagementProps> = ({ onNavigate }) =>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <button className="p-2 hover:bg-slate-200 dark:hover:bg-[#3a3a3c] rounded-lg transition-colors" title="Edit">
+                      <button
+                        onClick={() => {
+                          setEditingSOP(sop);
+                          setShowNewSOPModal(true);
+                        }}
+                        className="p-2 hover:bg-slate-200 dark:hover:bg-[#3a3a3c] rounded-lg transition-colors"
+                        title="Edit"
+                      >
                         <Edit size={18} className="text-slate-400" />
                       </button>
-                      <button className="p-2 hover:bg-slate-200 dark:hover:bg-[#3a3a3c] rounded-lg transition-colors" title="Delete">
+                      <button
+                        onClick={async () => {
+                          if (window.confirm(`Are you sure you want to delete "${sop.title}"?`)) {
+                            try {
+                              await service.updateSOP(sop.id, { isActive: false });
+                              loadData();
+                            } catch (error) {
+                              console.error('Error deleting SOP:', error);
+                              alert('Failed to delete SOP. Please try again.');
+                            }
+                          }
+                        }}
+                        className="p-2 hover:bg-slate-200 dark:hover:bg-[#3a3a3c] rounded-lg transition-colors"
+                        title="Delete"
+                      >
                         <Trash2 size={18} className="text-red-400" />
                       </button>
                     </div>
@@ -288,6 +318,19 @@ export const SOPsManagement: React.FC<SOPsManagementProps> = ({ onNavigate }) =>
           </div>
         </div>
       )}
+
+      {/* New/Edit SOP Modal */}
+      <NewSOPModal
+        isOpen={showNewSOPModal}
+        onClose={() => {
+          setShowNewSOPModal(false);
+          setEditingSOP(null);
+        }}
+        onSuccess={() => {
+          loadData();
+        }}
+        editingSOP={editingSOP}
+      />
     </div>
   );
 };
