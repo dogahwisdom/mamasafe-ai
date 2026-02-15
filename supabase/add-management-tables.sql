@@ -136,41 +136,54 @@ ALTER TABLE sops ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sop_access_logs ENABLE ROW LEVEL SECURITY;
 
 -- Allow public read/write for development (adjust for production)
+DROP POLICY IF EXISTS "Allow public read subscriptions" ON subscriptions;
 CREATE POLICY "Allow public read subscriptions" ON subscriptions
   FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "Allow public write subscriptions" ON subscriptions;
 CREATE POLICY "Allow public write subscriptions" ON subscriptions
   FOR INSERT WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Allow public update subscriptions" ON subscriptions;
 CREATE POLICY "Allow public update subscriptions" ON subscriptions
   FOR UPDATE USING (true);
 
+DROP POLICY IF EXISTS "Allow public read support_tickets" ON support_tickets;
 CREATE POLICY "Allow public read support_tickets" ON support_tickets
   FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "Allow public write support_tickets" ON support_tickets;
 CREATE POLICY "Allow public write support_tickets" ON support_tickets
   FOR INSERT WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Allow public update support_tickets" ON support_tickets;
 CREATE POLICY "Allow public update support_tickets" ON support_tickets
   FOR UPDATE USING (true);
 
+DROP POLICY IF EXISTS "Allow public read support_ticket_messages" ON support_ticket_messages;
 CREATE POLICY "Allow public read support_ticket_messages" ON support_ticket_messages
   FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "Allow public write support_ticket_messages" ON support_ticket_messages;
 CREATE POLICY "Allow public write support_ticket_messages" ON support_ticket_messages
   FOR INSERT WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Allow public read sops" ON sops;
 CREATE POLICY "Allow public read sops" ON sops
   FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "Allow public write sops" ON sops;
 CREATE POLICY "Allow public write sops" ON sops
   FOR INSERT WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Allow public update sops" ON sops;
 CREATE POLICY "Allow public update sops" ON sops
   FOR UPDATE USING (true);
 
+DROP POLICY IF EXISTS "Allow public read sop_access_logs" ON sop_access_logs;
 CREATE POLICY "Allow public read sop_access_logs" ON sop_access_logs
   FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "Allow public write sop_access_logs" ON sop_access_logs;
 CREATE POLICY "Allow public write sop_access_logs" ON sop_access_logs
   FOR INSERT WITH CHECK (true);
