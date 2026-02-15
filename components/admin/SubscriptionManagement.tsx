@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { CreditCard, TrendingUp, Users, Calendar, CheckCircle, XCircle, AlertCircle, RefreshCw, Plus, Edit, MoreVertical } from 'lucide-react';
 import { SubscriptionService, Subscription, SubscriptionMetrics, SubscriptionPlan } from '../../services/backend/subscriptionService';
 import { MetricCard } from './MetricCard';
+import { NewSubscriptionModal } from './NewSubscriptionModal';
 
 interface SubscriptionManagementProps {
   onNavigate?: (view: string) => void;
@@ -13,6 +14,8 @@ export const SubscriptionManagement: React.FC<SubscriptionManagementProps> = ({ 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlan | null>(null);
+  const [showNewSubscriptionModal, setShowNewSubscriptionModal] = useState(false);
+  const [editingSubscription, setEditingSubscription] = useState<Subscription | null>(null);
 
   const service = new SubscriptionService();
 
@@ -148,7 +151,13 @@ export const SubscriptionManagement: React.FC<SubscriptionManagementProps> = ({ 
               {subscriptions.length} subscriptions
             </p>
           </div>
-          <button className="flex items-center gap-2 px-4 py-2.5 bg-brand-600 text-white rounded-xl font-semibold hover:bg-brand-700 transition-colors">
+          <button
+            onClick={() => {
+              setEditingSubscription(null);
+              setShowNewSubscriptionModal(true);
+            }}
+            className="flex items-center gap-2 px-4 py-2.5 bg-brand-600 text-white rounded-xl font-semibold hover:bg-brand-700 transition-colors"
+          >
             <Plus size={18} />
             Add Subscription
           </button>
@@ -205,8 +214,16 @@ export const SubscriptionManagement: React.FC<SubscriptionManagementProps> = ({ 
                       </div>
                     </div>
                   </div>
-                  <button className="p-2 hover:bg-slate-200 dark:hover:bg-[#3a3a3c] rounded-lg transition-colors">
-                    <MoreVertical size={18} className="text-slate-400" />
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditingSubscription(sub);
+                      setShowNewSubscriptionModal(true);
+                    }}
+                    className="p-2 hover:bg-slate-200 dark:hover:bg-[#3a3a3c] rounded-lg transition-colors"
+                    title="Edit subscription"
+                  >
+                    <Edit size={18} className="text-slate-400" />
                   </button>
                 </div>
               </div>
@@ -224,6 +241,19 @@ export const SubscriptionManagement: React.FC<SubscriptionManagementProps> = ({ 
           )}
         </div>
       </div>
+
+      {/* New/Edit Subscription Modal */}
+      <NewSubscriptionModal
+        isOpen={showNewSubscriptionModal}
+        onClose={() => {
+          setShowNewSubscriptionModal(false);
+          setEditingSubscription(null);
+        }}
+        onSuccess={() => {
+          loadData();
+        }}
+        editingSubscription={editingSubscription}
+      />
     </div>
   );
 };
