@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { MessageSquare, AlertCircle, Clock, CheckCircle, XCircle, Filter, Search, Plus, User, Building2, RefreshCw } from 'lucide-react';
 import { SupportService, SupportTicket, SupportMetrics } from '../../services/backend/supportService';
 import { MetricCard } from './MetricCard';
+import { NewTicketModal } from './NewTicketModal';
+import { TicketDetailsModal } from './TicketDetailsModal';
 
 interface SupportManagementProps {
   onNavigate?: (view: string) => void;
