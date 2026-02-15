@@ -114,12 +114,15 @@ CREATE INDEX IF NOT EXISTS idx_sop_access_logs_accessed_at ON sop_access_logs(ac
 -- ============================================
 -- TRIGGERS: Auto-update updated_at
 -- ============================================
+DROP TRIGGER IF EXISTS update_subscriptions_updated_at ON subscriptions;
 CREATE TRIGGER update_subscriptions_updated_at BEFORE UPDATE ON subscriptions
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_support_tickets_updated_at ON support_tickets;
 CREATE TRIGGER update_support_tickets_updated_at BEFORE UPDATE ON support_tickets
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_sops_updated_at ON sops;
 CREATE TRIGGER update_sops_updated_at BEFORE UPDATE ON sops
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
