@@ -7,9 +7,10 @@ import { backend } from '../services/backend';
 interface PatientsViewProps {
   onNavigate: (view: string) => void;
   patients: Patient[];
+  onDeletePatient?: (id: string) => Promise<void>;
 }
 
-export const PatientsView: React.FC<PatientsViewProps> = ({ onNavigate, patients }) => {
+export const PatientsView: React.FC<PatientsViewProps> = ({ onNavigate, patients, onDeletePatient }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState<'all' | 'high_risk'>('all');
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
@@ -172,15 +173,40 @@ export const PatientsView: React.FC<PatientsViewProps> = ({ onNavigate, patients
             className="bg-white dark:bg-[#1c1c1e] w-full max-w-2xl rounded-[2.5rem] p-8 shadow-2xl relative animate-scale-in border border-slate-100 dark:border-slate-800 my-8 max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            <button 
-              onClick={() => {
-                setSelectedPatient(null);
-                setActiveTab('details');
-              }} 
-              className="absolute top-6 right-6 p-2 bg-slate-100 dark:bg-[#2c2c2e] rounded-full text-slate-500 hover:bg-slate-200 dark:hover:bg-[#3a3a3c] transition-colors z-10"
-            >
-              <X size={20} />
-            </button>
+            <div className="absolute top-6 right-6 flex items-center gap-2 z-10">
+              {onDeletePatient && (
+                <button
+                  onClick={async () => {
+                    if (!selectedPatient) return;
+                    const confirmed = window.confirm(
+                      `Remove ${selectedPatient.name} from this facility?\n\nThis will delete their patient record and login from MamaSafe.`
+                    );
+                    if (!confirmed) return;
+                    try {
+                      await onDeletePatient(selectedPatient.id);
+                    } catch (error) {
+                      console.error('Error deleting patient:', error);
+                      alert('Unable to delete patient. Please try again.');
+                      return;
+                    }
+                    setSelectedPatient(null);
+                    setActiveTab('details');
+                  }}
+                  className="px-3 py-1.5 rounded-full text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-300 dark:hover:bg-red-900/40 border border-red-100 dark:border-red-800 transition-colors"
+                >
+                  Remove
+                </button>
+              )}
+              <button 
+                onClick={() => {
+                  setSelectedPatient(null);
+                  setActiveTab('details');
+                }} 
+                className="p-2 bg-slate-100 dark:bg-[#2c2c2e] rounded-full text-slate-500 hover:bg-slate-200 dark:hover:bg-[#3a3a3c] transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
 
             <div className="flex flex-col items-center text-center mb-6">
                <div className={`

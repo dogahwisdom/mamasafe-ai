@@ -131,8 +131,6 @@ export const DashboardView: React.FC<DashboardProps> = ({ onNavigate, user }) =>
           subtitle="Critical follow-ups"
           icon={AlertTriangle} 
           variant={activeTasks.length > 0 ? "alert" : "default"}
-          trend="up"
-          trendValue="2 New"
         />
         <ActionCard 
           title="24h Follow-up" 
@@ -140,8 +138,6 @@ export const DashboardView: React.FC<DashboardProps> = ({ onNavigate, user }) =>
           subtitle="Response within 24h"
           icon={Clock} 
           variant="brand"
-          trend="up"
-          trendValue="2%"
         />
          <ActionCard 
           title="ANC < 16 Wks" 
@@ -149,8 +145,6 @@ export const DashboardView: React.FC<DashboardProps> = ({ onNavigate, user }) =>
           subtitle="Early Enrollment Rate"
           icon={Calendar} 
           variant="default"
-          trend="up"
-          trendValue="12%"
         />
          <ActionCard 
           title="Engagement" 

@@ -12,13 +12,25 @@ export class PatientService {
   public async getAll(): Promise<Patient[]> {
     // Use Supabase if configured
     if (isSupabaseConfigured()) {
-      const { data, error } = await supabase
+      // Determine current facility (clinic / pharmacy) from local session
+      const currentUser = storage.get<UserProfile | null>(KEYS.CURRENT_USER, null);
+
+      let query = supabase
         .from('patients')
-        .select(`
+        .select(
+          `
           *,
           medications (*)
-        `)
+        `
+        )
         .order('created_at', { ascending: false });
+
+      // If a clinic or pharmacy is logged in, only fetch their patients
+      if (currentUser && (currentUser.role === 'clinic' || currentUser.role === 'pharmacy')) {
+        query = query.eq('facility_id', currentUser.id);
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         console.error('Error fetching patients:', error);
@@ -54,11 +66,80 @@ export class PatientService {
     return storage.get<Patient[]>(KEYS.PATIENTS, []);
   }
 
+  /**
+   * Permanently delete a patient and related records.
+   * Used when a facility removes a patient from their panel.
+   */
+  public async delete(id: string): Promise<void> {
+    // Use Supabase if configured
+    if (isSupabaseConfigured()) {
+      try {
+        // Clean up related records first to avoid orphans.
+        // Each operation is isolated so that a missing table/column
+        // does not block the core patient deletion.
+        await supabase.from("medications").delete().eq("patient_id", id);
+      } catch (error) {
+        console.warn("Error deleting medications for patient:", error);
+      }
+
+      try {
+        await supabase.from("tasks").delete().eq("patient_id", id);
+      } catch (error) {
+        console.warn("Error deleting tasks for patient:", error);
+      }
+
+      try {
+        await supabase.from("referrals").delete().eq("patient_id", id);
+      } catch (error) {
+        console.warn("Error deleting referrals for patient:", error);
+      }
+
+      try {
+        await supabase.from("reminders").delete().eq("patient_id", id);
+      } catch (error) {
+        console.warn("Error deleting reminders for patient:", error);
+      }
+
+      try {
+        // Delete user account linked to this patient
+        await supabase.from("users").delete().eq("id", id);
+      } catch (error) {
+        console.warn("Error deleting user for patient:", error);
+      }
+
+      try {
+        // Finally delete the patient record
+        await supabase.from("patients").delete().eq("id", id);
+      } catch (error) {
+        console.error("Error deleting patient:", error);
+        throw error;
+      }
+
+      return;
+    }
+
+    // Fallback to localStorage
+    const patients = storage.get<Patient[]>(KEYS.PATIENTS, []);
+    const remainingPatients = patients.filter((p) => p.id !== id);
+    storage.set(KEYS.PATIENTS, remainingPatients);
+
+    const users = storage.get<UserProfile[]>(KEYS.USERS, []);
+    const remainingUsers = users.filter((u) => u.id !== id);
+    storage.set(KEYS.USERS, remainingUsers);
+  }
+
   public async add(patient: Patient): Promise<Patient> {
     const cleanPhone = normalizePhone(patient.phone);
 
     // Use Supabase if configured
     if (isSupabaseConfigured()) {
+      // Determine facility enrolling this patient (clinic or pharmacy)
+      const currentUser = storage.get<UserProfile | null>(KEYS.CURRENT_USER, null);
+      const facilityId =
+        currentUser && (currentUser.role === 'clinic' || currentUser.role === 'pharmacy')
+          ? currentUser.id
+          : null;
+
       // Check if patient exists
       const { data: existing } = await supabase
         .from('patients')
@@ -76,6 +157,7 @@ export class PatientService {
         risk_status: patient.riskStatus,
         next_appointment: patient.nextAppointment || null,
         alerts: JSON.parse(JSON.stringify(patient.alerts || [])),
+        facility_id: facilityId,
       };
 
       let finalPatientId: string;

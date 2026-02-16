@@ -445,7 +445,15 @@ export const App: React.FC = () => {
          {currentView === 'triage' && <TriageView user={currentUser} />}
 
          {currentView === 'patients' && (
-           <PatientsView patients={patients} onNavigate={setCurrentView} />
+           <PatientsView
+             patients={patients}
+             onNavigate={setCurrentView}
+             onDeletePatient={async (id: string) => {
+               await backend.patients.delete(id);
+               const updated = await backend.patients.getAll();
+               setPatients(updated);
+             }}
+           />
          )}
 
          {currentView === 'education' && (
