@@ -20,7 +20,9 @@ Open or create `.env.local` in your project root and add:
 
 ```env
 # Africa's Talking SMS API
-VITE_AFRICAS_TALKING_API_KEY=atsk_b77510188832ef56577ca3e0a6d033b42c72c8720e075a7de34a4e736e4cb26145150320
+# IMPORTANT: Do NOT commit real API keys to the repo.
+# Use a placeholder here and set the real value in environment variables (e.g. Netlify).
+VITE_AFRICAS_TALKING_API_KEY=YOUR_AFRICAS_TALKING_API_KEY_HERE
 VITE_AFRICAS_TALKING_USERNAME=your_username_here
 ```
 
