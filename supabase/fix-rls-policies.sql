@@ -13,18 +13,23 @@ DROP POLICY IF EXISTS "Allow public update users" ON users;
 DROP POLICY IF EXISTS "Allow public read patients" ON patients;
 DROP POLICY IF EXISTS "Allow public insert patients" ON patients;
 DROP POLICY IF EXISTS "Allow public update patients" ON patients;
+DROP POLICY IF EXISTS "Allow public delete patients" ON patients;
 DROP POLICY IF EXISTS "Allow public read medications" ON medications;
 DROP POLICY IF EXISTS "Allow public insert medications" ON medications;
 DROP POLICY IF EXISTS "Allow public update medications" ON medications;
+DROP POLICY IF EXISTS "Allow public delete medications" ON medications;
 DROP POLICY IF EXISTS "Allow public read tasks" ON tasks;
 DROP POLICY IF EXISTS "Allow public insert tasks" ON tasks;
 DROP POLICY IF EXISTS "Allow public update tasks" ON tasks;
+DROP POLICY IF EXISTS "Allow public delete tasks" ON tasks;
 DROP POLICY IF EXISTS "Allow public read referrals" ON referrals;
 DROP POLICY IF EXISTS "Allow public insert referrals" ON referrals;
 DROP POLICY IF EXISTS "Allow public update referrals" ON referrals;
+DROP POLICY IF EXISTS "Allow public delete referrals" ON referrals;
 DROP POLICY IF EXISTS "Allow public read reminders" ON reminders;
 DROP POLICY IF EXISTS "Allow public insert reminders" ON reminders;
 DROP POLICY IF EXISTS "Allow public update reminders" ON reminders;
+DROP POLICY IF EXISTS "Allow public delete reminders" ON reminders;
 DROP POLICY IF EXISTS "Allow public read refill_requests" ON refill_requests;
 DROP POLICY IF EXISTS "Allow public insert refill_requests" ON refill_requests;
 DROP POLICY IF EXISTS "Allow public update refill_requests" ON refill_requests;
@@ -53,6 +58,10 @@ CREATE POLICY "Allow public insert patients" ON patients
 CREATE POLICY "Allow public update patients" ON patients
   FOR UPDATE USING (true);
 
+-- Allow public delete for patients
+CREATE POLICY "Allow public delete patients" ON patients
+  FOR DELETE USING (true);
+
 -- Allow public read/write for medications
 CREATE POLICY "Allow public read medications" ON medications
   FOR SELECT USING (true);
@@ -62,6 +71,9 @@ CREATE POLICY "Allow public insert medications" ON medications
 
 CREATE POLICY "Allow public update medications" ON medications
   FOR UPDATE USING (true);
+
+CREATE POLICY "Allow public delete medications" ON medications
+  FOR DELETE USING (true);
 
 -- Allow public read/write for tasks
 CREATE POLICY "Allow public read tasks" ON tasks
@@ -73,6 +85,9 @@ CREATE POLICY "Allow public insert tasks" ON tasks
 CREATE POLICY "Allow public update tasks" ON tasks
   FOR UPDATE USING (true);
 
+CREATE POLICY "Allow public delete tasks" ON tasks
+  FOR DELETE USING (true);
+
 -- Allow public read/write for referrals
 CREATE POLICY "Allow public read referrals" ON referrals
   FOR SELECT USING (true);
@@ -83,6 +98,9 @@ CREATE POLICY "Allow public insert referrals" ON referrals
 CREATE POLICY "Allow public update referrals" ON referrals
   FOR UPDATE USING (true);
 
+CREATE POLICY "Allow public delete referrals" ON referrals
+  FOR DELETE USING (true);
+
 -- Allow public read/write for reminders
 CREATE POLICY "Allow public read reminders" ON reminders
   FOR SELECT USING (true);
@@ -92,6 +110,9 @@ CREATE POLICY "Allow public insert reminders" ON reminders
 
 CREATE POLICY "Allow public update reminders" ON reminders
   FOR UPDATE USING (true);
+
+CREATE POLICY "Allow public delete reminders" ON reminders
+  FOR DELETE USING (true);
 
 -- Allow public read/write for refill_requests
 CREATE POLICY "Allow public read refill_requests" ON refill_requests
