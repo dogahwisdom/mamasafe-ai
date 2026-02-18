@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { ActionCard } from '../components/ActionCard';
 import { backend } from '../services/backend';
-import { Users, AlertTriangle, Calendar, Activity, ChevronRight, Building2, TrendingUp, CheckCircle, Clock, MessageCircle, Workflow, FlaskConical, CreditCard } from 'lucide-react';
+import { Users, AlertTriangle, Calendar, Activity, ChevronRight, Building2, TrendingUp, CheckCircle, Clock, MessageCircle, Workflow, FlaskConical, CreditCard, Stethoscope, FileText } from 'lucide-react';
 import { AreaChart, Area, XAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { Patient, UserProfile, Task, Reminder, ClinicVisit } from '../types';
 import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
@@ -45,50 +45,109 @@ export const DashboardView: React.FC<DashboardProps> = ({ onNavigate, user }) =>
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [todayVisits, setTodayVisits] = useState<number>(0);
   const [pendingLabRequests, setPendingLabRequests] = useState<number>(0);
+  const [completedLabTests, setCompletedLabTests] = useState<number>(0);
+  const [totalLabTests, setTotalLabTests] = useState<number>(0);
   const [todayPayments, setTodayPayments] = useState<number>(0);
   const [activeVisits, setActiveVisits] = useState<ClinicVisit[]>([]);
+  const [totalDiagnoses, setTotalDiagnoses] = useState<number>(0);
+  const [completedVisits, setCompletedVisits] = useState<number>(0);
   
   useEffect(() => {
     const loadData = async () => {
-      const [taskData, patients, visits] = await Promise.all([
-        backend.clinic.getTasks(),
-        backend.patients.getAll(),
-        backend.workflow.getVisits(),
-      ]);
-      setTasks(taskData);
-      
-      // Calculate workflow metrics
-      const today = new Date().toISOString().split('T')[0];
-      const todayVisitsCount = visits.filter(v => v.visitDate.startsWith(today)).length;
-      setTodayVisits(todayVisitsCount);
-      
-      const inProgressVisits = visits.filter(v => v.status === 'in_progress' || v.status === 'registered');
-      setActiveVisits(inProgressVisits);
-      
-      // Get lab requests and payments for today (more efficient query)
-      const todayVisitIds = visits.filter(v => v.visitDate.startsWith(today)).map(v => v.id);
-      
-      if (todayVisitIds.length > 0) {
-        const { data: labRequestsData } = await supabase
-          .from('lab_requests')
-          .select('id, status')
-          .in('visit_id', todayVisitIds)
-          .eq('status', 'requested');
+      try {
+        const [taskData, patients] = await Promise.all([
+          backend.clinic.getTasks(),
+          backend.patients.getAll(),
+        ]);
+        setTasks(taskData);
+
+        // Load workflow data with error handling
+        let visits: ClinicVisit[] = [];
+        try {
+          visits = await backend.workflow.getVisits();
+        } catch (error) {
+          console.warn('Could not load visits (workflow tables may not exist yet):', error);
+          // Set defaults if workflow tables don't exist
+          setTodayVisits(0);
+          setActiveVisits([]);
+          setPendingLabRequests(0);
+          setCompletedLabTests(0);
+          setTotalLabTests(0);
+          setTodayPayments(0);
+          setTotalDiagnoses(0);
+          setCompletedVisits(0);
+        }
         
-        setPendingLabRequests(labRequestsData?.length || 0);
+        // Calculate workflow metrics
+        const today = new Date().toISOString().split('T')[0];
+        const todayVisitsCount = visits.filter(v => v.visitDate.startsWith(today)).length;
+        setTodayVisits(todayVisitsCount);
         
-        const { data: paymentsData } = await supabase
-          .from('payments')
-          .select('amount, payment_status')
-          .in('visit_id', todayVisitIds)
-          .eq('payment_status', 'paid');
+        const inProgressVisits = visits.filter(v => v.status === 'in_progress' || v.status === 'registered');
+        setActiveVisits(inProgressVisits);
         
-        const totalPayments = paymentsData?.reduce((sum, p) => sum + parseFloat(p.amount), 0) || 0;
-        setTodayPayments(totalPayments);
-      } else {
-        setPendingLabRequests(0);
-        setTodayPayments(0);
-      }
+        // Get lab requests and payments for today (more efficient query)
+        const todayVisitIds = visits.filter(v => v.visitDate.startsWith(today)).map(v => v.id);
+        const allVisitIds = visits.map(v => v.id);
+        
+        if (isSupabaseConfigured() && todayVisitIds.length > 0) {
+          try {
+            const { data: labRequestsData } = await supabase
+              .from('lab_requests')
+              .select('id, status')
+              .in('visit_id', todayVisitIds);
+            
+            const pending = labRequestsData?.filter(lr => lr.status === 'requested').length || 0;
+            const completed = labRequestsData?.filter(lr => lr.status === 'completed').length || 0;
+            const total = labRequestsData?.length || 0;
+            
+            setPendingLabRequests(pending);
+            setCompletedLabTests(completed);
+            setTotalLabTests(total);
+            
+            const { data: paymentsData } = await supabase
+              .from('payments')
+              .select('amount, payment_status')
+              .in('visit_id', todayVisitIds)
+              .eq('payment_status', 'paid');
+            
+            const totalPayments = paymentsData?.reduce((sum, p) => sum + parseFloat(p.amount), 0) || 0;
+            setTodayPayments(totalPayments);
+          } catch (error) {
+            console.warn('Error loading lab/payment data:', error);
+            setPendingLabRequests(0);
+            setCompletedLabTests(0);
+            setTotalLabTests(0);
+            setTodayPayments(0);
+          }
+        } else {
+          setPendingLabRequests(0);
+          setCompletedLabTests(0);
+          setTotalLabTests(0);
+          setTodayPayments(0);
+        }
+
+        // Get total diagnoses and completed visits
+        if (isSupabaseConfigured() && allVisitIds.length > 0) {
+          try {
+            const { data: diagnosesData } = await supabase
+              .from('diagnoses')
+              .select('id')
+              .in('visit_id', allVisitIds);
+            
+            setTotalDiagnoses(diagnosesData?.length || 0);
+
+            const completed = visits.filter(v => v.status === 'completed').length;
+            setCompletedVisits(completed);
+          } catch (error) {
+            console.warn('Error loading diagnoses:', error);
+            setTotalDiagnoses(0);
+            setCompletedVisits(0);
+          }
+        } else {
+          setTotalDiagnoses(0);
+          setCompletedVisits(0);
+        }
 
       if (patients.length) {
         // Calculate early enrollment rate based on condition type
@@ -258,8 +317,13 @@ export const DashboardView: React.FC<DashboardProps> = ({ onNavigate, user }) =>
                 <FlaskConical className="text-purple-600 dark:text-purple-400" size={20} />
               </div>
               <div>
-                <div className="text-2xl font-bold text-slate-900 dark:text-white">{pendingLabRequests}</div>
-                <div className="text-xs text-slate-500 dark:text-slate-400">Pending Lab Tests</div>
+                <div className="text-2xl font-bold text-slate-900 dark:text-white">{totalLabTests}</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">Total Lab Tests</div>
+                {completedLabTests > 0 && (
+                  <div className="text-xs text-green-600 dark:text-green-400 mt-1">
+                    {completedLabTests} completed
+                  </div>
+                )}
               </div>
             </div>
           </div>
