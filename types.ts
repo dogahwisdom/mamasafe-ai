@@ -53,7 +53,7 @@ export interface Medication {
   type: 'morning' | 'afternoon' | 'evening';
 }
 
-export type ConditionType = 'pregnancy' | 'diabetes' | 'hypertension' | 'hiv' | 'tuberculosis' | 'other' | null;
+export type ConditionType = 'pregnancy' | 'diabetes' | 'hypertension' | 'tuberculosis' | 'other' | null;
 
 export interface Patient {
   id: string;

@@ -442,7 +442,6 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({ onAddPatient }) 
                 <option value="pregnancy">Pregnancy / ANC</option>
                 <option value="diabetes">Diabetes</option>
                 <option value="hypertension">Hypertension</option>
-                <option value="hiv">HIV</option>
                 <option value="tuberculosis">Tuberculosis</option>
                 <option value="other">Other</option>
               </select>

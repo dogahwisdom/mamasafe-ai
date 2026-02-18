@@ -137,19 +137,37 @@ export const PatientSearchModal: React.FC<PatientSearchModalProps> = ({
                             <MapPin size={14} />
                             <span>{patient.location}</span>
                           </div>
-                          <div className="flex items-center gap-4 mt-2">
+                          <div className="flex items-center gap-4 mt-2 flex-wrap">
                             <div className="flex items-center gap-1.5 text-xs">
-                              <Activity size={12} className="text-slate-400" />
+                              <User size={12} className="text-slate-400" />
                               <span className="text-slate-600 dark:text-slate-400">
-                                {patient.gestationalWeeks} weeks
+                                Age: {patient.age} years
                               </span>
                             </div>
-                            <div className="flex items-center gap-1.5 text-xs">
-                              <Calendar size={12} className="text-slate-400" />
-                              <span className="text-slate-600 dark:text-slate-400">
-                                Next: {new Date(patient.nextAppointment).toLocaleDateString()}
-                              </span>
-                            </div>
+                            {patient.patientType && (
+                              <div className="flex items-center gap-1.5 text-xs">
+                                <span className="text-slate-600 dark:text-slate-400 capitalize">
+                                  Type: {patient.patientType}
+                                </span>
+                              </div>
+                            )}
+                            {patient.conditionType && (
+                              <div className="flex items-center gap-1.5 text-xs">
+                                <Activity size={12} className="text-slate-400" />
+                                <span className="text-slate-600 dark:text-slate-400 capitalize">
+                                  {patient.conditionType}
+                                  {patient.gestationalWeeks && ` (${patient.gestationalWeeks} weeks)`}
+                                </span>
+                              </div>
+                            )}
+                            {patient.nextAppointment && (
+                              <div className="flex items-center gap-1.5 text-xs">
+                                <Calendar size={12} className="text-slate-400" />
+                                <span className="text-slate-600 dark:text-slate-400">
+                                  Next: {new Date(patient.nextAppointment).toLocaleDateString()}
+                                </span>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>

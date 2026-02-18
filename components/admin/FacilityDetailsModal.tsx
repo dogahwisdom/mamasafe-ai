@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, Users, Activity, MapPin, Phone, Calendar, AlertTriangle, Clock, User, FileText } from 'lucide-react';
-import { Patient, Task, FacilityMetrics } from '../../types';
+import { X, Users, Activity, MapPin, Phone, Calendar, AlertTriangle, Clock, User, FileText, ChevronRight } from 'lucide-react';
+import { Patient, Task, FacilityMetrics, RiskLevel } from '../../types';
 import { SuperadminService } from '../../services/backend/superadminService';
 
 interface FacilityDetailsModalProps {
@@ -171,6 +171,10 @@ export const FacilityDetailsModal: React.FC<FacilityDetailsModalProps> = ({
                           </h3>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+                              <User size={14} />
+                              <span>Age: {patient.age} years</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
                               <Phone size={14} />
                               <span>{patient.phone}</span>
                             </div>
@@ -178,17 +182,49 @@ export const FacilityDetailsModal: React.FC<FacilityDetailsModalProps> = ({
                               <MapPin size={14} />
                               <span>{patient.location}</span>
                             </div>
-                            <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-                              <Calendar size={14} />
-                              <span>{patient.gestationalWeeks} weeks gestation</span>
-                            </div>
+                            {patient.patientType && (
+                              <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+                                <span className="capitalize">Type: {patient.patientType}</span>
+                              </div>
+                            )}
+                            {patient.conditionType && (
+                              <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+                                <Activity size={14} />
+                                <span className="capitalize">
+                                  {patient.conditionType}
+                                  {patient.gestationalWeeks && ` (${patient.gestationalWeeks} weeks)`}
+                                </span>
+                              </div>
+                            )}
                             {patient.nextAppointment && (
                               <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-                                <Clock size={14} />
+                                <Calendar size={14} />
                                 <span>Next: {new Date(patient.nextAppointment).toLocaleDateString()}</span>
                               </div>
                             )}
+                            {patient.nextFollowUpDate && (
+                              <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+                                <Clock size={14} />
+                                <span>Follow-up: {new Date(patient.nextFollowUpDate).toLocaleDateString()}</span>
+                              </div>
+                            )}
                           </div>
+                          {patient.medicalConditions && patient.medicalConditions.length > 0 && (
+                            <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                              <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Medical Conditions</p>
+                              <div className="flex flex-wrap gap-2">
+                                {patient.medicalConditions.map((condition, idx) => (
+                                  <span
+                                    key={idx}
+                                    className="px-2 py-1 bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 rounded-lg text-xs capitalize"
+                                  >
+                                    {condition.type}
+                                    {condition.severity && ` (${condition.severity})`}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                           {patient.medications && patient.medications.length > 0 && (
                             <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
                               <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">

@@ -314,81 +314,173 @@ export const PatientsView: React.FC<PatientsViewProps> = ({ onNavigate, patients
 
             {/* Tab Content */}
             {activeTab === 'details' && (
-              <>
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                  <div className="p-4 bg-slate-50 dark:bg-[#2c2c2e] rounded-2xl">
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Pregnancy</p>
-                    <div className="flex items-center gap-2">
-                      <Activity size={18} className="text-brand-500" />
-                      <span className="font-bold text-slate-900 dark:text-white">{selectedPatient.gestationalWeeks} Weeks</span>
+              <div className="space-y-6 max-h-[600px] overflow-y-auto pr-2">
+                {/* Personal Information Section */}
+                <div>
+                  <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <User size={16} /> Personal Information
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-4 bg-slate-50 dark:bg-[#2c2c2e] rounded-2xl">
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Full Name</p>
+                      <p className="font-bold text-slate-900 dark:text-white">{selectedPatient.name}</p>
                     </div>
-                  </div>
-                  <div className="p-4 bg-slate-50 dark:bg-[#2c2c2e] rounded-2xl">
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Age</p>
-                    <div className="flex items-center gap-2">
-                      <User size={18} className="text-blue-500" />
-                      <span className="font-bold text-slate-900 dark:text-white">{selectedPatient.age} Yrs</span>
+                    <div className="p-4 bg-slate-50 dark:bg-[#2c2c2e] rounded-2xl">
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Age</p>
+                      <div className="flex items-center gap-2">
+                        <User size={18} className="text-blue-500" />
+                        <span className="font-bold text-slate-900 dark:text-white">{selectedPatient.age} Years</span>
+                      </div>
                     </div>
-                  </div>
-                  <div className="p-4 bg-slate-50 dark:bg-[#2c2c2e] rounded-2xl">
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Next Visit</p>
-                    <div className="flex items-center gap-2">
-                      <Calendar size={18} className="text-purple-500" />
-                      <span className="font-bold text-slate-900 dark:text-white">
-                        {selectedPatient.nextAppointment ? new Date(selectedPatient.nextAppointment).toLocaleDateString(undefined, {day: 'numeric', month: 'short'}) : 'Not scheduled'}
-                      </span>
+                    <div className="p-4 bg-slate-50 dark:bg-[#2c2c2e] rounded-2xl">
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Patient Type</p>
+                      <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-bold ${
+                        selectedPatient.patientType === 'inpatient' 
+                          ? 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400' 
+                          : 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
+                      }`}>
+                        {selectedPatient.patientType === 'inpatient' ? 'Inpatient' : 'Outpatient'}
+                      </div>
                     </div>
-                  </div>
-                  <div className="p-4 bg-slate-50 dark:bg-[#2c2c2e] rounded-2xl">
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Status</p>
-                    <div className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold ${
-                      selectedPatient.riskStatus === RiskLevel.HIGH || selectedPatient.riskStatus === RiskLevel.CRITICAL ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' : 
-                      selectedPatient.riskStatus === RiskLevel.MEDIUM ? 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400'
-                    }`}>
-                      {selectedPatient.riskStatus}
+                    <div className="p-4 bg-slate-50 dark:bg-[#2c2c2e] rounded-2xl">
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Risk Status</p>
+                      <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-bold ${
+                        selectedPatient.riskStatus === RiskLevel.HIGH || selectedPatient.riskStatus === RiskLevel.CRITICAL ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' : 
+                        selectedPatient.riskStatus === RiskLevel.MEDIUM ? 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400'
+                      }`}>
+                        {selectedPatient.riskStatus}
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="space-y-3">
-                  <div className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-full text-slate-600 dark:text-slate-300">
-                        <Phone size={20} />
+                {/* Contact Information Section */}
+                <div>
+                  <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <Phone size={16} /> Contact Information
+                  </h3>
+                  <div className="space-y-3">
+                    <div className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-full text-slate-600 dark:text-slate-300">
+                          <Phone size={20} />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Phone Number</p>
+                          <p className="font-semibold text-slate-900 dark:text-white">{selectedPatient.phone}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Phone Number</p>
-                        <p className="font-semibold text-slate-900 dark:text-white">{selectedPatient.phone}</p>
+                      <a 
+                        href={`tel:${selectedPatient.phone.replace(/\s+/g, '')}`}
+                        className="px-4 py-2 bg-slate-900 dark:bg-white text-white dark:text-black rounded-full font-bold text-sm shadow-md hover:scale-105 active:scale-95 transition-all"
+                      >
+                        Call
+                      </a>
+                    </div>
+                    <div className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-full text-slate-600 dark:text-slate-300">
+                          <MapPin size={20} />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Location</p>
+                          <p className="font-semibold text-slate-900 dark:text-white">{selectedPatient.location}</p>
+                        </div>
                       </div>
                     </div>
-                    <a 
-                      href={`tel:${selectedPatient.phone.replace(/\s+/g, '')}`}
-                      className="px-4 py-2 bg-slate-900 dark:bg-white text-white dark:text-black rounded-full font-bold text-sm shadow-md hover:scale-105 active:scale-95 transition-all"
-                    >
-                      Call
-                    </a>
                   </div>
+                </div>
 
-                  <div className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-full text-slate-600 dark:text-slate-300">
-                        <Clock size={20} />
+                {/* Medical Condition Section */}
+                {selectedPatient.conditionType && (
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                      <Activity size={16} /> Medical Condition
+                    </h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="p-4 bg-slate-50 dark:bg-[#2c2c2e] rounded-2xl">
+                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Primary Condition</p>
+                        <p className="font-bold text-slate-900 dark:text-white capitalize">{selectedPatient.conditionType}</p>
                       </div>
-                      <div>
-                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Last Check-in</p>
-                        <p className="font-semibold text-slate-900 dark:text-white">
-                          {selectedPatient.lastCheckIn || 'Never'}
-                        </p>
+                      {selectedPatient.gestationalWeeks && (
+                        <div className="p-4 bg-slate-50 dark:bg-[#2c2c2e] rounded-2xl">
+                          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Gestational Weeks</p>
+                          <div className="flex items-center gap-2">
+                            <Activity size={18} className="text-brand-500" />
+                            <span className="font-bold text-slate-900 dark:text-white">{selectedPatient.gestationalWeeks} Weeks</span>
+                          </div>
+                        </div>
+                      )}
+                      {selectedPatient.medicalConditions && selectedPatient.medicalConditions.length > 0 && (
+                        selectedPatient.medicalConditions.map((condition, idx) => (
+                          <div key={idx} className="p-4 bg-slate-50 dark:bg-[#2c2c2e] rounded-2xl">
+                            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Condition Details</p>
+                            <p className="font-semibold text-slate-900 dark:text-white capitalize">{condition.type}</p>
+                            {condition.diagnosisDate && (
+                              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                Diagnosed: {new Date(condition.diagnosisDate).toLocaleDateString()}
+                              </p>
+                            )}
+                            {condition.severity && (
+                              <p className="text-xs text-slate-500 dark:text-slate-400">
+                                Severity: <span className="capitalize">{condition.severity}</span>
+                              </p>
+                            )}
+                            {condition.notes && (
+                              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{condition.notes}</p>
+                            )}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Appointment Information */}
+                <div>
+                  <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <Calendar size={16} /> Appointment Information
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-4 bg-slate-50 dark:bg-[#2c2c2e] rounded-2xl">
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Next Appointment</p>
+                      <div className="flex items-center gap-2">
+                        <Calendar size={18} className="text-purple-500" />
+                        <span className="font-bold text-slate-900 dark:text-white">
+                          {selectedPatient.nextAppointment ? new Date(selectedPatient.nextAppointment).toLocaleDateString(undefined, {day: 'numeric', month: 'short', year: 'numeric'}) : 'Not scheduled'}
+                        </span>
+                      </div>
+                    </div>
+                    {selectedPatient.nextFollowUpDate && (
+                      <div className="p-4 bg-slate-50 dark:bg-[#2c2c2e] rounded-2xl">
+                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Next Follow-up</p>
+                        <div className="flex items-center gap-2">
+                          <Calendar size={18} className="text-green-500" />
+                          <span className="font-bold text-slate-900 dark:text-white">
+                            {new Date(selectedPatient.nextFollowUpDate).toLocaleDateString(undefined, {day: 'numeric', month: 'short', year: 'numeric'})}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                    <div className="p-4 bg-slate-50 dark:bg-[#2c2c2e] rounded-2xl">
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Last Check-in</p>
+                      <div className="flex items-center gap-2">
+                        <Clock size={18} className="text-blue-500" />
+                        <span className="font-semibold text-slate-900 dark:text-white">
+                          {selectedPatient.lastCheckIn ? new Date(selectedPatient.lastCheckIn).toLocaleDateString(undefined, {day: 'numeric', month: 'short', year: 'numeric'}) : 'Never'}
+                        </span>
                       </div>
                     </div>
                   </div>
+                </div>
 
-                  {selectedPatient.alerts && selectedPatient.alerts.length > 0 && (
+                {/* Alerts Section */}
+                {selectedPatient.alerts && selectedPatient.alerts.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                      <AlertTriangle size={16} /> Alerts
+                    </h3>
                     <div className="p-4 rounded-2xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20">
-                      <div className="flex items-center gap-2 mb-2">
-                        <AlertTriangle size={18} className="text-red-600 dark:text-red-400" />
-                        <p className="text-xs font-bold text-red-600 dark:text-red-400 uppercase tracking-wider">Alerts</p>
-                      </div>
                       <div className="space-y-1">
                         {selectedPatient.alerts.map((alert: any, idx: number) => (
                           <p key={idx} className="text-sm text-red-700 dark:text-red-300">
@@ -397,9 +489,9 @@ export const PatientsView: React.FC<PatientsViewProps> = ({ onNavigate, patients
                         ))}
                       </div>
                     </div>
-                  )}
-                </div>
-              </>
+                  </div>
+                )}
+              </div>
             )}
 
             {activeTab === 'medications' && (
