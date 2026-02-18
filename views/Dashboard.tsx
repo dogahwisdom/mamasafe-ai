@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { ActionCard } from '../components/ActionCard';
 import { backend } from '../services/backend';
-import { Users, AlertTriangle, Calendar, Activity, ChevronRight, Building2, TrendingUp, CheckCircle, Clock, MessageCircle, Workflow, FlaskConical, CreditCard, Stethoscope, FileText } from 'lucide-react';
+import { Users, AlertTriangle, Calendar, Activity, ChevronRight, Building2, TrendingUp, CheckCircle, Clock, MessageCircle, Workflow, FlaskConical, CreditCard, Stethoscope, FileText, Bot, DollarSign } from 'lucide-react';
 import { AreaChart, Area, XAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { Patient, UserProfile, Task, Reminder, ClinicVisit } from '../types';
 import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
@@ -51,6 +51,9 @@ export const DashboardView: React.FC<DashboardProps> = ({ onNavigate, user }) =>
   const [activeVisits, setActiveVisits] = useState<ClinicVisit[]>([]);
   const [totalDiagnoses, setTotalDiagnoses] = useState<number>(0);
   const [completedVisits, setCompletedVisits] = useState<number>(0);
+  const [aiConversationsToday, setAiConversationsToday] = useState<number>(0);
+  const [resolvedTasksToday, setResolvedTasksToday] = useState<number>(0);
+  const [totalAiCost, setTotalAiCost] = useState<number>(0);
   
   useEffect(() => {
     const loadData = async () => {
@@ -198,6 +201,29 @@ export const DashboardView: React.FC<DashboardProps> = ({ onNavigate, user }) =>
         await backend.reminders.generateDailyReminders();
         const pending = await backend.reminders.getPending();
         setReminders(pending.slice(0, 5));
+
+        // Load AI usage and resolved tasks stats
+        try {
+          const today = new Date().toISOString().split('T')[0];
+          const tomorrow = new Date();
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          const tomorrowStr = tomorrow.toISOString().split('T')[0];
+
+          const [aiStats, resolvedStats] = await Promise.all([
+            backend.aiUsage.getUsageStats(today, tomorrowStr),
+            backend.aiUsage.getResolvedTasksStats(today, tomorrowStr),
+          ]);
+
+          setAiConversationsToday(aiStats.totalConversations);
+          setTotalAiCost(aiStats.totalCostUsd);
+          setResolvedTasksToday(resolvedStats.totalResolved);
+        } catch (error) {
+          console.warn('Error loading AI usage stats:', error);
+          // Set defaults if AI tracking not available
+          setAiConversationsToday(0);
+          setTotalAiCost(0);
+          setResolvedTasksToday(0);
+        }
       } catch (error) {
         console.error('Error loading dashboard data:', error);
       }
@@ -399,6 +425,56 @@ export const DashboardView: React.FC<DashboardProps> = ({ onNavigate, user }) =>
                   {totalLabTests > 0 ? Math.round((completedLabTests / totalLabTests) * 100) : 0}%
                 </div>
                 <div className="text-xs text-slate-500 dark:text-slate-400">Test Completion Rate</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* AI Usage & Resolved Tasks Section */}
+        <div className="bg-white dark:bg-[#1c1c1e] p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm mt-6">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white">AI Usage & Task Resolution</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Track AI conversations and resolved tasks for billing</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="p-4 bg-slate-50 dark:bg-[#2c2c2e] rounded-xl border border-slate-200 dark:border-slate-700">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+                  <Bot className="text-purple-600 dark:text-purple-400" size={20} />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-slate-900 dark:text-white">{aiConversationsToday}</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400">AI Conversations Today</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 bg-slate-50 dark:bg-[#2c2c2e] rounded-xl border border-slate-200 dark:border-slate-700">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                  <CheckCircle className="text-green-600 dark:text-green-400" size={20} />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-slate-900 dark:text-white">{resolvedTasksToday}</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400">Tasks Resolved Today</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 bg-slate-50 dark:bg-[#2c2c2e] rounded-xl border border-slate-200 dark:border-slate-700">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                  <DollarSign className="text-blue-600 dark:text-blue-400" size={20} />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-slate-900 dark:text-white">
+                    ${totalAiCost.toFixed(2)}
+                  </div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400">AI Cost Today</div>
+                </div>
               </div>
             </div>
           </div>

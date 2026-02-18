@@ -37,6 +37,28 @@ export const TriageView: React.FC<TriageViewProps> = ({ user }) => {
       setResult(analysis);
       setEditableDraft(analysis.draftResponse);
 
+      // Log AI conversation for billing
+      try {
+        const patientId = user?.role === 'patient' ? user.id : undefined;
+        await backend.aiUsage.logConversation(
+          'triage',
+          'web',
+          symptoms,
+          analysis.draftResponse,
+          0, // tokens - would be calculated from actual AI response
+          0, // cost - would be calculated based on tokens
+          patientId,
+          {
+            riskLevel: analysis.riskLevel,
+            gestationalAge,
+            reasoning: analysis.reasoning,
+          }
+        );
+      } catch (error) {
+        console.warn('Error logging AI conversation:', error);
+        // Don't block the UI if logging fails
+      }
+
       // AUTOMATION: If Risk is High/Critical, notify clinic immediately
       if (user && (analysis.riskLevel === RiskLevel.HIGH || analysis.riskLevel === RiskLevel.CRITICAL)) {
          const patientId = user.id;

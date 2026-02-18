@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Users, Building2, Activity, TrendingUp, AlertTriangle, 
   MapPin, Search, Filter, Download, RefreshCw, Settings,
-  UserCheck, Clock, BarChart3, Globe, Workflow, FlaskConical, CreditCard
+  UserCheck, Clock, BarChart3, Globe, Workflow, FlaskConical, CreditCard, Bot, DollarSign
 } from 'lucide-react';
 import { UserProfile } from '../types';
 import { SuperadminService, SystemMetrics, FacilityMetrics, EnrollmentTrend, RiskDistribution, GeographicDistribution } from '../services/backend/superadminService';
@@ -288,6 +288,31 @@ export const SuperadminDashboard: React.FC<SuperadminDashboardProps> = ({ user, 
               value={metrics.pendingReminders}
               icon={Clock}
               variant="default"
+            />
+          </div>
+
+          {/* AI Usage & Resolved Tasks Metrics */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            <MetricCard
+              title="AI Conversations Today"
+              value={metrics.totalAiConversations}
+              icon={Bot}
+              variant="default"
+              subtitle="Across all facilities"
+            />
+            <MetricCard
+              title="Tasks Resolved Today"
+              value={metrics.totalResolvedTasks}
+              icon={Activity}
+              variant="default"
+              subtitle="All facilities"
+            />
+            <MetricCard
+              title="Total AI Cost Today"
+              value={`$${metrics.totalAiCost.toFixed(2)}`}
+              icon={DollarSign}
+              variant="default"
+              subtitle="Billing amount"
             />
           </div>
 

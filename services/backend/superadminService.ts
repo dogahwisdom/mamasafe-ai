@@ -26,6 +26,10 @@ export interface SystemMetrics {
   activeVisits: number;
   pendingLabRequests: number;
   totalPaymentsToday: number;
+  // AI Usage metrics
+  totalAiConversations: number;
+  totalResolvedTasks: number;
+  totalAiCost: number;
   systemHealth: 'healthy' | 'degraded' | 'down';
 }
 
@@ -149,6 +153,21 @@ export class SuperadminService {
 
         const totalPaymentsToday = paymentsToday?.reduce((sum, p) => sum + parseFloat(p.amount), 0) || 0;
 
+        // Get AI usage metrics
+        const { data: aiConversations } = await supabase
+          .from('ai_conversations')
+          .select('id, cost_usd')
+          .gte('created_at', today);
+
+        const { data: resolvedTasks } = await supabase
+          .from('resolved_tasks_log')
+          .select('id')
+          .gte('resolved_at', today);
+
+        const totalAiConversations = aiConversations?.length || 0;
+        const totalResolvedTasks = resolvedTasks?.length || 0;
+        const totalAiCost = aiConversations?.reduce((sum, c) => sum + parseFloat(c.cost_usd || 0), 0) || 0;
+
         // Check system health
         let systemHealth: 'healthy' | 'degraded' | 'down' = 'healthy';
         try {
@@ -176,6 +195,9 @@ export class SuperadminService {
           activeVisits: activeVisits?.length || 0,
           pendingLabRequests: pendingLabs?.length || 0,
           totalPaymentsToday: totalPaymentsToday,
+          totalAiConversations,
+          totalResolvedTasks,
+          totalAiCost,
           systemHealth,
         };
       }

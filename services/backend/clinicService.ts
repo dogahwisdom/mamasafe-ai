@@ -36,6 +36,33 @@ export class ClinicService {
   public async resolveTask(taskId: string): Promise<void> {
     const resolvedAt = Date.now();
 
+    // Get task details first to log resolution
+    let task: Task | undefined;
+    if (isSupabaseConfigured()) {
+      const { data } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('id', taskId)
+        .single();
+      
+      if (data) {
+        task = {
+          id: data.id,
+          patientId: data.patient_id,
+          patientName: data.patient_name,
+          type: data.type,
+          deadline: data.deadline,
+          resolved: data.resolved,
+          notes: data.notes,
+          timestamp: data.timestamp,
+          resolvedAt: data.resolved_at,
+        };
+      }
+    } else {
+      const tasks = storage.get<Task[]>(KEYS.CLINIC_TASKS, DEFAULT_TASKS);
+      task = tasks.find(t => t.id === taskId);
+    }
+
     // Use Supabase if configured
     if (isSupabaseConfigured()) {
       const { error } = await supabase
@@ -49,6 +76,23 @@ export class ClinicService {
       if (error) {
         console.error('Error resolving task:', error);
         throw error;
+      }
+
+      // Log resolved task for tracking and billing
+      if (task) {
+        try {
+          const timeToResolve = task.timestamp ? Math.round((resolvedAt - task.timestamp) / (1000 * 60)) : undefined;
+          await backend.aiUsage.logResolvedTask(
+            taskId,
+            task.type,
+            task.patientId,
+            task.notes,
+            timeToResolve
+          );
+        } catch (error) {
+          console.warn('Error logging resolved task:', error);
+          // Don't throw - task resolution should succeed even if logging fails
+        }
       }
       return;
     }
