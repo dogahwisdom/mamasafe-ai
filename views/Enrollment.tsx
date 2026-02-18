@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
-import { UserPlus, Calendar, MapPin, CheckCircle, ChevronRight, ChevronLeft, Phone, User, Activity, Heart, FileText, Baby, Droplet, ShieldAlert, Lock, CheckSquare, Loader2, MessageSquare } from 'lucide-react';
-import { Patient, RiskLevel } from '../types';
+import { UserPlus, Calendar, MapPin, CheckCircle, ChevronRight, ChevronLeft, Phone, User, Activity, Heart, FileText, Baby, Droplet, ShieldAlert, Lock, CheckSquare, Loader2, MessageSquare, AlertCircle, ArrowRight } from 'lucide-react';
+import { Patient, RiskLevel, ConditionType } from '../types';
+import { backend } from '../services/backend';
 
 interface InputGroupProps {
   label: string;
@@ -29,6 +30,17 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({ onAddPatient }) 
   const [loading, setLoading] = useState(false);
   const [consent, setConsent] = useState(false);
   const [whatsappOptIn, setWhatsappOptIn] = useState(false);
+  const [checkingPatient, setCheckingPatient] = useState(false);
+  const [existingPatient, setExistingPatient] = useState<{
+    exists: boolean;
+    patientId?: string;
+    patientName?: string;
+    facilityId?: string;
+    facilityName?: string;
+  } | null>(null);
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [transferReason, setTransferReason] = useState('');
+  const [requestingTransfer, setRequestingTransfer] = useState(false);
   
   // Comprehensive State
   const [formData, setFormData] = useState({
@@ -40,30 +52,34 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({ onAddPatient }) 
     
     // Step 2: Contact & Location
     phone: '',
+    patientType: 'outpatient' as 'outpatient' | 'inpatient',
     nokName: '',
     nokPhone: '',
     county: '',
     subCounty: '',
     ward: '',
     
-    // Step 3: Medical History
+    // Step 3: Condition & Medical History
+    conditionType: '' as ConditionType | '',
     gravida: '', // Total pregnancies including current
     parity: '',  // Previous viable births
     bloodGroup: '',
     rhesus: '',
     previousComplications: '',
     
-    // Step 4: Current Pregnancy
+    // Step 4: Condition-Specific Details
     lmp: '',
     edd: '', // Estimated Date of Delivery
     gestationalWeeks: '',
     ancProfile: 'Not Started', // Started, Not Started
-    referralHospital: ''
+    referralHospital: '',
+    diagnosisDate: '',
+    conditionSeverity: '' as 'mild' | 'moderate' | 'severe' | '',
   });
 
   // Auto-calculate EDD and Gestational Weeks when LMP changes
   useEffect(() => {
-    if (formData.lmp) {
+    if (formData.lmp && formData.conditionType === 'pregnancy') {
       const lmpDate = new Date(formData.lmp);
       if (!isNaN(lmpDate.getTime())) {
         // EDD = LMP + 280 days (40 weeks)
@@ -81,28 +97,102 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({ onAddPatient }) 
         }));
       }
     }
-  }, [formData.lmp]);
+  }, [formData.lmp, formData.conditionType]);
+
+  // Check for existing patient when phone number is entered
+  useEffect(() => {
+    const checkExistingPatient = async () => {
+      if (formData.phone && formData.phone.length >= 10) {
+        setCheckingPatient(true);
+        try {
+          const result = await backend.transfers.findPatientByPhone(formData.phone);
+          setExistingPatient(result);
+        } catch (error) {
+          console.error('Error checking existing patient:', error);
+          setExistingPatient({ exists: false });
+        } finally {
+          setCheckingPatient(false);
+        }
+      } else {
+        setExistingPatient(null);
+      }
+    };
+
+    const timeoutId = setTimeout(checkExistingPatient, 1000); // Debounce
+    return () => clearTimeout(timeoutId);
+  }, [formData.phone]);
 
   const validateCurrentStep = () => {
     switch (step) {
       case 1: // Identity
         return formData.firstName && formData.lastName && formData.dob;
       case 2: // Contact
-        return formData.phone && formData.county && formData.subCounty && formData.nokName && formData.nokPhone;
-      case 3: // History
-        return formData.gravida && formData.parity && formData.bloodGroup && formData.rhesus;
-      case 4: // Pregnancy
-        return formData.lmp && formData.gestationalWeeks;
+        const baseContactValid = formData.phone && formData.county && formData.subCounty;
+        // Next of Kin only required for inpatient
+        if (formData.patientType === 'inpatient') {
+          return baseContactValid && formData.nokName && formData.nokPhone;
+        }
+        return baseContactValid;
+      case 3: // Condition & History
+        return formData.conditionType && formData.bloodGroup && formData.rhesus && 
+               (formData.conditionType !== 'pregnancy' || (formData.gravida && formData.parity));
+      case 4: // Condition-Specific
+        if (formData.conditionType === 'pregnancy') {
+          return formData.lmp && formData.gestationalWeeks;
+        } else if (formData.conditionType) {
+          return formData.diagnosisDate && formData.conditionSeverity;
+        }
+        return false;
       default:
         return true;
     }
   };
 
   const handleNext = () => {
+    // Check for existing patient before proceeding from step 2
+    if (step === 2 && existingPatient?.exists && existingPatient.facilityId) {
+      setShowTransferModal(true);
+      return;
+    }
+
     if (validateCurrentStep()) {
       setStep(s => Math.min(s + 1, 5));
     } else {
       alert("Please fill in all required fields to proceed.");
+    }
+  };
+
+  const handleRequestTransfer = async () => {
+    if (!existingPatient?.patientId || !existingPatient.facilityId || !transferReason.trim()) {
+      alert('Please provide a reason for the transfer request.');
+      return;
+    }
+
+    setRequestingTransfer(true);
+    try {
+      const currentUser = JSON.parse(localStorage.getItem('mamasafe_current_user') || '{}');
+      
+      await backend.transfers.requestTransfer(
+        existingPatient.patientId,
+        existingPatient.patientName || `${formData.firstName} ${formData.lastName}`,
+        formData.phone,
+        existingPatient.facilityId,
+        existingPatient.facilityName || 'Unknown Facility',
+        currentUser.id,
+        currentUser.name || 'Current Facility',
+        transferReason
+      );
+
+      alert('Transfer request sent successfully. The original facility will be notified.');
+      setShowTransferModal(false);
+      setExistingPatient(null);
+      // Continue with enrollment (patient will be transferred once approved)
+      setStep(3);
+    } catch (error) {
+      console.error('Error requesting transfer:', error);
+      alert('Failed to send transfer request. Please try again.');
+    } finally {
+      setRequestingTransfer(false);
     }
   };
 
@@ -129,12 +219,20 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({ onAddPatient }) 
             id: Date.now().toString(),
             name: `${formData.firstName} ${formData.lastName}`.trim(),
             age: age,
-            gestationalWeeks: parseInt(formData.gestationalWeeks) || 0,
+            gestationalWeeks: formData.conditionType === 'pregnancy' ? (parseInt(formData.gestationalWeeks) || undefined) : undefined,
             location: `${formData.county}${formData.subCounty ? ', ' + formData.subCounty : ''}`,
             phone: formData.phone,
             lastCheckIn: new Date().toISOString().split('T')[0],
             riskStatus: RiskLevel.LOW, // Default low risk until triage
             nextAppointment: nextAppt.toISOString().split('T')[0],
+            conditionType: formData.conditionType || undefined,
+            patientType: formData.patientType,
+            medicalConditions: formData.conditionType ? [{
+              type: formData.conditionType,
+              diagnosisDate: formData.diagnosisDate || undefined,
+              severity: formData.conditionSeverity || undefined,
+              notes: formData.previousComplications || undefined,
+            }] : undefined,
             alerts: []
         };
         
@@ -182,9 +280,10 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({ onAddPatient }) 
             setWhatsappOptIn(false);
             setFormData({
               firstName: '', lastName: '', dob: '', nationalId: '',
-              phone: '', nokName: '', nokPhone: '', county: '', subCounty: '', ward: '',
-              gravida: '', parity: '', bloodGroup: '', rhesus: '', previousComplications: '',
-              lmp: '', edd: '', gestationalWeeks: '', ancProfile: 'Not Started', referralHospital: ''
+              phone: '', patientType: 'outpatient', nokName: '', nokPhone: '', county: '', subCounty: '', ward: '',
+              conditionType: '', gravida: '', parity: '', bloodGroup: '', rhesus: '', previousComplications: '',
+              lmp: '', edd: '', gestationalWeeks: '', ancProfile: 'Not Started', referralHospital: '',
+              diagnosisDate: '', conditionSeverity: ''
             });
           }}
           className="px-8 py-3 bg-brand-600 hover:bg-brand-700 active:scale-95 text-white rounded-full font-semibold transition-all shadow-lg shadow-brand-500/20"
@@ -199,8 +298,8 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({ onAddPatient }) 
   const steps = [
     { num: 1, label: 'Identity' },
     { num: 2, label: 'Contact' },
-    { num: 3, label: 'History' },
-    { num: 4, label: 'Pregnancy' },
+    { num: 3, label: 'Condition' },
+    { num: 4, label: 'Details' },
     { num: 5, label: 'Consent' },
   ];
 
@@ -263,7 +362,46 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({ onAddPatient }) 
           <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2"><MapPin className="text-brand-500" /> Contact & Location</h3>
           <div className="space-y-6">
              <InputGroup label="Patient WhatsApp Number" icon={Phone}>
-                <input type="tel" required className={inputClasses} placeholder="+254 7..." value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
+                <div className="relative">
+                  <input 
+                    type="tel" 
+                    required 
+                    className={inputClasses} 
+                    placeholder="+254 7..." 
+                    value={formData.phone} 
+                    onChange={e => setFormData({...formData, phone: e.target.value})} 
+                  />
+                  {checkingPatient && (
+                    <div className="absolute right-4 top-4">
+                      <Loader2 className="animate-spin text-brand-500" size={18} />
+                    </div>
+                  )}
+                </div>
+                {existingPatient?.exists && existingPatient.facilityId && (
+                  <div className="mt-2 p-3 bg-orange-50 dark:bg-orange-900/20 rounded-xl border border-orange-200 dark:border-orange-900/30 flex items-start gap-3">
+                    <AlertCircle className="text-orange-500 mt-0.5" size={18} />
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-orange-800 dark:text-orange-300">
+                        Patient already enrolled at {existingPatient.facilityName}
+                      </p>
+                      <p className="text-xs text-orange-700 dark:text-orange-400 mt-1">
+                        You'll need to request a transfer to continue enrollment.
+                      </p>
+                    </div>
+                  </div>
+                )}
+             </InputGroup>
+
+             <InputGroup label="Patient Type" icon={User}>
+                <select 
+                  required 
+                  className={inputClasses} 
+                  value={formData.patientType} 
+                  onChange={e => setFormData({...formData, patientType: e.target.value as 'outpatient' | 'inpatient'})}
+                >
+                  <option value="outpatient">Outpatient</option>
+                  <option value="inpatient">Inpatient</option>
+                </select>
              </InputGroup>
              
              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -275,30 +413,51 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({ onAddPatient }) 
                 </InputGroup>
              </div>
 
-             <div className="p-5 bg-orange-50 dark:bg-orange-900/10 rounded-2xl border border-orange-100 dark:border-orange-900/20">
-               <h4 className="text-orange-800 dark:text-orange-400 font-bold text-sm mb-4 flex items-center gap-2">
-                 <ShieldAlert size={16} /> Emergency Contact (Next of Kin)
-               </h4>
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <input type="text" required className="w-full p-3 rounded-xl bg-white dark:bg-[#2c2c2e] border border-orange-200 dark:border-orange-900/30 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500/20" placeholder="NOK Name" value={formData.nokName} onChange={e => setFormData({...formData, nokName: e.target.value})} />
-                  <input type="tel" required className="w-full p-3 rounded-xl bg-white dark:bg-[#2c2c2e] border border-orange-200 dark:border-orange-900/30 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500/20" placeholder="NOK Phone" value={formData.nokPhone} onChange={e => setFormData({...formData, nokPhone: e.target.value})} />
+             {formData.patientType === 'inpatient' && (
+               <div className="p-5 bg-orange-50 dark:bg-orange-900/10 rounded-2xl border border-orange-100 dark:border-orange-900/20">
+                 <h4 className="text-orange-800 dark:text-orange-400 font-bold text-sm mb-4 flex items-center gap-2">
+                   <ShieldAlert size={16} /> Emergency Contact (Next of Kin) - Required for Inpatient
+                 </h4>
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <input type="text" required className="w-full p-3 rounded-xl bg-white dark:bg-[#2c2c2e] border border-orange-200 dark:border-orange-900/30 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500/20" placeholder="NOK Name" value={formData.nokName} onChange={e => setFormData({...formData, nokName: e.target.value})} />
+                    <input type="tel" required className="w-full p-3 rounded-xl bg-white dark:bg-[#2c2c2e] border border-orange-200 dark:border-orange-900/30 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500/20" placeholder="NOK Phone" value={formData.nokPhone} onChange={e => setFormData({...formData, nokPhone: e.target.value})} />
+                 </div>
                </div>
-             </div>
+             )}
           </div>
         </div>
 
-        {/* Step 3: Obstetric History */}
+        {/* Step 3: Condition & Medical History */}
         <div className={`transition-all duration-500 absolute inset-0 p-6 md:p-10 overflow-y-auto pb-24 ${step === 3 ? 'translate-x-0 opacity-100 z-10' : step < 3 ? 'translate-x-full opacity-0 pointer-events-none' : '-translate-x-full opacity-0 pointer-events-none'}`}>
-          <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2"><FileText className="text-brand-500" /> Obstetric History</h3>
+          <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2"><FileText className="text-brand-500" /> Condition & Medical History</h3>
           <div className="space-y-6">
-            <div className="grid grid-cols-2 gap-6">
-               <InputGroup label="Gravida (Total Pregnancies)" icon={Activity}>
+            <InputGroup label="Primary Condition" icon={Activity}>
+              <select 
+                required 
+                className={inputClasses} 
+                value={formData.conditionType} 
+                onChange={e => setFormData({...formData, conditionType: e.target.value as ConditionType})}
+              >
+                <option value="">Select condition...</option>
+                <option value="pregnancy">Pregnancy / ANC</option>
+                <option value="diabetes">Diabetes</option>
+                <option value="hypertension">Hypertension</option>
+                <option value="hiv">HIV</option>
+                <option value="tuberculosis">Tuberculosis</option>
+                <option value="other">Other</option>
+              </select>
+            </InputGroup>
+
+            {formData.conditionType === 'pregnancy' && (
+              <div className="grid grid-cols-2 gap-6">
+                <InputGroup label="Gravida (Total Pregnancies)" icon={Activity}>
                   <input type="number" min="1" required className={inputClasses} placeholder="e.g. 2" value={formData.gravida} onChange={e => setFormData({...formData, gravida: e.target.value})} />
-               </InputGroup>
-               <InputGroup label="Parity (Viable Births)" icon={Baby}>
+                </InputGroup>
+                <InputGroup label="Parity (Viable Births)" icon={Baby}>
                   <input type="number" min="0" required className={inputClasses} placeholder="e.g. 1" value={formData.parity} onChange={e => setFormData({...formData, parity: e.target.value})} />
-               </InputGroup>
-            </div>
+                </InputGroup>
+              </div>
+            )}
             
             <div className="grid grid-cols-2 gap-6">
                <InputGroup label="Blood Group" icon={Droplet}>
@@ -330,40 +489,74 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({ onAddPatient }) 
           </div>
         </div>
 
-        {/* Step 4: Current Pregnancy */}
+        {/* Step 4: Condition-Specific Details */}
         <div className={`transition-all duration-500 absolute inset-0 p-6 md:p-10 overflow-y-auto pb-24 ${step === 4 ? 'translate-x-0 opacity-100 z-10' : step < 4 ? 'translate-x-full opacity-0 pointer-events-none' : '-translate-x-full opacity-0 pointer-events-none'}`}>
-          <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2"><Heart className="text-brand-500" /> Current Pregnancy</h3>
+          <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
+            <Heart className="text-brand-500" /> 
+            {formData.conditionType === 'pregnancy' ? 'Current Pregnancy Details' : 'Condition Details'}
+          </h3>
           <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <InputGroup label="Last Menstrual Period (LMP)" icon={Calendar}>
-                <input type="date" required className={inputClasses} value={formData.lmp} onChange={e => setFormData({...formData, lmp: e.target.value})} />
-              </InputGroup>
-              <InputGroup label="Expected Delivery (EDD)" icon={Calendar}>
-                <input type="date" readOnly className={`${inputClasses} bg-slate-100 dark:bg-slate-800 cursor-not-allowed text-slate-500`} value={formData.edd} />
-              </InputGroup>
-            </div>
+            {formData.conditionType === 'pregnancy' ? (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <InputGroup label="Last Menstrual Period (LMP)" icon={Calendar}>
+                    <input type="date" required className={inputClasses} value={formData.lmp} onChange={e => setFormData({...formData, lmp: e.target.value})} />
+                  </InputGroup>
+                  <InputGroup label="Expected Delivery (EDD)" icon={Calendar}>
+                    <input type="date" readOnly className={`${inputClasses} bg-slate-100 dark:bg-slate-800 cursor-not-allowed text-slate-500`} value={formData.edd} />
+                  </InputGroup>
+                </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-               <InputGroup label="Gestational Age (Weeks)" icon={Activity}>
-                  <input 
-                     type="number" 
-                     min="0" 
-                     max="45" 
-                     required
-                     className={inputClasses} 
-                     placeholder="Auto-calculated from LMP"
-                     value={formData.gestationalWeeks} 
-                     onChange={e => setFormData({...formData, gestationalWeeks: e.target.value})}
-                  />
-               </InputGroup>
-               <InputGroup label="ANC Profile Status" icon={FileText}>
-                  <select className={inputClasses} value={formData.ancProfile} onChange={e => setFormData({...formData, ancProfile: e.target.value})}>
-                     <option value="Not Started">Not Started</option>
-                     <option value="Started">Started</option>
-                     <option value="Defaulted">Defaulted</option>
-                  </select>
-               </InputGroup>
-            </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <InputGroup label="Gestational Age (Weeks)" icon={Activity}>
+                    <input 
+                      type="number" 
+                      min="0" 
+                      max="45" 
+                      required
+                      className={inputClasses} 
+                      placeholder="Auto-calculated from LMP"
+                      value={formData.gestationalWeeks} 
+                      onChange={e => setFormData({...formData, gestationalWeeks: e.target.value})}
+                    />
+                  </InputGroup>
+                  <InputGroup label="ANC Profile Status" icon={FileText}>
+                    <select className={inputClasses} value={formData.ancProfile} onChange={e => setFormData({...formData, ancProfile: e.target.value})}>
+                      <option value="Not Started">Not Started</option>
+                      <option value="Started">Started</option>
+                      <option value="Defaulted">Defaulted</option>
+                    </select>
+                  </InputGroup>
+                </div>
+              </>
+            ) : formData.conditionType ? (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <InputGroup label="Diagnosis Date" icon={Calendar}>
+                    <input 
+                      type="date" 
+                      required 
+                      className={inputClasses} 
+                      value={formData.diagnosisDate} 
+                      onChange={e => setFormData({...formData, diagnosisDate: e.target.value})} 
+                    />
+                  </InputGroup>
+                  <InputGroup label="Severity" icon={Activity}>
+                    <select 
+                      required 
+                      className={inputClasses} 
+                      value={formData.conditionSeverity} 
+                      onChange={e => setFormData({...formData, conditionSeverity: e.target.value as 'mild' | 'moderate' | 'severe'})}
+                    >
+                      <option value="">Select...</option>
+                      <option value="mild">Mild</option>
+                      <option value="moderate">Moderate</option>
+                      <option value="severe">Severe</option>
+                    </select>
+                  </InputGroup>
+                </div>
+              </>
+            ) : null}
           </div>
         </div>
 
@@ -433,6 +626,79 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({ onAddPatient }) 
         </div>
 
       </form>
+
+      {/* Transfer Request Modal */}
+      {showTransferModal && existingPatient && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-md animate-fade-in">
+          <div className="bg-white dark:bg-[#1c1c1e] w-full max-w-lg rounded-[2.5rem] p-8 shadow-2xl relative animate-scale-in border border-slate-100 dark:border-slate-800">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Patient Transfer Request</h2>
+              <button 
+                onClick={() => {
+                  setShowTransferModal(false);
+                  setTransferReason('');
+                }}
+                className="p-2 bg-slate-100 dark:bg-[#2c2c2e] rounded-full text-slate-500 hover:text-slate-900 dark:hover:text-white"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="p-4 bg-orange-50 dark:bg-orange-900/20 rounded-xl border border-orange-200 dark:border-orange-900/30">
+                <p className="text-sm text-orange-800 dark:text-orange-300 mb-2">
+                  <strong>{existingPatient.patientName}</strong> is already enrolled at <strong>{existingPatient.facilityName}</strong>.
+                </p>
+                <p className="text-xs text-orange-700 dark:text-orange-400">
+                  To enroll this patient at your facility, you need to request a transfer from the original facility.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                  Reason for Transfer *
+                </label>
+                <textarea
+                  required
+                  className="w-full p-3 rounded-xl bg-slate-50 dark:bg-[#2c2c2e] border border-transparent focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/10 text-slate-900 dark:text-white outline-none resize-none h-32"
+                  placeholder="e.g. Patient moved to this area and prefers to continue care at this facility..."
+                  value={transferReason}
+                  onChange={e => setTransferReason(e.target.value)}
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  onClick={() => {
+                    setShowTransferModal(false);
+                    setTransferReason('');
+                  }}
+                  className="flex-1 px-6 py-3 rounded-xl bg-slate-100 dark:bg-[#2c2c2e] text-slate-700 dark:text-slate-300 font-semibold hover:bg-slate-200 dark:hover:bg-[#3a3a3c] transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleRequestTransfer}
+                  disabled={requestingTransfer || !transferReason.trim()}
+                  className="flex-1 px-6 py-3 rounded-xl bg-brand-600 text-white font-semibold hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                >
+                  {requestingTransfer ? (
+                    <>
+                      <Loader2 className="animate-spin" size={18} />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <ArrowRight size={18} />
+                      Request Transfer
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

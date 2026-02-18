@@ -2,9 +2,10 @@
 import React, { useState, useEffect } from 'react';
 import { ActionCard } from '../components/ActionCard';
 import { backend } from '../services/backend';
-import { Users, AlertTriangle, Calendar, Activity, ChevronRight, Building2, TrendingUp, CheckCircle, Clock, MessageCircle } from 'lucide-react';
+import { Users, AlertTriangle, Calendar, Activity, ChevronRight, Building2, TrendingUp, CheckCircle, Clock, MessageCircle, Workflow, FlaskConical, CreditCard } from 'lucide-react';
 import { AreaChart, Area, XAxis, Tooltip, ResponsiveContainer } from 'recharts';
-import { Patient, UserProfile, Task, Reminder } from '../types';
+import { Patient, UserProfile, Task, Reminder, ClinicVisit } from '../types';
+import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
 
 // Mock Data for Analytics
 const visitData = [
@@ -38,23 +39,77 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 export const DashboardView: React.FC<DashboardProps> = ({ onNavigate, user }) => {
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [ancEarlyRate, setAncEarlyRate] = useState<number | null>(null);
+  const [earlyEnrollmentRate, setEarlyEnrollmentRate] = useState<number | null>(null);
   const [followup24hRate, setFollowup24hRate] = useState<number | null>(null);
   const [engagementRate, setEngagementRate] = useState<number | null>(null);
   const [reminders, setReminders] = useState<Reminder[]>([]);
+  const [todayVisits, setTodayVisits] = useState<number>(0);
+  const [pendingLabRequests, setPendingLabRequests] = useState<number>(0);
+  const [todayPayments, setTodayPayments] = useState<number>(0);
+  const [activeVisits, setActiveVisits] = useState<ClinicVisit[]>([]);
   
   useEffect(() => {
     const loadData = async () => {
-      const [taskData, patients] = await Promise.all([
+      const [taskData, patients, visits] = await Promise.all([
         backend.clinic.getTasks(),
         backend.patients.getAll(),
+        backend.workflow.getVisits(),
       ]);
       setTasks(taskData);
+      
+      // Calculate workflow metrics
+      const today = new Date().toISOString().split('T')[0];
+      const todayVisitsCount = visits.filter(v => v.visitDate.startsWith(today)).length;
+      setTodayVisits(todayVisitsCount);
+      
+      const inProgressVisits = visits.filter(v => v.status === 'in_progress' || v.status === 'registered');
+      setActiveVisits(inProgressVisits);
+      
+      // Get lab requests and payments for today (more efficient query)
+      const todayVisitIds = visits.filter(v => v.visitDate.startsWith(today)).map(v => v.id);
+      
+      if (todayVisitIds.length > 0) {
+        const { data: labRequestsData } = await supabase
+          .from('lab_requests')
+          .select('id, status')
+          .in('visit_id', todayVisitIds)
+          .eq('status', 'requested');
+        
+        setPendingLabRequests(labRequestsData?.length || 0);
+        
+        const { data: paymentsData } = await supabase
+          .from('payments')
+          .select('amount, payment_status')
+          .in('visit_id', todayVisitIds)
+          .eq('payment_status', 'paid');
+        
+        const totalPayments = paymentsData?.reduce((sum, p) => sum + parseFloat(p.amount), 0) || 0;
+        setTodayPayments(totalPayments);
+      } else {
+        setPendingLabRequests(0);
+        setTodayPayments(0);
+      }
 
       if (patients.length) {
-        const early = patients.filter((p: Patient) => p.gestationalWeeks <= 16);
-        const ancRate = Math.round((early.length / patients.length) * 100);
-        setAncEarlyRate(ancRate);
+        // Calculate early enrollment rate based on condition type
+        // For pregnancy: gestational weeks <= 16
+        // For other conditions: enrolled within first month of diagnosis
+        const now = new Date();
+        const early = patients.filter((p: Patient) => {
+          if (p.conditionType === 'pregnancy') {
+            return p.gestationalWeeks && p.gestationalWeeks <= 16;
+          } else if (p.medicalConditions && p.medicalConditions.length > 0) {
+            const firstCondition = p.medicalConditions[0];
+            if (firstCondition.diagnosisDate) {
+              const diagnosisDate = new Date(firstCondition.diagnosisDate);
+              const daysDiff = Math.floor((now.getTime() - diagnosisDate.getTime()) / (1000 * 60 * 60 * 24));
+              return daysDiff <= 30; // Enrolled within 30 days of diagnosis
+            }
+          }
+          return false;
+        });
+        const earlyRate = Math.round((early.length / patients.length) * 100);
+        setEarlyEnrollmentRate(earlyRate);
 
         const allMeds = patients.flatMap((p) => p.medications || []);
         if (allMeds.length) {
@@ -66,7 +121,7 @@ export const DashboardView: React.FC<DashboardProps> = ({ onNavigate, user }) =>
           setEngagementRate(null);
         }
       } else {
-        setAncEarlyRate(null);
+        setEarlyEnrollmentRate(null);
         setEngagementRate(null);
       }
 
@@ -140,9 +195,9 @@ export const DashboardView: React.FC<DashboardProps> = ({ onNavigate, user }) =>
           variant="brand"
         />
          <ActionCard 
-          title="ANC < 16 Wks" 
-          value={ancEarlyRate !== null ? `${ancEarlyRate}%` : '—'} 
-          subtitle="Early Enrollment Rate"
+          title="Early Enrollment" 
+          value={earlyEnrollmentRate !== null ? `${earlyEnrollmentRate}%` : '—'} 
+          subtitle="Timely registration rate"
           icon={Calendar} 
           variant="default"
         />
@@ -156,6 +211,105 @@ export const DashboardView: React.FC<DashboardProps> = ({ onNavigate, user }) =>
         />
       </div>
 
+      {/* Workflow Overview */}
+      <div className="bg-white dark:bg-[#1c1c1e] p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h3 className="text-xl font-bold text-slate-900 dark:text-white">Today's Workflow</h3>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Real-time clinic operations</p>
+          </div>
+          <button
+            onClick={() => onNavigate('workflow')}
+            className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-semibold text-sm transition-colors flex items-center gap-2"
+          >
+            <Workflow size={18} />
+            Start Visit
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="p-4 bg-slate-50 dark:bg-[#2c2c2e] rounded-xl border border-slate-200 dark:border-slate-700">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                <Users className="text-blue-600 dark:text-blue-400" size={20} />
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-slate-900 dark:text-white">{todayVisits}</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">Visits Today</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-4 bg-slate-50 dark:bg-[#2c2c2e] rounded-xl border border-slate-200 dark:border-slate-700">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg">
+                <Workflow className="text-yellow-600 dark:text-yellow-400" size={20} />
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-slate-900 dark:text-white">{activeVisits.length}</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">Active Visits</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-4 bg-slate-50 dark:bg-[#2c2c2e] rounded-xl border border-slate-200 dark:border-slate-700">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+                <FlaskConical className="text-purple-600 dark:text-purple-400" size={20} />
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-slate-900 dark:text-white">{pendingLabRequests}</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">Pending Lab Tests</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-4 bg-slate-50 dark:bg-[#2c2c2e] rounded-xl border border-slate-200 dark:border-slate-700">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                <CreditCard className="text-green-600 dark:text-green-400" size={20} />
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-slate-900 dark:text-white">
+                  {todayPayments > 0 ? `KES ${(todayPayments / 1000).toFixed(0)}K` : 'KES 0'}
+                </div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">Payments Today</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {activeVisits.length > 0 && (
+          <div className="mt-6 pt-6 border-t border-slate-200 dark:border-slate-800">
+            <h4 className="font-semibold text-slate-900 dark:text-white mb-3">Active Visits</h4>
+            <div className="space-y-2">
+              {activeVisits.slice(0, 3).map((visit) => (
+                <div
+                  key={visit.id}
+                  onClick={() => onNavigate('workflow')}
+                  className="p-3 bg-slate-50 dark:bg-[#2c2c2e] rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-[#3a3a3c] cursor-pointer transition-colors"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-semibold text-slate-900 dark:text-white">{visit.patientName}</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400">
+                        {visit.visitType} • {new Date(visit.registrationTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                      </div>
+                    </div>
+                    <span className={`px-2 py-1 rounded-lg text-xs font-semibold ${
+                      visit.status === 'in_progress' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400' :
+                      'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-400'
+                    }`}>
+                      {visit.status}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* Main Chart Area */}
@@ -163,7 +317,7 @@ export const DashboardView: React.FC<DashboardProps> = ({ onNavigate, user }) =>
           <div className="flex justify-between items-center mb-8">
              <div>
                <h3 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">Clinic Analytics</h3>
-               <p className="text-sm text-slate-500 font-medium">Weekly ANC Visits Trend</p>
+               <p className="text-sm text-slate-500 font-medium">Weekly Patient Visits Trend</p>
              </div>
           </div>
           <div className="h-72 w-full">

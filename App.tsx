@@ -13,9 +13,10 @@ import { ReferralsView } from './views/Referrals';
 import { MedicationsView } from './views/Medications';
 import { SettingsView } from './views/Settings';
 import { SuperadminDashboard } from './views/SuperadminDashboard';
+import { ClinicWorkflow } from './views/ClinicWorkflow';
 import { backend } from './services/backend';
 import { ViewState, Alert, Patient, UserProfile } from './types';
-import { LayoutDashboard, UserPlus, Stethoscope, Sun, Moon, Bell, LogOut, Users, X, HelpCircle, Book, ExternalLink, MessageSquare, Phone, Clock, FileText, Settings, Loader2, CheckCircle } from 'lucide-react';
+import { LayoutDashboard, UserPlus, Stethoscope, Sun, Moon, Bell, LogOut, Users, X, HelpCircle, Book, ExternalLink, MessageSquare, Phone, Clock, FileText, Settings, Loader2, CheckCircle, Workflow } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -172,6 +173,7 @@ export const App: React.FC = () => {
       // Clinic / Default
       return [
         { id: 'dashboard', label: 'Overview', icon: LayoutDashboard },
+        { id: 'workflow', label: 'Workflow', icon: Workflow },
         { id: 'patients', label: 'Patients', icon: Users },
         { id: 'enrollment', label: 'Enroll', icon: UserPlus },
         { id: 'triage', label: 'Triage', icon: Stethoscope },
@@ -440,6 +442,10 @@ export const App: React.FC = () => {
          
          {currentView === 'enrollment' && (
            <EnrollmentView onAddPatient={handleAddPatient} />
+         )}
+
+         {currentView === 'workflow' && currentUser && (
+           <ClinicWorkflow user={currentUser} onNavigate={setCurrentView} />
          )}
 
          {currentView === 'triage' && <TriageView user={currentUser} />}

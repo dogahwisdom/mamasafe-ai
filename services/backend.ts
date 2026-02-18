@@ -9,6 +9,9 @@ import { SuperadminService } from "./backend/superadminService";
 import { SubscriptionService } from "./backend/subscriptionService";
 import { SupportService } from "./backend/supportService";
 import { SOPService } from "./backend/sopService";
+import { TransferService } from "./backend/transferService";
+import { DispensingService } from "./backend/dispensingService";
+import { ClinicWorkflowService } from "./backend/clinicWorkflowService";
 
 class BackendFacade {
   public readonly auth: AuthService;
@@ -22,6 +25,9 @@ class BackendFacade {
   public readonly subscriptions: SubscriptionService;
   public readonly support: SupportService;
   public readonly sops: SOPService;
+  public readonly transfers: TransferService;
+  public readonly dispensing: DispensingService;
+  public readonly workflow: ClinicWorkflowService;
 
   constructor() {
     this.auth = new AuthService();
@@ -35,6 +41,9 @@ class BackendFacade {
     this.subscriptions = new SubscriptionService();
     this.support = new SupportService();
     this.sops = new SOPService();
+    this.transfers = new TransferService();
+    this.dispensing = new DispensingService();
+    this.workflow = new ClinicWorkflowService();
   }
 }
 

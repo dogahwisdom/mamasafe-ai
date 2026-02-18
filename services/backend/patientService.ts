@@ -41,12 +41,17 @@ export class PatientService {
         id: p.id,
         name: p.name,
         age: p.age,
-        gestationalWeeks: p.gestational_weeks,
+        gestationalWeeks: p.gestational_weeks || undefined,
         location: p.location,
         phone: p.phone,
         lastCheckIn: p.last_check_in || '',
         riskStatus: p.risk_status as RiskLevel,
         nextAppointment: p.next_appointment || '',
+        nextFollowUpDate: p.next_follow_up_date || undefined,
+        conditionType: p.condition_type || undefined,
+        medicalConditions: p.medical_conditions || undefined,
+        patientType: p.patient_type || 'outpatient',
+        facilityId: p.facility_id || undefined,
         alerts: (p.alerts as any) || [],
         medications: (p.medications || []).map((m: any) => ({
           id: m.id,
@@ -147,15 +152,19 @@ export class PatientService {
         .eq('phone', cleanPhone)
         .single();
 
-      const patientData = {
+      const patientData: any = {
         name: patient.name,
         age: patient.age,
-        gestational_weeks: patient.gestationalWeeks,
+        gestational_weeks: patient.gestationalWeeks || null,
         location: patient.location,
         phone: cleanPhone,
         last_check_in: patient.lastCheckIn || null,
         risk_status: patient.riskStatus,
         next_appointment: patient.nextAppointment || null,
+        next_follow_up_date: patient.nextFollowUpDate || null,
+        condition_type: patient.conditionType || null,
+        medical_conditions: patient.medicalConditions ? JSON.parse(JSON.stringify(patient.medicalConditions)) : null,
+        patient_type: patient.patientType || 'outpatient',
         alerts: JSON.parse(JSON.stringify(patient.alerts || [])),
         facility_id: facilityId,
       };

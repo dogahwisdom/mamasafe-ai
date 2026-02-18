@@ -21,6 +21,11 @@ export interface SystemMetrics {
   pendingTasks: number;
   pendingRefills: number;
   pendingReminders: number;
+  // Workflow metrics
+  visitsToday: number;
+  activeVisits: number;
+  pendingLabRequests: number;
+  totalPaymentsToday: number;
   systemHealth: 'healthy' | 'degraded' | 'down';
 }
 
@@ -119,6 +124,31 @@ export class SuperadminService {
         const pendingRefills = refills.filter(r => r.status === 'pending').length;
         const pendingReminders = reminders.filter(r => !r.sent).length;
 
+        // Get workflow metrics
+        const today = new Date().toISOString().split('T')[0];
+        const { data: visitsToday } = await supabase
+          .from('clinic_visits')
+          .select('id, status')
+          .gte('visit_date', today);
+
+        const { data: activeVisits } = await supabase
+          .from('clinic_visits')
+          .select('id')
+          .in('status', ['registered', 'in_progress']);
+
+        const { data: pendingLabs } = await supabase
+          .from('lab_requests')
+          .select('id')
+          .eq('status', 'requested');
+
+        const { data: paymentsToday } = await supabase
+          .from('payments')
+          .select('amount, payment_status')
+          .gte('payment_date', today)
+          .eq('payment_status', 'paid');
+
+        const totalPaymentsToday = paymentsToday?.reduce((sum, p) => sum + parseFloat(p.amount), 0) || 0;
+
         // Check system health
         let systemHealth: 'healthy' | 'degraded' | 'down' = 'healthy';
         try {
@@ -142,6 +172,10 @@ export class SuperadminService {
           pendingTasks,
           pendingRefills,
           pendingReminders,
+          visitsToday: visitsToday?.length || 0,
+          activeVisits: activeVisits?.length || 0,
+          pendingLabRequests: pendingLabs?.length || 0,
+          totalPaymentsToday: totalPaymentsToday,
           systemHealth,
         };
       }

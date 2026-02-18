@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Users, Building2, Activity, TrendingUp, AlertTriangle, 
   MapPin, Search, Filter, Download, RefreshCw, Settings,
-  UserCheck, Clock, BarChart3, Globe
+  UserCheck, Clock, BarChart3, Globe, Workflow, FlaskConical, CreditCard
 } from 'lucide-react';
 import { UserProfile } from '../types';
 import { SuperadminService, SystemMetrics, FacilityMetrics, EnrollmentTrend, RiskDistribution, GeographicDistribution } from '../services/backend/superadminService';
@@ -289,6 +289,62 @@ export const SuperadminDashboard: React.FC<SuperadminDashboardProps> = ({ user, 
               icon={Clock}
               variant="default"
             />
+          </div>
+
+          {/* Workflow Metrics */}
+          <div className="bg-white dark:bg-[#1c1c1e] p-6 rounded-2xl border border-slate-200 dark:border-slate-800">
+            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Workflow Operations</h3>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="p-4 bg-slate-50 dark:bg-[#2c2c2e] rounded-xl border border-slate-200 dark:border-slate-700">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                    <Users className="text-blue-600 dark:text-blue-400" size={20} />
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-slate-900 dark:text-white">{metrics.visitsToday}</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400">Visits Today</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-4 bg-slate-50 dark:bg-[#2c2c2e] rounded-xl border border-slate-200 dark:border-slate-700">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg">
+                    <Workflow className="text-yellow-600 dark:text-yellow-400" size={20} />
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-slate-900 dark:text-white">{metrics.activeVisits}</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400">Active Visits</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-4 bg-slate-50 dark:bg-[#2c2c2e] rounded-xl border border-slate-200 dark:border-slate-700">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+                    <FlaskConical className="text-purple-600 dark:text-purple-400" size={20} />
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-slate-900 dark:text-white">{metrics.pendingLabRequests}</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400">Pending Lab Tests</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-4 bg-slate-50 dark:bg-[#2c2c2e] rounded-xl border border-slate-200 dark:border-slate-700">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                    <CreditCard className="text-green-600 dark:text-green-400" size={20} />
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-slate-900 dark:text-white">
+                      {metrics.totalPaymentsToday > 0 ? `KES ${(metrics.totalPaymentsToday / 1000).toFixed(0)}K` : 'KES 0'}
+                    </div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400">Payments Today</div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* System Health */}
