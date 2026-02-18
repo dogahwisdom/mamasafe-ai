@@ -149,55 +149,58 @@ export const DashboardView: React.FC<DashboardProps> = ({ onNavigate, user }) =>
           setCompletedVisits(0);
         }
 
-      if (patients.length) {
-        // Calculate early enrollment rate based on condition type
-        // For pregnancy: gestational weeks <= 16
-        // For other conditions: enrolled within first month of diagnosis
-        const now = new Date();
-        const early = patients.filter((p: Patient) => {
-          if (p.conditionType === 'pregnancy') {
-            return p.gestationalWeeks && p.gestationalWeeks <= 16;
-          } else if (p.medicalConditions && p.medicalConditions.length > 0) {
-            const firstCondition = p.medicalConditions[0];
-            if (firstCondition.diagnosisDate) {
-              const diagnosisDate = new Date(firstCondition.diagnosisDate);
-              const daysDiff = Math.floor((now.getTime() - diagnosisDate.getTime()) / (1000 * 60 * 60 * 24));
-              return daysDiff <= 30; // Enrolled within 30 days of diagnosis
+        if (patients.length) {
+          // Calculate early enrollment rate based on condition type
+          // For pregnancy: gestational weeks <= 16
+          // For other conditions: enrolled within first month of diagnosis
+          const now = new Date();
+          const early = patients.filter((p: Patient) => {
+            if (p.conditionType === 'pregnancy') {
+              return p.gestationalWeeks && p.gestationalWeeks <= 16;
+            } else if (p.medicalConditions && p.medicalConditions.length > 0) {
+              const firstCondition = p.medicalConditions[0];
+              if (firstCondition.diagnosisDate) {
+                const diagnosisDate = new Date(firstCondition.diagnosisDate);
+                const daysDiff = Math.floor((now.getTime() - diagnosisDate.getTime()) / (1000 * 60 * 60 * 24));
+                return daysDiff <= 30; // Enrolled within 30 days of diagnosis
+              }
             }
-          }
-          return false;
-        });
-        const earlyRate = Math.round((early.length / patients.length) * 100);
-        setEarlyEnrollmentRate(earlyRate);
+            return false;
+          });
+          const earlyRate = Math.round((early.length / patients.length) * 100);
+          setEarlyEnrollmentRate(earlyRate);
 
-        const allMeds = patients.flatMap((p) => p.medications || []);
-        if (allMeds.length) {
-          const avgAdherence =
-            allMeds.reduce((sum, m) => sum + (m.adherenceRate || 0), 0) /
-            allMeds.length;
-          setEngagementRate(Math.round(avgAdherence));
+          const allMeds = patients.flatMap((p) => p.medications || []);
+          if (allMeds.length) {
+            const avgAdherence =
+              allMeds.reduce((sum, m) => sum + (m.adherenceRate || 0), 0) /
+              allMeds.length;
+            setEngagementRate(Math.round(avgAdherence));
+          } else {
+            setEngagementRate(null);
+          }
         } else {
+          setEarlyEnrollmentRate(null);
           setEngagementRate(null);
         }
-      } else {
-        setEarlyEnrollmentRate(null);
-        setEngagementRate(null);
-      }
 
-      const missed = taskData.filter((t) => t.type === 'Missed Visit');
-      if (missed.length) {
-        const within24 = missed.filter(
-          (t) => t.resolved && t.resolvedAt && t.resolvedAt - t.timestamp <= 24 * 60 * 60 * 1000
-        );
-        const rate = Math.round((within24.length / missed.length) * 100);
-        setFollowup24hRate(rate);
-      } else {
-        setFollowup24hRate(null);
-      }
+        const missed = taskData.filter((t) => t.type === 'Missed Visit');
+        if (missed.length) {
+          const within24 = missed.filter(
+            (t) => t.resolved && t.resolvedAt && t.resolvedAt - t.timestamp <= 24 * 60 * 60 * 1000
+          );
+          const rate = Math.round((within24.length / missed.length) * 100);
+          setFollowup24hRate(rate);
+        } else {
+          setFollowup24hRate(null);
+        }
 
-      await backend.reminders.generateDailyReminders();
-      const pending = await backend.reminders.getPending();
-      setReminders(pending.slice(0, 5));
+        await backend.reminders.generateDailyReminders();
+        const pending = await backend.reminders.getPending();
+        setReminders(pending.slice(0, 5));
+      } catch (error) {
+        console.error('Error loading dashboard data:', error);
+      }
     };
     loadData();
   }, []);
@@ -338,6 +341,64 @@ export const DashboardView: React.FC<DashboardProps> = ({ onNavigate, user }) =>
                   {todayPayments > 0 ? `KES ${(todayPayments / 1000).toFixed(0)}K` : 'KES 0'}
                 </div>
                 <div className="text-xs text-slate-500 dark:text-slate-400">Payments Today</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Additional Metrics Row */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
+          <div className="p-4 bg-slate-50 dark:bg-[#2c2c2e] rounded-xl border border-slate-200 dark:border-slate-700">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
+                <FlaskConical className="text-orange-600 dark:text-orange-400" size={20} />
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-slate-900 dark:text-white">{completedLabTests}</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">Tests Completed</div>
+                {pendingLabRequests > 0 && (
+                  <div className="text-xs text-orange-600 dark:text-orange-400 mt-1">
+                    {pendingLabRequests} pending
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="p-4 bg-slate-50 dark:bg-[#2c2c2e] rounded-xl border border-slate-200 dark:border-slate-700">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg">
+                <Stethoscope className="text-indigo-600 dark:text-indigo-400" size={20} />
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-slate-900 dark:text-white">{totalDiagnoses}</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">Total Diagnoses</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-4 bg-slate-50 dark:bg-[#2c2c2e] rounded-xl border border-slate-200 dark:border-slate-700">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-teal-100 dark:bg-teal-900/30 rounded-lg">
+                <CheckCircle className="text-teal-600 dark:text-teal-400" size={20} />
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-slate-900 dark:text-white">{completedVisits}</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">Completed Visits</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-4 bg-slate-50 dark:bg-[#2c2c2e] rounded-xl border border-slate-200 dark:border-slate-700">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-pink-100 dark:bg-pink-900/30 rounded-lg">
+                <FileText className="text-pink-600 dark:text-pink-400" size={20} />
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-slate-900 dark:text-white">
+                  {totalLabTests > 0 ? Math.round((completedLabTests / totalLabTests) * 100) : 0}%
+                </div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">Test Completion Rate</div>
               </div>
             </div>
           </div>
