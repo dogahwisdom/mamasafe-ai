@@ -150,7 +150,6 @@ All requested features have been implemented and are functional. Here's how to a
   - Pregnancy / ANC
   - Diabetes
   - Hypertension
-  - HIV
   - Tuberculosis
   - Other
 

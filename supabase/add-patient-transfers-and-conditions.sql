@@ -11,7 +11,7 @@ ALTER TABLE patients
 
 -- Add condition_type field
 ALTER TABLE patients
-  ADD COLUMN IF NOT EXISTS condition_type TEXT CHECK (condition_type IN ('pregnancy', 'diabetes', 'hypertension', 'hiv', 'tuberculosis', 'other', NULL));
+  ADD COLUMN IF NOT EXISTS condition_type TEXT CHECK (condition_type IN ('pregnancy', 'diabetes', 'hypertension', 'tuberculosis', 'other', NULL));
 
 -- Add medical_conditions JSONB field for storing multiple conditions and details
 ALTER TABLE patients
