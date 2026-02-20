@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { UserPlus, Calendar, MapPin, CheckCircle, ChevronRight, ChevronLeft, Phone, User, Activity, Heart, FileText, Baby, Droplet, ShieldAlert, Lock, CheckSquare, Loader2, MessageSquare, AlertCircle, ArrowRight } from 'lucide-react';
+import { UserPlus, Calendar, MapPin, CheckCircle, ChevronRight, ChevronLeft, Phone, User, Activity, Heart, FileText, Baby, Lock, CheckSquare, Loader2, MessageSquare, AlertCircle, ArrowRight } from 'lucide-react';
 import { Patient, RiskLevel, ConditionType } from '../types';
 import { backend } from '../services/backend';
 
@@ -63,9 +63,6 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({ onAddPatient }) 
     conditionType: '' as ConditionType | '',
     gravida: '', // Total pregnancies including current
     parity: '',  // Previous viable births
-    bloodGroup: '',
-    rhesus: '',
-    previousComplications: '',
     
     // Step 4: Condition-Specific Details
     lmp: '',
@@ -74,7 +71,6 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({ onAddPatient }) 
     ancProfile: 'Not Started', // Started, Not Started
     referralHospital: '',
     diagnosisDate: '',
-    conditionSeverity: '' as 'mild' | 'moderate' | 'severe' | '',
   });
 
   // Auto-calculate EDD and Gestational Weeks when LMP changes
@@ -134,13 +130,15 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({ onAddPatient }) 
         }
         return baseContactValid;
       case 3: // Condition & History
-        return formData.conditionType && formData.bloodGroup && formData.rhesus && 
+        return formData.conditionType && 
                (formData.conditionType !== 'pregnancy' || (formData.gravida && formData.parity));
       case 4: // Condition-Specific
         if (formData.conditionType === 'pregnancy') {
           return formData.lmp && formData.gestationalWeeks;
         } else if (formData.conditionType) {
-          return formData.diagnosisDate && formData.conditionSeverity;
+          // For non-pregnancy conditions, only require diagnosis date;
+          // severity will be assessed and captured by clinician in the workflow
+          return formData.diagnosisDate;
         }
         return false;
       default:
@@ -211,10 +209,9 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({ onAddPatient }) 
         const age = formData.dob 
             ? new Date().getFullYear() - new Date(formData.dob).getFullYear() 
             : 0;
-            
-        const nextAppt = new Date();
-        nextAppt.setDate(nextAppt.getDate() + 30); // Default to 1 month from now
 
+        // Enrollment should not decide the next appointment.
+        // This will be set later by the clinician in the workflow.
         const newPatient: Patient = {
             id: Date.now().toString(),
             name: `${formData.firstName} ${formData.lastName}`.trim(),
@@ -224,14 +221,14 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({ onAddPatient }) 
             phone: formData.phone,
             lastCheckIn: new Date().toISOString().split('T')[0],
             riskStatus: RiskLevel.LOW, // Default low risk until triage
-            nextAppointment: nextAppt.toISOString().split('T')[0],
+            nextAppointment: '',
             conditionType: formData.conditionType || undefined,
             patientType: formData.patientType,
             medicalConditions: formData.conditionType ? [{
               type: formData.conditionType,
+              // Diagnosis date is captured here as a patient-reported date;
+              // detailed assessment, severity and notes are recorded later in the clinical workflow
               diagnosisDate: formData.diagnosisDate || undefined,
-              severity: formData.conditionSeverity || undefined,
-              notes: formData.previousComplications || undefined,
             }] : undefined,
             alerts: []
         };
@@ -281,9 +278,9 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({ onAddPatient }) 
             setFormData({
               firstName: '', lastName: '', dob: '', nationalId: '',
               phone: '', patientType: 'outpatient', nokName: '', nokPhone: '', county: '', subCounty: '', ward: '',
-              conditionType: '', gravida: '', parity: '', bloodGroup: '', rhesus: '', previousComplications: '',
+              conditionType: '', gravida: '', parity: '',
               lmp: '', edd: '', gestationalWeeks: '', ancProfile: 'Not Started', referralHospital: '',
-              diagnosisDate: '', conditionSeverity: ''
+              diagnosisDate: ''
             });
           }}
           className="px-8 py-3 bg-brand-600 hover:bg-brand-700 active:scale-95 text-white rounded-full font-semibold transition-all shadow-lg shadow-brand-500/20"
@@ -458,33 +455,6 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({ onAddPatient }) 
               </div>
             )}
             
-            <div className="grid grid-cols-2 gap-6">
-               <InputGroup label="Blood Group" icon={Droplet}>
-                  <select required className={inputClasses} value={formData.bloodGroup} onChange={e => setFormData({...formData, bloodGroup: e.target.value})}>
-                     <option value="">Select...</option>
-                     <option value="A">A</option>
-                     <option value="B">B</option>
-                     <option value="AB">AB</option>
-                     <option value="O">O</option>
-                  </select>
-               </InputGroup>
-               <InputGroup label="Rhesus Factor" icon={Activity}>
-                  <select required className={inputClasses} value={formData.rhesus} onChange={e => setFormData({...formData, rhesus: e.target.value})}>
-                     <option value="">Select...</option>
-                     <option value="Positive">Positive (+)</option>
-                     <option value="Negative">Negative (-)</option>
-                  </select>
-               </InputGroup>
-            </div>
-
-            <InputGroup label="Previous Complications" icon={ShieldAlert}>
-               <textarea 
-                  className="w-full pl-12 p-4 rounded-2xl bg-slate-50 dark:bg-[#2c2c2e] border-transparent focus:border-brand-500/50 focus:bg-white dark:focus:bg-black focus:ring-4 focus:ring-brand-500/10 text-slate-900 dark:text-white font-medium transition-all placeholder-slate-400 outline-none resize-none h-24" 
-                  placeholder="e.g. C-Section, PPH, Pre-eclampsia (Optional)"
-                  value={formData.previousComplications}
-                  onChange={e => setFormData({...formData, previousComplications: e.target.value})}
-               />
-            </InputGroup>
           </div>
         </div>
 
@@ -539,19 +509,6 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({ onAddPatient }) 
                       value={formData.diagnosisDate} 
                       onChange={e => setFormData({...formData, diagnosisDate: e.target.value})} 
                     />
-                  </InputGroup>
-                  <InputGroup label="Severity" icon={Activity}>
-                    <select 
-                      required 
-                      className={inputClasses} 
-                      value={formData.conditionSeverity} 
-                      onChange={e => setFormData({...formData, conditionSeverity: e.target.value as 'mild' | 'moderate' | 'severe'})}
-                    >
-                      <option value="">Select...</option>
-                      <option value="mild">Mild</option>
-                      <option value="moderate">Moderate</option>
-                      <option value="severe">Severe</option>
-                    </select>
                   </InputGroup>
                 </div>
               </>

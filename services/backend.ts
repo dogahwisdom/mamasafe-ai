@@ -13,7 +13,7 @@ import { TransferService } from "./backend/transferService";
 import { DispensingService } from "./backend/dispensingService";
 import { ClinicWorkflowService } from "./backend/clinicWorkflowService";
 import { AIUsageService } from "./backend/aiUsageService";
-import { AIUsageService } from "./backend/aiUsageService";
+import { AppointmentPlanningService } from "./backend/appointmentPlanningService";
 
 class BackendFacade {
   public readonly auth: AuthService;
@@ -31,6 +31,7 @@ class BackendFacade {
   public readonly dispensing: DispensingService;
   public readonly workflow: ClinicWorkflowService;
   public readonly aiUsage: AIUsageService;
+  public readonly appointmentPlanning: AppointmentPlanningService;
 
   constructor() {
     this.auth = new AuthService();
@@ -48,6 +49,7 @@ class BackendFacade {
     this.dispensing = new DispensingService();
     this.workflow = new ClinicWorkflowService();
     this.aiUsage = new AIUsageService();
+    this.appointmentPlanning = new AppointmentPlanningService();
   }
 }
 

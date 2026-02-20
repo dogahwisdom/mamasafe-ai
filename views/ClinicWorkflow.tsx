@@ -58,6 +58,14 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
     severity: 'mild' as 'mild' | 'moderate' | 'severe' | 'critical',
   });
 
+  // Next appointment is a clinician decision; captured here in the diagnosis/plan stage
+  const [nextAppointmentDate, setNextAppointmentDate] = useState<string>('');
+  const [nextAppointmentSuggestion, setNextAppointmentSuggestion] = useState<{
+    date: string;
+    rationale: string;
+  } | null>(null);
+  const [loadingSuggestion, setLoadingSuggestion] = useState(false);
+
   const [paymentForm, setPaymentForm] = useState({
     paymentType: 'consultation' as 'consultation' | 'lab' | 'pharmacy' | 'procedure' | 'other',
     amount: '',
@@ -123,6 +131,21 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
       );
       setCurrentVisit(visit);
       setActiveStage('history');
+
+      // Initialise next appointment control from existing patient value if present
+      if (selectedPatient.nextAppointment) {
+        try {
+          const existing = new Date(selectedPatient.nextAppointment);
+          if (!isNaN(existing.getTime())) {
+            setNextAppointmentDate(existing.toISOString().split('T')[0]);
+          }
+        } catch {
+          setNextAppointmentDate('');
+        }
+      } else {
+        setNextAppointmentDate('');
+      }
+      setNextAppointmentSuggestion(null);
     } catch (error) {
       console.error('Error creating visit:', error);
       alert('Failed to start visit. Please try again.');
@@ -231,7 +254,55 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
         description: '', 
         severity: 'mild' 
       });
+
+      // If clinician set a next appointment date, persist it on the patient record
+      if (nextAppointmentDate) {
+        try {
+          await backend.workflow.updateNextAppointment(
+            currentVisit.patientId,
+            nextAppointmentDate
+          );
+
+          // Keep local patient state in sync so UI updates immediately
+          setSelectedPatient(prev =>
+            prev ? { ...prev, nextAppointment: nextAppointmentDate } : prev
+          );
+        } catch (error) {
+          console.error('Error updating next appointment:', error);
+          alert('Diagnosis saved, but failed to update next appointment.');
+        }
+      }
+
       alert('Diagnosis added successfully');
+  const handleGetAppointmentSuggestion = () => {
+    if (!selectedPatient || !currentVisit) {
+      alert('Select a patient and start a visit first.');
+      return;
+    }
+
+    setLoadingSuggestion(true);
+    try {
+      const suggestion = backend.appointmentPlanning.suggestNextAppointment(
+        selectedPatient,
+        {
+          diagnosisName: diagnosisForm.diagnosisName || (diagnoses[0]?.diagnosisName || 'condition'),
+          severity: diagnosisForm.severity,
+          diagnosisType: diagnosisForm.diagnosisType,
+        },
+        {
+          visitType: currentVisit.visitType,
+        } as any
+      );
+
+      setNextAppointmentDate(suggestion.suggestedDate);
+      setNextAppointmentSuggestion({
+        date: suggestion.suggestedDate,
+        rationale: suggestion.rationale,
+      });
+    } finally {
+      setLoadingSuggestion(false);
+    }
+  };
     } catch (error) {
       console.error('Error creating diagnosis:', error);
       alert('Failed to add diagnosis');
@@ -401,23 +472,33 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
           </div>
 
           {/* Current Patient Info */}
-          <div className="mb-6 p-4 bg-slate-50 dark:bg-[#2c2c2e] rounded-xl">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-bold text-slate-900 dark:text-white">{selectedPatient.name}</h3>
-                <p className="text-sm text-slate-500 dark:text-slate-400">
-                  {selectedPatient.phone} • Age: {selectedPatient.age} • {selectedPatient.location}
-                </p>
-              </div>
-              {currentVisit && (
+          <div className="mb-6 p-4 bg-slate-50 dark:bg-[#2c2c2e] rounded-xl flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <h3 className="font-bold text-slate-900 dark:text-white">{selectedPatient.name}</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                {selectedPatient.phone} • Age: {selectedPatient.age} • {selectedPatient.location}
+              </p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                Next clinic appointment:{' '}
+                {selectedPatient.nextAppointment
+                  ? new Date(selectedPatient.nextAppointment).toLocaleDateString(undefined, {
+                      day: 'numeric',
+                      month: 'short',
+                      year: 'numeric',
+                    })
+                  : 'Not scheduled'}
+              </p>
+            </div>
+            {currentVisit && (
+              <div className="flex flex-col items-end gap-2">
                 <div className="text-right">
                   <div className="text-xs text-slate-500 dark:text-slate-400">Visit ID</div>
                   <div className="text-sm font-mono text-slate-700 dark:text-slate-300">
                     {currentVisit.id.substring(0, 8)}...
                   </div>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
           {/* Stage Content */}
@@ -714,10 +795,10 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
               </div>
             )}
 
-            {/* Diagnosis Stage */}
+            {/* Diagnosis & Plan Stage */}
             {activeStage === 'diagnosis' && currentVisit && (
               <div className="space-y-4">
-                <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Diagnosis</h3>
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Diagnosis & Follow-up Plan</h3>
                 
                 {/* Add Diagnosis Form */}
                 <div className="p-4 bg-slate-50 dark:bg-[#2c2c2e] rounded-xl border border-slate-200 dark:border-slate-700 mb-4">
@@ -789,14 +870,90 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
                       />
                     </div>
                   </div>
-                  <button
-                    onClick={handleAddDiagnosis}
-                    disabled={saving || !diagnosisForm.diagnosisName.trim()}
-                    className="mt-4 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-semibold transition-colors flex items-center gap-2 disabled:opacity-50"
-                  >
-                    <Plus size={16} />
-                    Add Diagnosis
-                  </button>
+                  <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <button
+                      onClick={handleAddDiagnosis}
+                      disabled={saving || !diagnosisForm.diagnosisName.trim()}
+                      className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-semibold transition-colors flex items-center gap-2 disabled:opacity-50"
+                    >
+                      <Plus size={16} />
+                      Add Diagnosis & Save Plan
+                    </button>
+                    {/* Next Appointment Planning */}
+                    <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                      <label className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                        Next Clinic Appointment
+                      </label>
+                    <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                        <input
+                          type="date"
+                          className="px-3 py-2 rounded-lg bg-white dark:bg-black border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white"
+                          value={nextAppointmentDate}
+                          onChange={e => setNextAppointmentDate(e.target.value)}
+                        />
+                        <div className="flex flex-wrap gap-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const d = new Date();
+                              d.setDate(d.getDate() + 7);
+                              setNextAppointmentDate(d.toISOString().split('T')[0]);
+                            }}
+                            className="px-2 py-1 text-[11px] rounded-full bg-slate-100 dark:bg-[#2c2c2e] text-slate-700 dark:text-slate-200 hover:bg-slate-200"
+                          >
+                            +1 week
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const d = new Date();
+                              d.setDate(d.getDate() + 14);
+                              setNextAppointmentDate(d.toISOString().split('T')[0]);
+                            }}
+                            className="px-2 py-1 text-[11px] rounded-full bg-slate-100 dark:bg-[#2c2c2e] text-slate-700 dark:text-slate-200 hover:bg-slate-200"
+                          >
+                            +2 weeks
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const d = new Date();
+                              d.setMonth(d.getMonth() + 1);
+                              setNextAppointmentDate(d.toISOString().split('T')[0]);
+                            }}
+                            className="px-2 py-1 text-[11px] rounded-full bg-slate-100 dark:bg-[#2c2c2e] text-slate-700 dark:text-slate-200 hover:bg-slate-200"
+                          >
+                            +1 month
+                          </button>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleGetAppointmentSuggestion}
+                        disabled={loadingSuggestion}
+                        className="mt-2 sm:mt-0 px-3 py-1.5 text-[11px] rounded-full bg-brand-600 hover:bg-brand-700 text-white font-semibold disabled:opacity-60"
+                      >
+                        {loadingSuggestion ? 'Getting suggestion…' : 'AI Suggest'}
+                      </button>
+                    </div>
+                  </div>
+                  <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
+                    Appointment reminders will be generated automatically based on this date.
+                  </p>
+                  {nextAppointmentSuggestion && (
+                    <div className="mt-3 p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-900/40">
+                      <p className="text-[11px] text-emerald-900 dark:text-emerald-200 font-semibold">
+                        Suggested: {new Date(nextAppointmentSuggestion.date).toLocaleDateString(undefined, {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric',
+                        })}
+                      </p>
+                      <p className="mt-1 text-[11px] text-emerald-900/80 dark:text-emerald-200/80">
+                        {nextAppointmentSuggestion.rationale}
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Diagnoses List */}

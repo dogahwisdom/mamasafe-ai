@@ -352,6 +352,32 @@ export class ClinicWorkflowService {
     throw new Error('Supabase not configured');
   }
 
+  /**
+   * Update patient's next appointment date
+   * This is set by the clinician as part of the care plan, not at enrollment.
+   */
+  public async updateNextAppointment(
+    patientId: string,
+    nextAppointmentDate: string | null
+  ): Promise<void> {
+    if (!isSupabaseConfigured()) {
+      throw new Error('Supabase not configured');
+    }
+
+    // Expect a YYYY-MM-DD date string; store it directly in next_appointment.
+    const { error } = await supabase
+      .from('patients')
+      .update({
+        next_appointment: nextAppointmentDate || null,
+      })
+      .eq('id', patientId);
+
+    if (error) {
+      console.error('Error updating next appointment:', error);
+      throw error;
+    }
+  }
+
   // Mapper functions
   private mapVisitFromDB(data: any): ClinicVisit {
     return {
