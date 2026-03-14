@@ -108,6 +108,19 @@ export interface InventoryItem {
   unit: string;
 }
 
+export interface PharmacyExpense {
+  id: string;
+  pharmacyId: string;
+  medicationName: string;
+  quantity: number;
+  unitCost: number;
+  totalCost: number;
+  supplier?: string;
+  notes?: string;
+  purchasedAt: string;
+  createdAt: string;
+}
+
 // Patient Transfer Types
 export interface PatientTransfer {
   id: string;
@@ -300,6 +313,7 @@ export type ViewState =
   | 'triage'
   | 'patients'
   | 'pharmacy_inventory'
+  | 'pharmacy_reports'
   | 'profile'
   | 'education'
   | 'medications'

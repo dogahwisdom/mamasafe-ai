@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { UserProfile, Patient, DispensingRecord } from '../types';
 import { backend } from '../services/backend';
 import { ActionCard } from '../components/ActionCard';
-import { Pill, Users, Calendar, CheckSquare, Search, CheckCircle, Clock, UserPlus, X, Loader2, FileText, AlertCircle } from 'lucide-react';
+import { Pill, Users, Calendar, CheckSquare, Search, CheckCircle, Clock, UserPlus, X, Loader2, FileText, AlertCircle, BarChart2 } from 'lucide-react';
 
 interface PharmacyDashboardProps {
   user: UserProfile;
@@ -49,7 +49,7 @@ export const PharmacyDashboard: React.FC<PharmacyDashboardProps> = ({ user, onNa
 
   // Calculate metrics
   const today = new Date().toISOString().split('T')[0];
-  const dispensedToday = dispensingRecords.filter(r => 
+  const dispensedToday = dispensingRecords.filter(r =>
     r.dispensedAt.startsWith(today)
   ).length;
 
@@ -136,12 +136,12 @@ export const PharmacyDashboard: React.FC<PharmacyDashboardProps> = ({ user, onNa
     }
   };
 
-  const filteredPatients = patients.filter(p => 
+  const filteredPatients = patients.filter(p =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.phone.includes(searchTerm)
   );
 
-  const dispensedTodayRecords = dispensingRecords.filter(r => 
+  const dispensedTodayRecords = dispensingRecords.filter(r =>
     r.dispensedAt.startsWith(today)
   );
 
@@ -179,7 +179,7 @@ export const PharmacyDashboard: React.FC<PharmacyDashboardProps> = ({ user, onNa
           <div className="bg-white dark:bg-[#1c1c1e] w-full max-w-lg rounded-[2.5rem] p-8 shadow-2xl relative animate-scale-in border border-slate-100 dark:border-slate-800">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Record Dispensing</h2>
-              <button 
+              <button
                 onClick={() => {
                   setShowDispensingModal(false);
                   setSelectedPatient(null);
@@ -205,7 +205,7 @@ export const PharmacyDashboard: React.FC<PharmacyDashboardProps> = ({ user, onNa
                   required
                   className="w-full p-3 rounded-xl bg-slate-50 dark:bg-[#2c2c2e] border border-transparent focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/10 text-slate-900 dark:text-white outline-none"
                   value={dispensingForm.medicationName}
-                  onChange={e => setDispensingForm({...dispensingForm, medicationName: e.target.value})}
+                  onChange={e => setDispensingForm({ ...dispensingForm, medicationName: e.target.value })}
                   placeholder="e.g. Paracetamol"
                 />
               </div>
@@ -218,7 +218,7 @@ export const PharmacyDashboard: React.FC<PharmacyDashboardProps> = ({ user, onNa
                     required
                     className="w-full p-3 rounded-xl bg-slate-50 dark:bg-[#2c2c2e] border border-transparent focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/10 text-slate-900 dark:text-white outline-none"
                     value={dispensingForm.dosage}
-                    onChange={e => setDispensingForm({...dispensingForm, dosage: e.target.value})}
+                    onChange={e => setDispensingForm({ ...dispensingForm, dosage: e.target.value })}
                     placeholder="e.g. 500mg"
                   />
                 </div>
@@ -230,12 +230,12 @@ export const PharmacyDashboard: React.FC<PharmacyDashboardProps> = ({ user, onNa
                       min="1"
                       className="w-full p-3 rounded-xl bg-slate-50 dark:bg-[#2c2c2e] border border-transparent focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/10 text-slate-900 dark:text-white outline-none"
                       value={dispensingForm.quantity}
-                      onChange={e => setDispensingForm({...dispensingForm, quantity: parseInt(e.target.value) || 1})}
+                      onChange={e => setDispensingForm({ ...dispensingForm, quantity: parseInt(e.target.value) || 1 })}
                     />
                     <select
                       className="p-3 rounded-xl bg-slate-50 dark:bg-[#2c2c2e] border border-transparent focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/10 text-slate-900 dark:text-white outline-none"
                       value={dispensingForm.unit}
-                      onChange={e => setDispensingForm({...dispensingForm, unit: e.target.value})}
+                      onChange={e => setDispensingForm({ ...dispensingForm, unit: e.target.value })}
                     >
                       <option value="tablets">tablets</option>
                       <option value="capsules">capsules</option>
@@ -252,7 +252,7 @@ export const PharmacyDashboard: React.FC<PharmacyDashboardProps> = ({ user, onNa
                   type="date"
                   className="w-full p-3 rounded-xl bg-slate-50 dark:bg-[#2c2c2e] border border-transparent focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/10 text-slate-900 dark:text-white outline-none"
                   value={dispensingForm.nextFollowUpDate}
-                  onChange={e => setDispensingForm({...dispensingForm, nextFollowUpDate: e.target.value})}
+                  onChange={e => setDispensingForm({ ...dispensingForm, nextFollowUpDate: e.target.value })}
                 />
               </div>
 
@@ -261,7 +261,7 @@ export const PharmacyDashboard: React.FC<PharmacyDashboardProps> = ({ user, onNa
                 <textarea
                   className="w-full p-3 rounded-xl bg-slate-50 dark:bg-[#2c2c2e] border border-transparent focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/10 text-slate-900 dark:text-white outline-none resize-none h-24"
                   value={dispensingForm.notes}
-                  onChange={e => setDispensingForm({...dispensingForm, notes: e.target.value})}
+                  onChange={e => setDispensingForm({ ...dispensingForm, notes: e.target.value })}
                   placeholder="Additional notes..."
                 />
               </div>
@@ -306,7 +306,14 @@ export const PharmacyDashboard: React.FC<PharmacyDashboardProps> = ({ user, onNa
           <p className="text-slate-500 dark:text-slate-400 font-medium mt-1">Pharmacy Dashboard</p>
         </div>
         <div className="flex gap-3">
-          <button 
+          <button
+            onClick={() => onNavigate('pharmacy_reports')}
+            className="bg-white dark:bg-[#1c1c1e] hover:bg-slate-100 dark:hover:bg-[#2c2c2e] border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 px-5 py-2.5 rounded-full text-sm font-bold transition-all flex items-center gap-2 active:scale-95 shadow-sm"
+          >
+            <BarChart2 size={18} />
+            <span className="hidden md:inline">Reports</span>
+          </button>
+          <button
             onClick={() => onNavigate('enrollment')}
             className="bg-brand-600 hover:bg-brand-700 text-white px-5 py-2.5 rounded-full text-sm font-bold shadow-lg shadow-brand-500/20 transition-all flex items-center gap-2 active:scale-95"
           >
@@ -316,7 +323,7 @@ export const PharmacyDashboard: React.FC<PharmacyDashboardProps> = ({ user, onNa
           <div className="flex items-center gap-2 text-sm font-semibold text-slate-500 bg-white dark:bg-[#1c1c1e] px-4 py-2 rounded-full border border-slate-200 dark:border-slate-800 shadow-sm">
             <Clock size={16} />
             <span>
-              {new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })} • {new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+              {new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })} • {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </span>
           </div>
         </div>
@@ -330,25 +337,25 @@ export const PharmacyDashboard: React.FC<PharmacyDashboardProps> = ({ user, onNa
         <>
           {/* Stats Grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            <ActionCard 
-              title="Dispensed Today" 
-              value={dispensedToday} 
-              icon={CheckSquare} 
+            <ActionCard
+              title="Dispensed Today"
+              value={dispensedToday}
+              icon={CheckSquare}
               variant="default"
               subtitle="Medications dispensed"
             />
-            <ActionCard 
-              title="Assigned Patients" 
-              value={patients.length} 
-              icon={Users} 
+            <ActionCard
+              title="Assigned Patients"
+              value={patients.length}
+              icon={Users}
               variant="default"
               subtitle={patients.length > 0 ? "Active patients" : "No patients enrolled"}
               onClick={() => onNavigate('patients')}
             />
-            <ActionCard 
-              title="Upcoming Follow-ups" 
-              value={upcomingFollowUps} 
-              icon={Calendar} 
+            <ActionCard
+              title="Upcoming Follow-ups"
+              value={upcomingFollowUps}
+              icon={Calendar}
               variant={upcomingFollowUps > 0 ? "brand" : "default"}
               subtitle="Next 7 days"
             />
@@ -359,31 +366,28 @@ export const PharmacyDashboard: React.FC<PharmacyDashboardProps> = ({ user, onNa
             <div className="flex flex-wrap gap-2 mb-6 border-b border-slate-200 dark:border-slate-800 pb-4">
               <button
                 onClick={() => setActiveTab('queue')}
-                className={`px-4 py-2 rounded-xl font-semibold transition-colors ${
-                  activeTab === 'queue'
+                className={`px-4 py-2 rounded-xl font-semibold transition-colors ${activeTab === 'queue'
                     ? 'bg-brand-600 text-white'
                     : 'bg-slate-100 dark:bg-[#2c2c2e] text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-[#3a3a3c]'
-                }`}
+                  }`}
               >
                 Dispensing Queue
               </button>
               <button
                 onClick={() => setActiveTab('dispensed')}
-                className={`px-4 py-2 rounded-xl font-semibold transition-colors ${
-                  activeTab === 'dispensed'
+                className={`px-4 py-2 rounded-xl font-semibold transition-colors ${activeTab === 'dispensed'
                     ? 'bg-brand-600 text-white'
                     : 'bg-slate-100 dark:bg-[#2c2c2e] text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-[#3a3a3c]'
-                }`}
+                  }`}
               >
                 Dispensed Today ({dispensedToday})
               </button>
               <button
                 onClick={() => setActiveTab('followups')}
-                className={`px-4 py-2 rounded-xl font-semibold transition-colors ${
-                  activeTab === 'followups'
+                className={`px-4 py-2 rounded-xl font-semibold transition-colors ${activeTab === 'followups'
                     ? 'bg-brand-600 text-white'
                     : 'bg-slate-100 dark:bg-[#2c2c2e] text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-[#3a3a3c]'
-                }`}
+                  }`}
               >
                 Follow-up Dates ({upcomingFollowUpPatients.length})
               </button>
@@ -392,9 +396,9 @@ export const PharmacyDashboard: React.FC<PharmacyDashboardProps> = ({ user, onNa
             {/* Search */}
             <div className="relative mb-6">
               <Search className="absolute left-3 top-2.5 text-slate-400" size={18} />
-              <input 
-                type="text" 
-                placeholder="Search patients..." 
+              <input
+                type="text"
+                placeholder="Search patients..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 bg-slate-100 dark:bg-[#2c2c2e] rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-brand-500/50 dark:text-white transition-all placeholder-slate-500"
@@ -476,7 +480,7 @@ export const PharmacyDashboard: React.FC<PharmacyDashboardProps> = ({ user, onNa
                         <div className="text-right text-xs text-slate-500 dark:text-slate-400">
                           <div className="flex items-center gap-1">
                             <Clock size={12} />
-                            {new Date(record.dispensedAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                            {new Date(record.dispensedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </div>
                         </div>
                       </div>
@@ -498,10 +502,10 @@ export const PharmacyDashboard: React.FC<PharmacyDashboardProps> = ({ user, onNa
                   upcomingFollowUpPatients
                     .filter(p => filteredPatients.includes(p))
                     .map((patient) => {
-                      const daysUntil = patient.nextFollowUpDate 
+                      const daysUntil = patient.nextFollowUpDate
                         ? Math.ceil((new Date(patient.nextFollowUpDate).getTime() - new Date(today).getTime()) / (1000 * 60 * 60 * 24))
                         : null;
-                      
+
                       return (
                         <div key={patient.id} className="p-5 bg-slate-50 dark:bg-[#2c2c2e] rounded-2xl border border-slate-200 dark:border-slate-700">
                           <div className="flex items-center justify-between">
@@ -510,7 +514,7 @@ export const PharmacyDashboard: React.FC<PharmacyDashboardProps> = ({ user, onNa
                               <div className="flex items-center gap-3 text-sm">
                                 <Calendar size={16} className="text-brand-500" />
                                 <span className="text-slate-600 dark:text-slate-400">
-                                  {patient.nextFollowUpDate 
+                                  {patient.nextFollowUpDate
                                     ? new Date(patient.nextFollowUpDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
                                     : 'No follow-up scheduled'}
                                 </span>
