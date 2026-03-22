@@ -91,10 +91,12 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
   }, []);
 
   useEffect(() => {
-    if (currentVisit) {
-      loadVisitData();
-    }
-  }, [currentVisit]);
+    const visitId = currentVisit?.id;
+    if (!visitId) return;
+    loadVisitData(visitId);
+    // Only reload when the active visit id changes — not when setCurrentVisit replaces the
+    // same visit with a new object reference (that was resetting "Total treatment" while typing).
+  }, [currentVisit?.id]);
 
   const loadPatients = async () => {
     try {
@@ -105,11 +107,9 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
     }
   };
 
-  const loadVisitData = async () => {
-    if (!currentVisit) return;
-    
+  const loadVisitData = async (visitId: string) => {
     try {
-      const visitData = await backend.workflow.getVisitById(currentVisit.id);
+      const visitData = await backend.workflow.getVisitById(visitId);
       setCurrentVisit(visitData.visit);
       setClinicalHistory(visitData.clinicalHistory || null);
       setLabRequests(visitData.labRequests);
@@ -1076,13 +1076,14 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
                         Total treatment price (KES)
                       </label>
                       <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        className="w-full p-3 rounded-xl bg-white dark:bg-[#1c1c1e] border border-slate-200 dark:border-slate-700"
+                        type="text"
+                        inputMode="decimal"
+                        autoComplete="off"
+                        name="totalTreatmentKes"
+                        className="w-full p-3 rounded-xl bg-white dark:bg-[#1c1c1e] border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white relative z-10"
                         placeholder="e.g. 5000"
                         value={totalTreatmentInput}
-                        onChange={(e) => setTotalTreatmentInput(e.target.value)}
+                        onChange={(e) => setTotalTreatmentInput(e.target.value.replace(/[^\d.]/g, ''))}
                       />
                     </div>
                     <button

@@ -66,6 +66,68 @@ export class PharmacyService {
     );
   }
 
+  public async addInventoryItem(item: {
+    name: string;
+    unit: string;
+    stock: number;
+    minLevel: number;
+  }): Promise<InventoryItem> {
+    const name = item.name.trim();
+    if (!name) {
+      throw new Error("Medication name is required");
+    }
+    const unit = item.unit.trim() || "units";
+    const stock = Math.max(0, Math.floor(item.stock));
+    const minLevel = Math.max(0, Math.floor(item.minLevel));
+
+    if (isSupabaseConfigured()) {
+      const { data, error } = await supabase
+        .from("inventory")
+        .insert({
+          name,
+          unit,
+          stock,
+          min_level: minLevel,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error("Error adding inventory item:", error);
+        if (error.code === "23505" || String(error.message).includes("unique")) {
+          throw new Error(
+            "An item with this medication name already exists. Use a slightly different name or edit the existing row."
+          );
+        }
+        throw error;
+      }
+
+      return {
+        id: data.id,
+        name: data.name,
+        stock: data.stock,
+        minLevel: data.min_level,
+        unit: data.unit,
+      };
+    }
+
+    const inventory = storage.get<InventoryItem[]>(
+      KEYS.PHARMACY_INVENTORY,
+      DEFAULT_INVENTORY
+    );
+    const newItem: InventoryItem = {
+      id: typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `inv-${Date.now()}`,
+      name,
+      unit,
+      stock,
+      minLevel,
+    };
+    storage.set(KEYS.PHARMACY_INVENTORY, [...inventory, newItem]);
+    return newItem;
+  }
+
   public async updateInventoryItem(
     id: string,
     updates: Partial<Pick<InventoryItem, "stock" | "minLevel" | "name" | "unit">>

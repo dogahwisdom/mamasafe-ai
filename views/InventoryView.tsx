@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { UserProfile, InventoryItem } from '../types';
 import { backend } from '../services/backend';
 import { downloadInventoryStockPdf } from '../services/pdfReports';
-import { ArrowLeft, BookOpen, Download, Loader2, Package, Save, FileText } from 'lucide-react';
+import { ArrowLeft, BookOpen, Download, Loader2, Package, Plus, Save, FileText } from 'lucide-react';
 
 interface InventoryViewProps {
   user: UserProfile;
@@ -14,6 +14,13 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user, onBack }) =>
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, { stock: string; minLevel: string }>>({});
+  const [addForm, setAddForm] = useState({
+    name: '',
+    unit: 'tablets',
+    stock: '0',
+    minLevel: '0',
+  });
+  const [adding, setAdding] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -67,6 +74,37 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user, onBack }) =>
 
   const handleExportPdf = () => {
     downloadInventoryStockPdf(user, items);
+  };
+
+  const handleAddMedication = async () => {
+    const name = addForm.name.trim();
+    if (!name) {
+      alert('Enter a medication name.');
+      return;
+    }
+    const stock = parseInt(addForm.stock, 10);
+    const minLevel = parseInt(addForm.minLevel, 10);
+    if (Number.isNaN(stock) || stock < 0 || Number.isNaN(minLevel) || minLevel < 0) {
+      alert('Enter valid stock and min level (0 or more).');
+      return;
+    }
+    setAdding(true);
+    try {
+      await backend.pharmacy.addInventoryItem({
+        name,
+        unit: addForm.unit.trim() || 'units',
+        stock,
+        minLevel,
+      });
+      setAddForm({ name: '', unit: 'tablets', stock: '0', minLevel: '0' });
+      await load();
+    } catch (e: unknown) {
+      console.error(e);
+      const msg = e instanceof Error ? e.message : 'Failed to add medication.';
+      alert(msg);
+    } finally {
+      setAdding(false);
+    }
   };
 
   return (
@@ -143,20 +181,85 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user, onBack }) =>
             </a>
           </div>
         </div>
+
+        <div className="p-4 md:p-5 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1c1c1e]">
+          <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-3">Add medication</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+            Register a new line in stock (name must be unique). Then adjust quantities in the table below.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-end">
+            <div className="lg:col-span-4">
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                Medication name *
+              </label>
+              <input
+                type="text"
+                className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-[#2c2c2e] text-slate-900 dark:text-white"
+                placeholder="e.g. Paracetamol 500mg"
+                value={addForm.name}
+                onChange={(e) => setAddForm((f) => ({ ...f, name: e.target.value }))}
+              />
+            </div>
+            <div className="lg:col-span-2">
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">Unit</label>
+              <input
+                type="text"
+                className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-[#2c2c2e] text-slate-900 dark:text-white"
+                placeholder="tablets, bottles…"
+                value={addForm.unit}
+                onChange={(e) => setAddForm((f) => ({ ...f, unit: e.target.value }))}
+              />
+            </div>
+            <div className="lg:col-span-2">
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">Initial stock</label>
+              <input
+                type="number"
+                min={0}
+                className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-[#2c2c2e] text-slate-900 dark:text-white"
+                value={addForm.stock}
+                onChange={(e) => setAddForm((f) => ({ ...f, stock: e.target.value }))}
+              />
+            </div>
+            <div className="lg:col-span-2">
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">Min level</label>
+              <input
+                type="number"
+                min={0}
+                className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-[#2c2c2e] text-slate-900 dark:text-white"
+                value={addForm.minLevel}
+                onChange={(e) => setAddForm((f) => ({ ...f, minLevel: e.target.value }))}
+              />
+            </div>
+            <div className="lg:col-span-2">
+              <button
+                type="button"
+                onClick={handleAddMedication}
+                disabled={adding || loading}
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-semibold text-sm disabled:opacity-50"
+              >
+                {adding ? <Loader2 size={18} className="animate-spin" /> : <Plus size={18} />}
+                Add medication
+              </button>
+            </div>
+          </div>
+        </div>
+
         {loading ? (
           <div className="flex items-center justify-center py-24 text-slate-500 gap-2">
             <Loader2 className="animate-spin" size={24} />
             Loading inventory…
           </div>
         ) : items.length === 0 ? (
-          <div className="p-12 text-center text-slate-500">No inventory rows yet.</div>
+          <div className="p-12 text-center text-slate-500 text-sm">
+            No inventory rows yet. Add a medication above to create your first line.
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-slate-50 dark:bg-[#2c2c2e] text-left border-b border-slate-200 dark:border-slate-700">
                   <th className="px-4 py-3 font-bold text-slate-700 dark:text-slate-200">Code</th>
-                  <th className="px-4 py-3 font-bold text-slate-700 dark:text-slate-200">Product</th>
+                  <th className="px-4 py-3 font-bold text-slate-700 dark:text-slate-200">Medication</th>
                   <th className="px-4 py-3 font-bold text-slate-700 dark:text-slate-200 text-right">Current stock</th>
                   <th className="px-4 py-3 font-bold text-slate-700 dark:text-slate-200 text-right">Min level</th>
                   <th className="px-4 py-3 font-bold text-slate-700 dark:text-slate-200 w-28"></th>
