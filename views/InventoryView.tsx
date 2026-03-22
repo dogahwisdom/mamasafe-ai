@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { UserProfile, InventoryItem } from '../types';
 import { backend } from '../services/backend';
 import { downloadInventoryStockPdf } from '../services/pdfReports';
-import { ArrowLeft, BookOpen, Download, Loader2, Package, Save } from 'lucide-react';
+import { ArrowLeft, BookOpen, Download, Loader2, Package, Save, FileText } from 'lucide-react';
 
 interface InventoryViewProps {
   user: UserProfile;
@@ -114,6 +114,15 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user, onBack }) =>
                 Your <strong>Download PDF</strong> export uses the same kind of header and bordered grid; see{' '}
                 <code className="text-xs bg-slate-200/80 dark:bg-slate-800 px-1.5 py-0.5 rounded">docs/INVENTORY_REFERENCE_NILA.md</code> for details.
               </p>
+              <a
+                href="/inventory-reference/nila-pharmaceutical-comprehensive-price-list-2023.pdf"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 mt-2 text-sm font-semibold text-brand-600 dark:text-brand-400 hover:underline"
+              >
+                <FileText size={16} />
+                Open Nila Pharmaceuticals PDF price list (2023)
+              </a>
             </div>
             <a
               href="/inventory-reference/nila-pharmaceuticals-price-list-reference.png"

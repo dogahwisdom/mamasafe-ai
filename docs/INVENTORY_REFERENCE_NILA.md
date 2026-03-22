@@ -15,8 +15,9 @@ Clinics and pharmacies use this as a **visual guide** when:
 | File | Purpose |
 |------|---------|
 | [assets/nila-pharmaceuticals-price-list-reference.png](./assets/nila-pharmaceuticals-price-list-reference.png) | Reference image (sample “PRICE LIST” layout) |
+| [NILA_PHARMACEUTICAL_COMPREHENSIVE_PRICE_LIST_2023.pdf](./NILA_PHARMACEUTICAL_COMPREHENSIVE_PRICE_LIST_2023.pdf) | Full **Nila Pharmaceuticals** comprehensive price list (2023) — use for product codes, descriptions, and trade prices when reconciling or updating your stock sheet |
 
-The same image is copied to `public/inventory-reference/` so the **Inventory** screen in the app can display it beside your live stock table.
+The reference image and PDF are also available under `public/inventory-reference/` for the in-app **Inventory** page (open links in the browser).
 
 ## How MamaSafe maps to this layout
 
