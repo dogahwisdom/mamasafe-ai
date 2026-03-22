@@ -66,6 +66,13 @@ The dashboard displays:
 4. Track progress
 5. Mark as completed when resolved
 
+## Inventory (stock)
+
+Clinics that keep medicines or supplies on site can use **Inventory** in the navigation (same screen as pharmacy partners):
+
+1. Update **current stock** and **minimum levels** after deliveries or use.
+2. Export a **PDF** for audits or reorder sheets. The printable format mirrors a common **code + product + levels** layout; see **[Inventory reference (Nila-style)](../INVENTORY_REFERENCE_NILA.md)** in `docs/` for the sample reference image and column mapping.
+
 ## Best Practices
 
 - Enroll patients early (before 16 weeks)

@@ -43,11 +43,11 @@ The dashboard shows:
 
 ### Inventory Management
 
-1. View all medications
-2. Check stock levels
-3. Identify low stock items
-4. Update quantities as needed
-5. Set restocking thresholds
+1. Open **Inventory** in the main navigation (or from the dashboard).
+2. View all medications, **update stock** and **min level** per row, and save.
+3. Use **Download PDF** for a printable list; layout follows a familiar **code + product + levels** table style—see the **[Nila-style reference guide](../INVENTORY_REFERENCE_NILA.md)** in `docs/` for the sample layout.
+4. Identify low stock items (highlighted when current stock ≤ min level).
+5. Set restocking thresholds via **min level** and keep counts current after deliveries.
 
 ### Low Stock Management
 

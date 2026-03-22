@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { UserProfile, InventoryItem } from '../types';
 import { backend } from '../services/backend';
 import { downloadInventoryStockPdf } from '../services/pdfReports';
-import { ArrowLeft, Download, Loader2, Package, Save } from 'lucide-react';
+import { ArrowLeft, BookOpen, Download, Loader2, Package, Save } from 'lucide-react';
 
 interface InventoryViewProps {
   user: UserProfile;
@@ -102,6 +102,38 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user, onBack }) =>
       </div>
 
       <div className="bg-white dark:bg-[#1c1c1e] rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+        <div className="p-4 md:p-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/40">
+          <div className="flex flex-col lg:flex-row gap-5 lg:items-start">
+            <div className="flex-1 space-y-2">
+              <div className="flex items-center gap-2 text-slate-900 dark:text-white font-bold text-sm">
+                <BookOpen size={18} className="text-brand-600 shrink-0" />
+                Reference layout (Nila Pharmaceuticals–style sample)
+              </div>
+              <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+                Use this familiar <strong className="text-slate-800 dark:text-slate-200">code + product + table</strong> format as a guide when updating stock.
+                Your <strong>Download PDF</strong> export uses the same kind of header and bordered grid; see{' '}
+                <code className="text-xs bg-slate-200/80 dark:bg-slate-800 px-1.5 py-0.5 rounded">docs/INVENTORY_REFERENCE_NILA.md</code> for details.
+              </p>
+            </div>
+            <a
+              href="/inventory-reference/nila-pharmaceuticals-price-list-reference.png"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="shrink-0 block w-full max-w-sm mx-auto lg:mx-0 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden bg-white shadow-sm hover:opacity-95 transition-opacity"
+              title="Open reference image full size"
+            >
+              <img
+                src="/inventory-reference/nila-pharmaceuticals-price-list-reference.png"
+                alt="Sample professional pharmacy price list layout: branded header and three-column table"
+                className="w-full h-auto object-contain max-h-48 object-top"
+                loading="lazy"
+              />
+              <div className="px-3 py-2 text-[11px] text-center text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-800">
+                Tap to open full size · example layout only
+              </div>
+            </a>
+          </div>
+        </div>
         {loading ? (
           <div className="flex items-center justify-center py-24 text-slate-500 gap-2">
             <Loader2 className="animate-spin" size={24} />
