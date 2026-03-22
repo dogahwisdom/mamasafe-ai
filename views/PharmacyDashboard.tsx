@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { UserProfile, Patient, DispensingRecord } from '../types';
 import { backend } from '../services/backend';
 import { ActionCard } from '../components/ActionCard';
-import { Pill, Users, Calendar, CheckSquare, Search, CheckCircle, Clock, UserPlus, X, Loader2, FileText, AlertCircle, BarChart2 } from 'lucide-react';
+import { Pill, Users, Calendar, CheckSquare, Search, CheckCircle, Clock, UserPlus, X, Loader2, FileText, AlertCircle, BarChart2, Package } from 'lucide-react';
 
 interface PharmacyDashboardProps {
   user: UserProfile;
@@ -305,7 +305,15 @@ export const PharmacyDashboard: React.FC<PharmacyDashboardProps> = ({ user, onNa
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">{user.name}</h1>
           <p className="text-slate-500 dark:text-slate-400 font-medium mt-1">Pharmacy Dashboard</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-3 flex-wrap">
+          <button
+            type="button"
+            onClick={() => onNavigate('pharmacy_inventory')}
+            className="bg-white dark:bg-[#1c1c1e] hover:bg-slate-100 dark:hover:bg-[#2c2c2e] border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 px-5 py-2.5 rounded-full text-sm font-bold transition-all flex items-center gap-2 active:scale-95 shadow-sm"
+          >
+            <Package size={18} />
+            <span className="hidden md:inline">Inventory</span>
+          </button>
           <button
             onClick={() => onNavigate('pharmacy_reports')}
             className="bg-white dark:bg-[#1c1c1e] hover:bg-slate-100 dark:hover:bg-[#2c2c2e] border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 px-5 py-2.5 rounded-full text-sm font-bold transition-all flex items-center gap-2 active:scale-95 shadow-sm"

@@ -218,6 +218,8 @@ export interface ClinicVisit {
   receptionNotes?: string;
   registeredBy?: string;
   status: 'registered' | 'in_progress' | 'completed' | 'cancelled';
+  /** Full treatment bill for this visit; use with payment lines to compute balance (partial payments). */
+  totalTreatmentAmount?: number | null;
   createdAt: string;
   updatedAt: string;
 }

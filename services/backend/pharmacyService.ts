@@ -66,6 +66,41 @@ export class PharmacyService {
     );
   }
 
+  public async updateInventoryItem(
+    id: string,
+    updates: Partial<Pick<InventoryItem, "stock" | "minLevel" | "name" | "unit">>
+  ): Promise<void> {
+    if (isSupabaseConfigured()) {
+      const payload: Record<string, unknown> = {};
+      if (updates.stock !== undefined) payload.stock = updates.stock;
+      if (updates.minLevel !== undefined) payload.min_level = updates.minLevel;
+      if (updates.name !== undefined) payload.name = updates.name;
+      if (updates.unit !== undefined) payload.unit = updates.unit;
+
+      if (Object.keys(payload).length === 0) return;
+
+      const { error } = await supabase
+        .from("inventory")
+        .update(payload)
+        .eq("id", id);
+
+      if (error) {
+        console.error("Error updating inventory:", error);
+        throw error;
+      }
+      return;
+    }
+
+    const inventory = storage.get<InventoryItem[]>(
+      KEYS.PHARMACY_INVENTORY,
+      DEFAULT_INVENTORY
+    );
+    const next = inventory.map((item) =>
+      item.id === id ? { ...item, ...updates } : item
+    );
+    storage.set(KEYS.PHARMACY_INVENTORY, next);
+  }
+
   public async dispense(refillId: string): Promise<void> {
     // Use Supabase if configured
     if (isSupabaseConfigured()) {

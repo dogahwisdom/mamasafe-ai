@@ -46,6 +46,33 @@ export class ClinicWorkflowService {
   }
 
   /**
+   * Set expected total treatment cost for a visit (used with partial payments and balance due).
+   */
+  public async updateVisitTreatmentTotal(
+    visitId: string,
+    totalTreatmentAmount: number | null
+  ): Promise<void> {
+    if (!isSupabaseConfigured()) {
+      throw new Error('Supabase not configured');
+    }
+
+    const { error } = await supabase
+      .from('clinic_visits')
+      .update({
+        total_treatment_amount:
+          totalTreatmentAmount != null && totalTreatmentAmount > 0
+            ? totalTreatmentAmount
+            : null,
+      })
+      .eq('id', visitId);
+
+    if (error) {
+      console.error('Error updating visit treatment total:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Get all visits for the current facility
    */
   public async getVisits(
@@ -318,6 +345,39 @@ export class ClinicWorkflowService {
         throw new Error('Only facilities can create payments');
       }
 
+      let resolvedStatus: 'pending' | 'partial' | 'paid' | 'refunded' =
+        data?.paymentStatus || 'paid';
+
+      if (visitId && resolvedStatus !== 'refunded' && resolvedStatus !== 'pending') {
+        const { data: visitRow } = await supabase
+          .from('clinic_visits')
+          .select('total_treatment_amount')
+          .eq('id', visitId)
+          .maybeSingle();
+
+        const totalDue =
+          visitRow?.total_treatment_amount != null &&
+          visitRow.total_treatment_amount !== ''
+            ? parseFloat(String(visitRow.total_treatment_amount))
+            : null;
+
+        if (totalDue != null && totalDue > 0) {
+          const { data: existingPay } = await supabase
+            .from('payments')
+            .select('amount')
+            .eq('visit_id', visitId);
+
+          const sumExisting =
+            existingPay?.reduce(
+              (s, row: { amount: string | number }) =>
+                s + parseFloat(String(row.amount)),
+              0
+            ) ?? 0;
+          const cumulative = sumExisting + amount;
+          resolvedStatus = cumulative >= totalDue ? 'paid' : 'partial';
+        }
+      }
+
       const paymentData: any = {
         visit_id: visitId || null,
         patient_id: patientId,
@@ -326,7 +386,7 @@ export class ClinicWorkflowService {
         amount: amount,
         currency: data?.currency || 'KES',
         payment_method: paymentMethod,
-        payment_status: data?.paymentStatus || 'paid',
+        payment_status: resolvedStatus,
         transaction_reference: data?.transactionReference || null,
         insurance_provider: data?.insuranceProvider || null,
         insurance_number: data?.insuranceNumber || null,
@@ -391,6 +451,10 @@ export class ClinicWorkflowService {
       receptionNotes: data.reception_notes,
       registeredBy: data.registered_by,
       status: data.status,
+      totalTreatmentAmount:
+        data.total_treatment_amount != null && data.total_treatment_amount !== ''
+          ? parseFloat(data.total_treatment_amount)
+          : null,
       createdAt: data.created_at,
       updatedAt: data.updated_at,
     };

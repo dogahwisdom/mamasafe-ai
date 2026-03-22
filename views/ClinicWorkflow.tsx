@@ -3,8 +3,9 @@ import { UserProfile, Patient, ClinicVisit, ClinicalHistory, LabRequest, Diagnos
 import { backend } from '../services/backend';
 import { 
   UserPlus, Calendar, FileText, FlaskConical, Stethoscope, Pill, CreditCard, 
-  CheckCircle, Clock, AlertCircle, Loader2, X, ChevronRight, Plus, Save
+  CheckCircle, Clock, AlertCircle, Loader2, X, ChevronRight, Plus, Save, Download
 } from 'lucide-react';
+import { downloadPatientDiagnosisPdf, downloadVisitPaymentSummaryPdf } from '../services/pdfReports';
 
 interface ClinicWorkflowProps {
   user: UserProfile;
@@ -77,6 +78,9 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
     notes: '',
   });
 
+  /** Full bill for treatment; instalments recorded as separate payment lines. */
+  const [totalTreatmentInput, setTotalTreatmentInput] = useState('');
+
   const [labRequests, setLabRequests] = useState<LabRequest[]>([]);
   const [diagnoses, setDiagnoses] = useState<Diagnosis[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -106,10 +110,16 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
     
     try {
       const visitData = await backend.workflow.getVisitById(currentVisit.id);
+      setCurrentVisit(visitData.visit);
       setClinicalHistory(visitData.clinicalHistory || null);
       setLabRequests(visitData.labRequests);
       setDiagnoses(visitData.diagnoses);
       setPayments(visitData.payments);
+      if (visitData.visit.totalTreatmentAmount != null && visitData.visit.totalTreatmentAmount > 0) {
+        setTotalTreatmentInput(String(visitData.visit.totalTreatmentAmount));
+      } else {
+        setTotalTreatmentInput('');
+      }
     } catch (error) {
       console.error('Error loading visit data:', error);
     }
@@ -274,6 +284,14 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
       }
 
       alert('Diagnosis added successfully');
+    } catch (error) {
+      console.error('Error creating diagnosis:', error);
+      alert('Failed to add diagnosis');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleGetAppointmentSuggestion = () => {
     if (!selectedPatient || !currentVisit) {
       alert('Select a patient and start a visit first.');
@@ -303,13 +321,6 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
       setLoadingSuggestion(false);
     }
   };
-    } catch (error) {
-      console.error('Error creating diagnosis:', error);
-      alert('Failed to add diagnosis');
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const handleAddPayment = async () => {
     if (!currentVisit || !paymentForm.amount || parseFloat(paymentForm.amount) <= 0) {
@@ -331,7 +342,6 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
           insuranceNumber: paymentForm.insuranceNumber || undefined,
           nhifNumber: paymentForm.nhifNumber || undefined,
           notes: paymentForm.notes || undefined,
-          paymentStatus: 'paid',
         }
       );
       setPayments([...payments, payment]);
@@ -373,9 +383,34 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
       setDiagnoses([]);
       setPayments([]);
       setClinicalHistory(null);
+      setTotalTreatmentInput('');
     } catch (error) {
       console.error('Error completing visit:', error);
       alert('Failed to complete visit');
+    }
+  };
+
+  const handleSaveTreatmentTotal = async () => {
+    if (!currentVisit) return;
+    const raw = totalTreatmentInput.trim();
+    const num = raw === '' ? null : parseFloat(raw);
+    if (raw !== '' && (Number.isNaN(num!) || num! < 0)) {
+      alert('Enter a valid total treatment amount (KES), or leave blank.');
+      return;
+    }
+    setSaving(true);
+    try {
+      await backend.workflow.updateVisitTreatmentTotal(currentVisit.id, num);
+      setCurrentVisit({
+        ...currentVisit,
+        totalTreatmentAmount: num ?? null,
+      });
+      alert('Treatment total saved. Record payments as instalments; balance updates automatically.');
+    } catch (error) {
+      console.error('Error saving treatment total:', error);
+      alert('Could not save total. If this persists, apply the Supabase migration for total_treatment_amount on clinic_visits.');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -984,6 +1019,22 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
                         </div>
                       </div>
                     ))}
+                    {selectedPatient && (
+                      <div className="flex justify-end pt-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            downloadPatientDiagnosisPdf(user, selectedPatient, diagnoses, {
+                              visitDate: currentVisit?.visitDate?.slice(0, 10),
+                            })
+                          }
+                          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-sm font-semibold"
+                        >
+                          <Download size={16} />
+                          Download diagnosis PDF
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -999,10 +1050,11 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
                     Pharmacy dispensing is handled through the Pharmacy Dashboard.
                   </p>
                   <button
+                    type="button"
                     onClick={() => onNavigate('pharmacy_inventory')}
                     className="mt-4 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold"
                   >
-                    Go to Pharmacy Dashboard
+                    Open stock & inventory
                   </button>
                 </div>
               </div>
@@ -1012,10 +1064,41 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
             {activeStage === 'payment' && currentVisit && (
               <div className="space-y-4">
                 <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Payment</h3>
+
+                <div className="p-4 bg-amber-50/80 dark:bg-amber-900/15 rounded-xl border border-amber-200 dark:border-amber-900/40 mb-4">
+                  <h4 className="font-semibold text-slate-900 dark:text-white mb-2">Total treatment (optional)</h4>
+                  <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">
+                    Set the full bill for this visit, then record each instalment (half, less, or later payments). Balance due is calculated automatically.
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
+                    <div className="flex-1">
+                      <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                        Total treatment price (KES)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        className="w-full p-3 rounded-xl bg-white dark:bg-[#1c1c1e] border border-slate-200 dark:border-slate-700"
+                        placeholder="e.g. 5000"
+                        value={totalTreatmentInput}
+                        onChange={(e) => setTotalTreatmentInput(e.target.value)}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleSaveTreatmentTotal}
+                      disabled={saving}
+                      className="px-4 py-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-semibold text-sm disabled:opacity-50"
+                    >
+                      Save total
+                    </button>
+                  </div>
+                </div>
                 
                 {/* Add Payment Form */}
                 <div className="p-4 bg-slate-50 dark:bg-[#2c2c2e] rounded-xl border border-slate-200 dark:border-slate-700 mb-4">
-                  <h4 className="font-semibold text-slate-900 dark:text-white mb-3">Record Payment</h4>
+                  <h4 className="font-semibold text-slate-900 dark:text-white mb-3">Record payment instalment</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
@@ -1164,14 +1247,61 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
                         </div>
                       </div>
                     ))}
-                    <div className="p-4 bg-brand-50 dark:bg-brand-900/20 rounded-xl border border-brand-200 dark:border-brand-900/30">
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-slate-900 dark:text-white">Total Paid:</span>
-                        <span className="text-2xl font-bold text-brand-600 dark:text-brand-400">
-                          KES {payments.reduce((sum, p) => sum + (p.paymentStatus === 'paid' ? p.amount : 0), 0).toLocaleString()}
-                        </span>
-                      </div>
+                    <div className="p-4 bg-brand-50 dark:bg-brand-900/20 rounded-xl border border-brand-200 dark:border-brand-900/30 space-y-2">
+                      {(() => {
+                        const sumPaid = payments.reduce((sum, p) => sum + p.amount, 0);
+                        const totalDue =
+                          currentVisit.totalTreatmentAmount != null &&
+                          currentVisit.totalTreatmentAmount > 0
+                            ? currentVisit.totalTreatmentAmount
+                            : null;
+                        const balance =
+                          totalDue != null ? Math.max(0, totalDue - sumPaid) : null;
+                        return (
+                          <>
+                            <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                              <span className="font-bold text-slate-900 dark:text-white">Total treatment</span>
+                              <span className="font-mono">
+                                {totalDue != null ? `KES ${totalDue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '— (set above)'}
+                              </span>
+                            </div>
+                            <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                              <span className="font-bold text-slate-900 dark:text-white">Amount paid (sum)</span>
+                              <span className="font-mono text-brand-600 dark:text-brand-400">
+                                KES {sumPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                            </div>
+                            <div className="flex flex-wrap items-center justify-between gap-2 text-sm border-t border-brand-200 dark:border-brand-800 pt-2">
+                              <span className="font-bold text-slate-900 dark:text-white">Balance due</span>
+                              <span className="font-mono font-bold text-amber-700 dark:text-amber-400">
+                                {balance != null
+                                  ? `KES ${balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                  : '—'}
+                              </span>
+                            </div>
+                          </>
+                        );
+                      })()}
                     </div>
+                    {selectedPatient && payments.length > 0 && (
+                      <div className="flex justify-end pt-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            downloadVisitPaymentSummaryPdf(
+                              user,
+                              selectedPatient,
+                              payments,
+                              currentVisit.totalTreatmentAmount
+                            )
+                          }
+                          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-sm font-semibold"
+                        >
+                          <Download size={16} />
+                          Download payment PDF
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

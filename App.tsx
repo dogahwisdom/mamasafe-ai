@@ -9,6 +9,7 @@ import { AuthView } from './views/Auth';
 import { PatientDashboard } from './views/PatientDashboard';
 import { PharmacyDashboard } from './views/PharmacyDashboard';
 import { PharmacyReports } from './views/PharmacyReports';
+import { InventoryView } from './views/InventoryView';
 import { EducationView } from './views/Education';
 import { ReferralsView } from './views/Referrals';
 import { MedicationsView } from './views/Medications';
@@ -17,7 +18,7 @@ import { SuperadminDashboard } from './views/SuperadminDashboard';
 import { ClinicWorkflow } from './views/ClinicWorkflow';
 import { backend } from './services/backend';
 import { ViewState, Alert, Patient, UserProfile } from './types';
-import { LayoutDashboard, UserPlus, Stethoscope, Sun, Moon, Bell, LogOut, Users, X, HelpCircle, Book, ExternalLink, MessageSquare, Phone, Clock, FileText, Settings, Loader2, CheckCircle, Workflow, BarChart2 } from 'lucide-react';
+import { LayoutDashboard, UserPlus, Stethoscope, Sun, Moon, Bell, LogOut, Users, X, HelpCircle, Book, ExternalLink, MessageSquare, Phone, Clock, FileText, Settings, Loader2, CheckCircle, Workflow, BarChart2, Package } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -168,6 +169,7 @@ export const App: React.FC = () => {
       return [
         { id: 'dashboard', label: 'Pharmacy', icon: LayoutDashboard },
         { id: 'patients', label: 'Patients', icon: Users },
+        { id: 'pharmacy_inventory', label: 'Inventory', icon: Package },
         { id: 'pharmacy_reports', label: 'Reports', icon: BarChart2 },
         { id: 'enrollment', label: 'Register', icon: UserPlus },
       ];
@@ -177,6 +179,7 @@ export const App: React.FC = () => {
         { id: 'dashboard', label: 'Overview', icon: LayoutDashboard },
         { id: 'workflow', label: 'Workflow', icon: Workflow },
         { id: 'patients', label: 'Patients', icon: Users },
+        { id: 'pharmacy_inventory', label: 'Inventory', icon: Package },
         { id: 'enrollment', label: 'Enroll', icon: UserPlus },
         { id: 'triage', label: 'Triage', icon: Stethoscope },
         { id: 'referrals', label: 'Referrals', icon: FileText },
@@ -437,6 +440,12 @@ export const App: React.FC = () => {
         {currentView === 'pharmacy_reports' && currentUser?.role === 'pharmacy' && currentUser && (
           <PharmacyReports user={currentUser} onBack={() => setCurrentView('dashboard')} />
         )}
+
+        {currentView === 'pharmacy_inventory' &&
+          currentUser &&
+          (currentUser.role === 'pharmacy' || currentUser.role === 'clinic') && (
+            <InventoryView user={currentUser} onBack={() => setCurrentView('dashboard')} />
+          )}
 
         {currentView === 'dashboard' && currentUser?.role === 'superadmin' && (
           <SuperadminDashboard user={currentUser} onNavigate={setCurrentView} />
