@@ -468,6 +468,7 @@ export const App: React.FC = () => {
         {currentView === 'patients' && (
           <PatientsView
             patients={patients}
+            currentUser={currentUser}
             onNavigate={setCurrentView}
             onDeletePatient={async (id: string) => {
               await backend.patients.delete(id);

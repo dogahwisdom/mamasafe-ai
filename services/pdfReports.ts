@@ -1,6 +1,15 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import type { UserProfile, InventoryItem, Patient, Diagnosis, Payment } from '../types';
+import type {
+  UserProfile,
+  InventoryItem,
+  Patient,
+  Diagnosis,
+  Payment,
+  Referral,
+  Task,
+  Reminder,
+} from '../types';
 
 const PAGE_MARGIN = 14;
 const HEADER_BOX_WIDTH = 120;
@@ -241,4 +250,201 @@ export function downloadVisitPaymentSummaryPdf(
   doc.text(`Generated ${new Date().toLocaleString()}`, PAGE_MARGIN, finalY + 8);
 
   triggerDownload(doc, `mamasafe-payments-${patient.name.replace(/\s+/g, '-')}-${Date.now()}.pdf`);
+}
+
+function clipCell(s: string, max = 120): string {
+  const t = (s || '').replace(/\s+/g, ' ').trim();
+  return t.length > max ? `${t.slice(0, max)}…` : t;
+}
+
+/**
+ * Full patient profile export (details, medications, referrals, tasks, reminders) for clinics/pharmacies.
+ */
+export function downloadPatientInformationPdf(
+  facility: UserProfile,
+  patient: Patient,
+  context: {
+    referrals: Referral[];
+    tasks: Task[];
+    reminders: Reminder[];
+  }
+): void {
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  let y = drawFacilityHeader(doc, facility, 'PATIENT INFORMATION RECORD');
+
+  doc.setFontSize(9);
+  doc.setTextColor(0, 0, 0);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Patient identification', PAGE_MARGIN, y);
+  doc.setFont('helvetica', 'normal');
+  y += 5;
+  doc.text(`Name: ${patient.name}`, PAGE_MARGIN, y);
+  y += 4;
+  doc.text(
+    `Patient ID: ${shortCode(patient.id)} · Age: ${patient.age} · Phone: ${patient.phone || '—'}`,
+    PAGE_MARGIN,
+    y
+  );
+  y += 4;
+  doc.text(`Location: ${patient.location || '—'}`, PAGE_MARGIN, y);
+  y += 4;
+  doc.text(
+    `Patient type: ${patient.patientType === 'inpatient' ? 'Inpatient' : 'Outpatient'} · Risk: ${patient.riskStatus}`,
+    PAGE_MARGIN,
+    y
+  );
+  y += 4;
+  if (patient.conditionType) {
+    doc.text(`Primary condition: ${String(patient.conditionType)}`, PAGE_MARGIN, y);
+    y += 4;
+  }
+  if (patient.gestationalWeeks != null) {
+    doc.text(`Gestational weeks: ${patient.gestationalWeeks}`, PAGE_MARGIN, y);
+    y += 4;
+  }
+  doc.text(
+    `Next appointment: ${patient.nextAppointment ? new Date(patient.nextAppointment).toLocaleDateString() : '—'}`,
+    PAGE_MARGIN,
+    y
+  );
+  y += 4;
+  if (patient.nextFollowUpDate) {
+    doc.text(
+      `Next follow-up: ${new Date(patient.nextFollowUpDate).toLocaleDateString()}`,
+      PAGE_MARGIN,
+      y
+    );
+    y += 4;
+  }
+  doc.text(
+    `Last check-in: ${patient.lastCheckIn ? new Date(patient.lastCheckIn).toLocaleDateString() : '—'}`,
+    PAGE_MARGIN,
+    y
+  );
+  y += 6;
+
+  if (patient.alerts && patient.alerts.length > 0) {
+    doc.setFont('helvetica', 'bold');
+    doc.text('Alerts', PAGE_MARGIN, y);
+    doc.setFont('helvetica', 'normal');
+    y += 4;
+    patient.alerts.slice(0, 8).forEach((a) => {
+      const msg = typeof a === 'string' ? a : a.message || '';
+      doc.text(`• ${clipCell(msg, 100)}`, PAGE_MARGIN, y);
+      y += 4;
+    });
+    y += 2;
+  }
+
+  const meds = patient.medications || [];
+  if (meds.length > 0) {
+    doc.setFont('helvetica', 'bold');
+    doc.text('Medications', PAGE_MARGIN, y);
+    y += 4;
+    doc.setFont('helvetica', 'normal');
+    const medBody = meds.map((m) => [
+      clipCell(m.name, 40),
+      clipCell(m.dosage, 24),
+      clipCell(m.frequency, 24),
+      clipCell(m.instructions || '—', 50),
+    ]);
+    autoTable(doc, {
+      startY: y,
+      head: [['Medication', 'Dosage', 'Frequency', 'Instructions']],
+      body: medBody,
+      theme: 'grid',
+      styles: { fontSize: 7, cellPadding: 1.5 },
+      headStyles: { fillColor: [245, 245, 245], textColor: [0, 0, 0], fontStyle: 'bold' },
+      margin: { left: PAGE_MARGIN, right: PAGE_MARGIN },
+    });
+    y = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? y + 30;
+    y += 6;
+  }
+
+  const refs = context.referrals;
+  if (refs.length > 0) {
+    doc.setFont('helvetica', 'bold');
+    doc.text('Referrals', PAGE_MARGIN, y);
+    y += 4;
+    doc.setFont('helvetica', 'normal');
+    const refBody = refs.map((r) => [
+      clipCell(`${r.fromFacility} → ${r.toFacility}`, 55),
+      clipCell(r.reason, 60),
+      r.status,
+      new Date(r.createdAt).toLocaleDateString(),
+    ]);
+    autoTable(doc, {
+      startY: y,
+      head: [['Route', 'Reason', 'Status', 'Created']],
+      body: refBody,
+      theme: 'grid',
+      styles: { fontSize: 7, cellPadding: 1.5 },
+      headStyles: { fillColor: [245, 245, 245], textColor: [0, 0, 0], fontStyle: 'bold' },
+      margin: { left: PAGE_MARGIN, right: PAGE_MARGIN },
+    });
+    y = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? y + 30;
+    y += 6;
+  }
+
+  const tasks = context.tasks;
+  if (tasks.length > 0) {
+    doc.setFont('helvetica', 'bold');
+    doc.text('Tasks', PAGE_MARGIN, y);
+    y += 4;
+    doc.setFont('helvetica', 'normal');
+    const taskBody = tasks.map((t) => [
+      t.type,
+      t.resolved ? 'Done' : 'Open',
+      clipCell(t.deadline, 40),
+      clipCell(t.notes || '—', 55),
+    ]);
+    autoTable(doc, {
+      startY: y,
+      head: [['Type', 'Status', 'Deadline', 'Notes']],
+      body: taskBody,
+      theme: 'grid',
+      styles: { fontSize: 7, cellPadding: 1.5 },
+      headStyles: { fillColor: [245, 245, 245], textColor: [0, 0, 0], fontStyle: 'bold' },
+      margin: { left: PAGE_MARGIN, right: PAGE_MARGIN },
+    });
+    y = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? y + 30;
+    y += 6;
+  }
+
+  const rems = context.reminders;
+  if (rems.length > 0) {
+    doc.setFont('helvetica', 'bold');
+    doc.text('Reminders', PAGE_MARGIN, y);
+    y += 4;
+    doc.setFont('helvetica', 'normal');
+    const remBody = rems.map((r) => [
+      r.type,
+      r.channel,
+      r.sent ? 'Sent' : 'Pending',
+      new Date(r.scheduledFor).toLocaleString(),
+      clipCell(r.message, 70),
+    ]);
+    autoTable(doc, {
+      startY: y,
+      head: [['Type', 'Channel', 'State', 'Scheduled', 'Message']],
+      body: remBody,
+      theme: 'grid',
+      styles: { fontSize: 6.5, cellPadding: 1.5 },
+      headStyles: { fillColor: [245, 245, 245], textColor: [0, 0, 0], fontStyle: 'bold' },
+      margin: { left: PAGE_MARGIN, right: PAGE_MARGIN },
+    });
+    y = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? y + 30;
+  }
+
+  const finalY = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? y;
+  doc.setFontSize(8);
+  doc.setTextColor(100, 100, 100);
+  doc.text(
+    `Generated ${new Date().toLocaleString()} · Confidential — for authorized clinical use only.`,
+    PAGE_MARGIN,
+    Math.min(finalY + 10, 285)
+  );
+
+  const safeName = patient.name.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-_]/g, '');
+  triggerDownload(doc, `mamasafe-patient-${safeName || 'record'}-${Date.now()}.pdf`);
 }

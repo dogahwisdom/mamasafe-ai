@@ -1,16 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Phone, Filter, ChevronRight, User, X, Calendar, MapPin, Activity, Clock, Pill, History, ArrowRightLeft, CheckCircle, MessageSquare, AlertTriangle, FileText } from 'lucide-react';
-import { Patient, RiskLevel, Referral, Task, Reminder } from '../types';
+import { Search, Phone, Filter, ChevronRight, User, X, Calendar, MapPin, Activity, Clock, Pill, History, ArrowRightLeft, CheckCircle, MessageSquare, AlertTriangle, FileText, Download } from 'lucide-react';
+import { Patient, RiskLevel, Referral, Task, Reminder, UserProfile } from '../types';
 import { MedicationPrescription } from '../components/MedicationPrescription';
 import { backend } from '../services/backend';
+import { downloadPatientInformationPdf } from '../services/pdfReports';
 
 interface PatientsViewProps {
   onNavigate: (view: string) => void;
   patients: Patient[];
   onDeletePatient?: (id: string) => Promise<void>;
+  /** Logged-in facility (clinic/pharmacy) — used for PDF letterhead */
+  currentUser?: UserProfile | null;
 }
 
-export const PatientsView: React.FC<PatientsViewProps> = ({ onNavigate, patients, onDeletePatient }) => {
+export const PatientsView: React.FC<PatientsViewProps> = ({ onNavigate, patients, onDeletePatient, currentUser }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState<'all' | 'high_risk'>('all');
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
@@ -54,6 +57,20 @@ export const PatientsView: React.FC<PatientsViewProps> = ({ onNavigate, patients
       console.error('Error loading patient history:', error);
     } finally {
       setLoadingHistory(false);
+    }
+  };
+
+  const handleDownloadPatientPdf = () => {
+    if (!selectedPatient || !currentUser) return;
+    try {
+      downloadPatientInformationPdf(currentUser, selectedPatient, {
+        referrals: patientReferrals,
+        tasks: patientTasks,
+        reminders: patientReminders,
+      });
+    } catch (e) {
+      console.error(e);
+      alert('Could not generate PDF. Please try again.');
     }
   };
 
@@ -173,9 +190,21 @@ export const PatientsView: React.FC<PatientsViewProps> = ({ onNavigate, patients
             className="bg-white dark:bg-[#1c1c1e] w-full max-w-2xl rounded-[2.5rem] p-8 shadow-2xl relative animate-scale-in border border-slate-100 dark:border-slate-800 my-8 max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="absolute top-6 right-6 flex items-center gap-2 z-10">
+            <div className="absolute top-6 right-6 flex items-center gap-2 z-10 flex-wrap justify-end max-w-[min(100%,22rem)]">
+              {currentUser && (
+                <button
+                  type="button"
+                  onClick={handleDownloadPatientPdf}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-brand-600 text-white hover:bg-brand-700 dark:bg-brand-500 dark:hover:bg-brand-600 border border-brand-500/30 transition-colors shadow-sm"
+                  title="Download patient details, medications, referrals, tasks, and reminders as PDF"
+                >
+                  <Download size={14} strokeWidth={2.5} />
+                  Download PDF
+                </button>
+              )}
               {onDeletePatient && (
                 <button
+                  type="button"
                   onClick={async () => {
                     if (!selectedPatient) return;
                     const confirmed = window.confirm(
