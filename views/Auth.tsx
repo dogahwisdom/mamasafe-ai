@@ -242,8 +242,6 @@ export const AuthView: React.FC<AuthProps> = ({ onSuccess }) => {
                         >
                             Sign In
                         </button>
-                        
-                        <GoogleButton onClick={handleGoogleLogin} loading={loading} />
 
                         <div className="relative py-4">
                             <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-200 dark:border-slate-700"></div></div>
@@ -328,14 +326,6 @@ export const AuthView: React.FC<AuthProps> = ({ onSuccess }) => {
                             >
                                 {loading ? <Loader2 className="animate-spin" /> : 'Sign In'} <ArrowRight size={18} />
                             </button>
-                            
-                            <div className="relative flex py-2 items-center">
-                                <div className="flex-grow border-t border-slate-200 dark:border-slate-700"></div>
-                                <span className="flex-shrink-0 mx-4 text-slate-400 text-xs">OR</span>
-                                <div className="flex-grow border-t border-slate-200 dark:border-slate-700"></div>
-                            </div>
-                            
-                            <GoogleButton onClick={handleGoogleLogin} loading={loading} />
                         </div>
                     </form>
                 )}
@@ -562,14 +552,6 @@ export const AuthView: React.FC<AuthProps> = ({ onSuccess }) => {
                             >
                                 {loading ? <Loader2 className="animate-spin" /> : 'Create Account'}
                             </button>
-                            
-                            <div className="relative flex py-2 items-center">
-                                <div className="flex-grow border-t border-slate-200 dark:border-slate-700"></div>
-                                <span className="flex-shrink-0 mx-4 text-slate-400 text-xs">OR</span>
-                                <div className="flex-grow border-t border-slate-200 dark:border-slate-700"></div>
-                            </div>
-                            
-                            <GoogleButton onClick={handleGoogleLogin} loading={loading} />
                         </div>
                     </form>
                 )}
