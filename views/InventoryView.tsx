@@ -145,33 +145,34 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user, onBack }) =>
             <div className="flex-1 space-y-2">
               <div className="flex items-center gap-2 text-slate-900 dark:text-white font-bold text-sm">
                 <BookOpen size={18} className="text-brand-600 shrink-0" />
-                Reference layout (Nila Pharmaceuticals–style sample)
+                Reference layout (price list layout sample)
               </div>
               <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
                 Use this familiar <strong className="text-slate-800 dark:text-slate-200">code + product + table</strong> format as a guide when updating stock.
+                You create inventory rows in the platform using <strong>Add medication</strong>; the reference download is only for layout/price-sheet reconciliation.
                 Your <strong>Download PDF</strong> export uses the same kind of header and bordered grid; see{' '}
-                <code className="text-xs bg-slate-200/80 dark:bg-slate-800 px-1.5 py-0.5 rounded">docs/INVENTORY_REFERENCE_NILA.md</code> for details.
+                <code className="text-xs bg-slate-200/80 dark:bg-slate-800 px-1.5 py-0.5 rounded">docs/INVENTORY_REFERENCE_PRICE_LIST.md</code> for details.
               </p>
               <a
-                href="/inventory-reference/nila-pharmaceutical-comprehensive-price-list-2023.pdf"
+                href="/inventory-reference/comprehensive-price-list-2023.pdf"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 mt-2 text-sm font-semibold text-brand-600 dark:text-brand-400 hover:underline"
               >
                 <FileText size={16} />
-                Open Nila Pharmaceuticals PDF price list (2023)
+                Open comprehensive price list PDF (2023)
               </a>
             </div>
             <a
-              href="/inventory-reference/nila-pharmaceuticals-price-list-reference.png"
+              href="/inventory-reference/price-list-layout-reference.png"
               target="_blank"
               rel="noopener noreferrer"
               className="shrink-0 block w-full max-w-sm mx-auto lg:mx-0 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden bg-white shadow-sm hover:opacity-95 transition-opacity"
               title="Open reference image full size"
             >
               <img
-                src="/inventory-reference/nila-pharmaceuticals-price-list-reference.png"
-                alt="Sample professional pharmacy price list layout: branded header and three-column table"
+                src="/inventory-reference/price-list-layout-reference.png"
+                alt="Sample professional price list layout: branded header and three-column table"
                 className="w-full h-auto object-contain max-h-48 object-top"
                 loading="lazy"
               />

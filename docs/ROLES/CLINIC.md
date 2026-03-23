@@ -71,7 +71,7 @@ The dashboard displays:
 Clinics that keep medicines or supplies on site can use **Inventory** in the navigation (same screen as pharmacy partners):
 
 1. Update **current stock** and **minimum levels** after deliveries or use.
-2. Export a **PDF** for audits or reorder sheets. The printable format mirrors a common **code + product + levels** layout; see **[Inventory reference (Nila-style)](../INVENTORY_REFERENCE_NILA.md)** in `docs/` for the sample reference image and column mapping.
+2. Export a **PDF** for audits or reorder sheets. The printable format mirrors a common **code + product + levels** layout; see **[Inventory reference (price list layout sample)](../INVENTORY_REFERENCE_PRICE_LIST.md)** in `docs/` for the sample reference image and column mapping.
 
 ## Best Practices
 

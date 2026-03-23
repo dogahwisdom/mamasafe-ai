@@ -329,8 +329,7 @@ export function downloadPatientInformationPdf(
     doc.setFont('helvetica', 'normal');
     y += 4;
     patient.alerts.slice(0, 8).forEach((a) => {
-      const msg = typeof a === 'string' ? a : a.message || '';
-      doc.text(`• ${clipCell(msg, 100)}`, PAGE_MARGIN, y);
+      doc.text(`• ${clipCell(a.message || '', 100)}`, PAGE_MARGIN, y);
       y += 4;
     });
     y += 2;
