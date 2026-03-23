@@ -14,6 +14,19 @@ import {
 import { supabase, isSupabaseConfigured } from "../supabaseClient";
 
 export class AuthService {
+  private normalizeEmail(email: string | null | undefined): string | null {
+    if (!email) return null;
+    const e = email.trim().toLowerCase();
+    return e.length ? e : null;
+  }
+
+  private getAllowInsecureDemoAuth(): boolean {
+    // Never allow hard-coded credentials in production.
+    // This is only for local/dev environments when Supabase isn't available.
+    const v = import.meta.env.VITE_ALLOW_INSECURE_DEMO_AUTH;
+    return !!(import.meta.env.DEV || v === 'true');
+  }
+
   public async loginAsDemo(role: UserRole): Promise<{ user: UserProfile }> {
     await delay(200);
 
@@ -286,6 +299,7 @@ export class AuthService {
     if (isSupabaseConfigured()) {
       let users: any[] | null = null;
       let error: any = null;
+      const identifierLower = rawInput.toLowerCase();
 
       // Special handling for "admin" - check email first
       if (rawInput.toLowerCase() === "admin" || rawInput.toLowerCase() === "admin@mamasafe.ai") {
@@ -301,7 +315,8 @@ export class AuthService {
         const { data: emailUsers, error: emailErr } = await supabase
           .from('users')
           .select('*')
-          .eq('email', rawInput.toLowerCase())
+          // Email matching must be case-insensitive.
+          .ilike('email', identifierLower)
           .limit(1);
         
         if (emailUsers && emailUsers.length > 0) {
@@ -335,14 +350,14 @@ export class AuthService {
       }
 
       if (error || !users || users.length === 0) {
-        throw new Error('Invalid credentials. Try "admin" / "1234"');
+        throw new Error('Invalid credentials.');
       }
 
       const dbUser = users[0];
       
       // Verify password
       if (!Security.compare(cleanPassword, dbUser.pin_hash || '')) {
-        throw new Error('Invalid credentials. Try "admin" / "1234"');
+        throw new Error('Invalid credentials.');
       }
 
       // Convert DB user to UserProfile
@@ -367,70 +382,74 @@ export class AuthService {
     }
 
     // Fallback to localStorage
-    if (
-      (rawInput.toLowerCase() === "admin" ||
-        rawInput.toLowerCase() === "admin@mamasafe.ai") &&
-      cleanPassword === "1234"
-    ) {
-      const admin: UserProfile = {
-        id: "admin",
-        role: "clinic",
-        name: "MamaSafe HQ",
-        phone: "+254700000000",
-        email: "admin@mamasafe.ai",
-        location: "Nairobi",
-        countryCode: "KE",
-        facilityData: { managerName: "System Admin" },
-        avatar:
-          "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80",
-      };
-      storage.set(KEYS.CURRENT_USER, admin);
-      storage.set(KEYS.SESSION, "true");
-      return { user: admin };
+    if (this.getAllowInsecureDemoAuth()) {
+      if (
+        (rawInput.toLowerCase() === "admin" ||
+          rawInput.toLowerCase() === "admin@mamasafe.ai") &&
+        cleanPassword === "1234"
+      ) {
+        const admin: UserProfile = {
+          id: "admin",
+          role: "clinic",
+          name: "MamaSafe HQ",
+          phone: "+254700000000",
+          email: "admin@mamasafe.ai",
+          location: "Nairobi",
+          countryCode: "KE",
+          facilityData: { managerName: "System Admin" },
+          avatar:
+            "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80",
+        };
+        storage.set(KEYS.CURRENT_USER, admin);
+        storage.set(KEYS.SESSION, "true");
+        return { user: admin };
+      }
     }
 
     const cleanIdentifier = normalizePhone(rawInput);
 
-    if (cleanIdentifier === "+254722000000" && cleanPassword === "1234") {
-      const demoPatient: UserProfile = {
-        id: "demo_patient",
-        role: "patient",
-        name: "Jane Demo (Patient)",
-        phone: "+254722000000",
-        location: "Nairobi",
-        countryCode: "KE",
-        pin: Security.hash("1234"),
-        patientData: {
-          gestationWeeks: 28,
-          dob: "1995-01-01",
-          nextOfKin: { name: "John Doe", phone: "+254711000000" },
-          medicalHistory: ["Mild Anemia"],
-          allergies: [],
-          medications: [],
-          nextAppointment: new Date(
-            Date.now() + 86400000 * 5
-          ).toISOString(),
-          riskStatus: RiskLevel.LOW,
-        },
-      };
-      storage.set(KEYS.CURRENT_USER, demoPatient);
-      storage.set(KEYS.SESSION, "true");
-      return { user: demoPatient };
-    }
+    if (this.getAllowInsecureDemoAuth()) {
+      if (cleanIdentifier === "+254722000000" && cleanPassword === "1234") {
+        const demoPatient: UserProfile = {
+          id: "demo_patient",
+          role: "patient",
+          name: "Jane Demo (Patient)",
+          phone: "+254722000000",
+          location: "Nairobi",
+          countryCode: "KE",
+          pin: Security.hash("1234"),
+          patientData: {
+            gestationWeeks: 28,
+            dob: "1995-01-01",
+            nextOfKin: { name: "John Doe", phone: "+254711000000" },
+            medicalHistory: ["Mild Anemia"],
+            allergies: [],
+            medications: [],
+            nextAppointment: new Date(
+              Date.now() + 86400000 * 5
+            ).toISOString(),
+            riskStatus: RiskLevel.LOW,
+          },
+        };
+        storage.set(KEYS.CURRENT_USER, demoPatient);
+        storage.set(KEYS.SESSION, "true");
+        return { user: demoPatient };
+      }
 
-    if (cleanIdentifier === "+254733000000" && cleanPassword === "1234") {
-      const demoPharmacy: UserProfile = {
-        id: "demo_pharmacy",
-        role: "pharmacy",
-        name: "City Care Pharmacy",
-        phone: "+254733000000",
-        location: "Westlands, Nairobi",
-        countryCode: "KE",
-        facilityData: { managerName: "Peter Drugman" },
-      };
-      storage.set(KEYS.CURRENT_USER, demoPharmacy);
-      storage.set(KEYS.SESSION, "true");
-      return { user: demoPharmacy };
+      if (cleanIdentifier === "+254733000000" && cleanPassword === "1234") {
+        const demoPharmacy: UserProfile = {
+          id: "demo_pharmacy",
+          role: "pharmacy",
+          name: "City Care Pharmacy",
+          phone: "+254733000000",
+          location: "Westlands, Nairobi",
+          countryCode: "KE",
+          facilityData: { managerName: "Peter Drugman" },
+        };
+        storage.set(KEYS.CURRENT_USER, demoPharmacy);
+        storage.set(KEYS.SESSION, "true");
+        return { user: demoPharmacy };
+      }
     }
 
     const users = storage.get<UserProfile[]>(KEYS.USERS, []);
@@ -449,7 +468,7 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new Error('Invalid credentials. Try "admin" / "1234"');
+      throw new Error('Invalid credentials.');
     }
 
     if (user.role === "patient") {
@@ -471,6 +490,7 @@ export class AuthService {
     await delay(500);
 
     const cleanPhone = normalizePhone(user.phone);
+    const emailNormalized = this.normalizeEmail(user.email);
     const hasEmail = user.email && user.email.includes("@");
 
     if (cleanPhone === "+254700000000") {
@@ -505,7 +525,7 @@ export class AuthService {
         const { data } = await supabase
           .from('users')
           .select('*')
-          .eq('email', user.email?.toLowerCase())
+          .eq('email', emailNormalized)
           .limit(1)
           .single();
         existingUser = data;
@@ -515,7 +535,7 @@ export class AuthService {
         role: user.role,
         name: user.name,
         phone: cleanPhone,
-        email: user.email || null,
+        email: emailNormalized,
         location: user.location,
         avatar: user.avatar || null,
         country_code: user.countryCode || 'KE',
@@ -674,12 +694,13 @@ export class AuthService {
 
     // Use Supabase if configured
     if (isSupabaseConfigured()) {
+      const emailNormalized = this.normalizeEmail(user.email);
       const { error } = await supabase
         .from('users')
         .update({
           name: user.name,
           phone: user.phone,
-          email: user.email || null,
+          email: emailNormalized,
           location: user.location,
           avatar: user.avatar || null,
           country_code: user.countryCode || 'KE',
