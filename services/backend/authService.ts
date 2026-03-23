@@ -12,6 +12,7 @@ import {
   storage,
 } from "./shared";
 import { supabase, isSupabaseConfigured } from "../supabaseClient";
+import { MessagingService } from "./messagingService";
 
 export class AuthService {
   private normalizeEmail(email: string | null | undefined): string | null {
@@ -30,6 +31,176 @@ export class AuthService {
   private isDebugAuthEnabled(): boolean {
     const v = import.meta.env.VITE_DEBUG_AUTH;
     return !!(import.meta.env.DEV || v === 'true');
+  }
+
+  private generateResetCode(): string {
+    // 6-digit code, cryptographically random when available.
+    const c: Uint32Array =
+      typeof crypto !== 'undefined' && crypto.getRandomValues
+        ? new Uint32Array(1)
+        : new Uint32Array([Math.floor(Math.random() * 2 ** 32)]);
+
+    if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+      crypto.getRandomValues(c);
+    }
+
+    const n = c[0] % 1000000;
+    return n.toString().padStart(6, '0');
+  }
+
+  private resolveUserIdByIdentifier = async (
+    identifier: string
+  ): Promise<{ userId: string; phone: string } | null> => {
+    const rawInput = identifier.trim();
+    if (!rawInput) return null;
+
+    const identifierLower = rawInput.toLowerCase();
+    const looksLikeEmail =
+      identifierLower.includes('@') && identifierLower.includes('.');
+
+    if (!isSupabaseConfigured()) return null;
+
+    if (looksLikeEmail) {
+      const { data: eqUsers } = await supabase
+        .from('users')
+        .select('id, phone')
+        .eq('email', identifierLower)
+        .limit(1);
+
+      if (eqUsers && eqUsers.length > 0) {
+        return { userId: eqUsers[0].id, phone: eqUsers[0].phone };
+      }
+
+      const { data: ilikeUsers } = await supabase
+        .from('users')
+        .select('id, phone')
+        .ilike('email', identifierLower)
+        .limit(1);
+
+      if (ilikeUsers && ilikeUsers.length > 0) {
+        return { userId: ilikeUsers[0].id, phone: ilikeUsers[0].phone };
+      }
+    }
+
+    const cleanIdentifier = normalizePhone(rawInput);
+    if (cleanIdentifier) {
+      const { data: phoneUsers } = await supabase
+        .from('users')
+        .select('id, phone')
+        .eq('phone', cleanIdentifier)
+        .limit(1);
+
+      if (phoneUsers && phoneUsers.length > 0) {
+        return { userId: phoneUsers[0].id, phone: phoneUsers[0].phone };
+      }
+    }
+
+    const { data: nameUsers } = await supabase
+      .from('users')
+      .select('id, phone')
+      .ilike('name', `%${rawInput}%`)
+      .limit(1);
+
+    if (nameUsers && nameUsers.length > 0) {
+      return { userId: nameUsers[0].id, phone: nameUsers[0].phone };
+    }
+
+    return null;
+  };
+
+  /**
+   * Request a one-time PIN reset code.
+   * Always returns `{ ok: true }` to avoid leaking whether the user exists.
+   */
+  public async requestPinReset(
+    identifier: string
+  ): Promise<{ ok: true }> {
+    if (!isSupabaseConfigured()) return { ok: true };
+
+    const user = await this.resolveUserIdByIdentifier(identifier);
+    if (!user) return { ok: true };
+
+    const code = this.generateResetCode();
+    const tokenHash = Security.hash(`${code}:${user.userId}`);
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+
+    const messagingService = new MessagingService();
+    const portalUrl =
+      typeof window !== 'undefined'
+        ? window.location.origin
+        : 'https://mamasafe.ai';
+
+    try {
+      await supabase.from('pin_reset_tokens').insert({
+        user_id: user.userId,
+        token_hash: tokenHash,
+        expires_at: expiresAt,
+      });
+
+      const message = `Habari! Umeomba kuweka upya PIN yako kwenye MamaSafe.\n\nPIN RESET CODE yako ni: ${code}\nInatakiwa itumike ndani ya dakika 15.\n\nKuingia: ${portalUrl}`;
+      // Best effort messaging; do not block the reset flow.
+      await messagingService.sendNotification(user.phone, message, ['whatsapp', 'sms']);
+    } catch (e) {
+      console.error('Error requesting PIN reset:', e);
+      // Still return ok to prevent enumeration.
+    }
+
+    return { ok: true };
+  }
+
+  /**
+   * Reset the user's PIN using the one-time reset code.
+   */
+  public async resetPin(
+    identifier: string,
+    code: string,
+    newPin: string
+  ): Promise<{ ok: true }> {
+    if (!isSupabaseConfigured()) throw new Error('Supabase not configured');
+
+    const pin = newPin.trim();
+    const resetCode = code.trim();
+
+    if (!pin || pin.length < 4) {
+      throw new Error('New PIN must be at least 4 characters.');
+    }
+    if (!resetCode) {
+      throw new Error('Reset code is required.');
+    }
+
+    const user = await this.resolveUserIdByIdentifier(identifier);
+    if (!user) {
+      throw new Error('Invalid or expired reset code.');
+    }
+
+    const tokenHash = Security.hash(`${resetCode}:${user.userId}`);
+    const nowIso = new Date().toISOString();
+
+    const { data: tokens } = await supabase
+      .from('pin_reset_tokens')
+      .select('id, used, expires_at')
+      .eq('user_id', user.userId)
+      .eq('token_hash', tokenHash)
+      .eq('used', false)
+      .gt('expires_at', nowIso)
+      .limit(1);
+
+    const token = tokens && tokens.length > 0 ? tokens[0] : null;
+    if (!token) {
+      throw new Error('Invalid or expired reset code.');
+    }
+
+    // Update PIN + mark token used.
+    await supabase.from('users').update({
+      pin_hash: Security.hash(pin),
+    }).eq('id', user.userId);
+
+    await supabase.from('pin_reset_tokens').update({
+      used: true,
+      used_at: new Date().toISOString(),
+    }).eq('id', token.id);
+
+    return { ok: true };
   }
 
   public async loginAsDemo(role: UserRole): Promise<{ user: UserProfile }> {

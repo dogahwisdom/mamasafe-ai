@@ -4,7 +4,7 @@ import { Logo } from '../components/Logo';
 import { UserRole, UserProfile } from '../types';
 import { backend } from '../services/backend';
 import { 
-  Loader2, AlertCircle, ArrowRight, Eye, EyeOff, Globe, Check, ChevronDown, ChevronLeft, Mail, Building2, Pill, User
+  Loader2, AlertCircle, ArrowRight, Eye, EyeOff, Globe, Check, ChevronDown, ChevronLeft, Mail, Building2, Pill, User, X
 } from 'lucide-react';
 
 // Data: List of African Countries with ISO Codes and Dial Codes
@@ -83,6 +83,16 @@ export const AuthView: React.FC<AuthProps> = ({ onSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+
+  // Forgot PIN flow
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [forgotStep, setForgotStep] = useState<'request' | 'reset' | 'done'>('request');
+  const [resetIdentifier, setResetIdentifier] = useState('');
+  const [resetCode, setResetCode] = useState('');
+  const [resetNewPin, setResetNewPin] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetError, setResetError] = useState('');
+  const [resetInfo, setResetInfo] = useState('');
   
   // Login State
   const [identifier, setIdentifier] = useState('');
@@ -113,6 +123,16 @@ export const AuthView: React.FC<AuthProps> = ({ onSuccess }) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const openForgotPin = () => {
+    setForgotOpen(true);
+    setForgotStep('request');
+    setResetError('');
+    setResetInfo('');
+    setResetIdentifier(identifier);
+    setResetCode('');
+    setResetNewPin('');
   };
 
   const handleGoogleLogin = async () => {
@@ -282,6 +302,16 @@ export const AuthView: React.FC<AuthProps> = ({ onSuccess }) => {
                                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                                 </button>
                             </div>
+
+                            <div className="flex justify-end">
+                              <button
+                                type="button"
+                                onClick={openForgotPin}
+                                className="text-xs font-semibold text-slate-500 hover:text-slate-900 dark:hover:text-white"
+                              >
+                                Forgot PIN?
+                              </button>
+                            </div>
                         </div>
 
                         {error && (
@@ -308,6 +338,146 @@ export const AuthView: React.FC<AuthProps> = ({ onSuccess }) => {
                             <GoogleButton onClick={handleGoogleLogin} loading={loading} />
                         </div>
                     </form>
+                )}
+
+                {/* Forgot PIN Modal */}
+                {forgotOpen && (
+                  <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/40 backdrop-blur-md">
+                    <div
+                      className="bg-white dark:bg-[#1c1c1e] w-full max-w-md rounded-[2.5rem] p-6 md:p-8 shadow-2xl relative border border-slate-100 dark:border-slate-800"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex items-start justify-between gap-3 mb-5">
+                        <div>
+                          <h2 className="text-xl font-bold text-slate-900 dark:text-white">Reset PIN</h2>
+                          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                            {forgotStep === 'request'
+                              ? 'Enter your email or phone. We will send a reset code.'
+                              : forgotStep === 'reset'
+                              ? 'Enter the code and choose a new PIN.'
+                              : 'PIN updated successfully.'}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setForgotOpen(false)}
+                          className="p-2 bg-slate-100 dark:bg-[#2c2c2e] rounded-full text-slate-500 hover:text-slate-900 dark:hover:text-white"
+                          aria-label="Close"
+                        >
+                          <X size={18} />
+                        </button>
+                      </div>
+
+                      {resetError && (
+                        <div className="p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm font-medium rounded-xl flex items-center gap-2 mb-4">
+                          <AlertCircle size={16} />
+                          {resetError}
+                        </div>
+                      )}
+
+                      {resetInfo && (
+                        <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-200 text-sm font-medium rounded-xl flex items-center gap-2 mb-4">
+                          <Check size={16} />
+                          {resetInfo}
+                        </div>
+                      )}
+
+                      {forgotStep === 'request' && (
+                        <div className="space-y-3">
+                          <InputField
+                            placeholder="Email, Phone or Username"
+                            value={resetIdentifier}
+                            onChange={(e: any) => { setResetIdentifier(e.target.value); setResetError(''); }}
+                          />
+                          <button
+                            type="button"
+                            disabled={resetLoading}
+                            onClick={async () => {
+                              if (resetLoading) return;
+                              setResetLoading(true);
+                              setResetError('');
+                              setResetInfo('');
+                              try {
+                                await backend.auth.requestPinReset(resetIdentifier);
+                                setForgotStep('reset');
+                                setResetInfo('If the account exists, a reset code was sent to the phone on file.');
+                              } catch (err: any) {
+                                setResetError(err?.message || 'Could not send reset code.');
+                              } finally {
+                                setResetLoading(false);
+                              }
+                            }}
+                            className="w-full h-[52px] bg-brand-600 hover:bg-brand-700 text-white rounded-full font-bold text-[15px] transition-all shadow-lg shadow-brand-500/30 flex items-center justify-center gap-2 disabled:opacity-70"
+                          >
+                            {resetLoading ? <Loader2 size={18} className="animate-spin" /> : 'Send Reset Code'}
+                          </button>
+                        </div>
+                      )}
+
+                      {forgotStep === 'reset' && (
+                        <div className="space-y-3">
+                          <InputField
+                            placeholder="Reset code"
+                            value={resetCode}
+                            onChange={(e: any) => { setResetCode(e.target.value); setResetError(''); }}
+                          />
+                          <InputField
+                            type="password"
+                            placeholder="New PIN (min 4 chars)"
+                            value={resetNewPin}
+                            onChange={(e: any) => { setResetNewPin(e.target.value); setResetError(''); }}
+                          />
+                          <button
+                            type="button"
+                            disabled={resetLoading}
+                            onClick={async () => {
+                              if (resetLoading) return;
+                              setResetLoading(true);
+                              setResetError('');
+                              setResetInfo('');
+                              try {
+                                await backend.auth.resetPin(resetIdentifier, resetCode, resetNewPin);
+                                setForgotStep('done');
+                                setResetInfo('PIN updated successfully. You can sign in now.');
+                                setPassword('');
+                              } catch (err: any) {
+                                setResetError(err?.message || 'Reset failed. Check the code and try again.');
+                              } finally {
+                                setResetLoading(false);
+                              }
+                            }}
+                            className="w-full h-[52px] bg-brand-600 hover:bg-brand-700 text-white rounded-full font-bold text-[15px] transition-all shadow-lg shadow-brand-500/30 flex items-center justify-center gap-2 disabled:opacity-70"
+                          >
+                            {resetLoading ? <Loader2 size={18} className="animate-spin" /> : 'Update PIN'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setForgotStep('request')}
+                            className="w-full h-[48px] bg-slate-100 dark:bg-[#2c2c2e] text-slate-700 dark:text-slate-200 rounded-full font-bold text-[13px] hover:bg-slate-200 dark:hover:bg-[#3a3a3c] transition-colors"
+                          >
+                            Back
+                          </button>
+                        </div>
+                      )}
+
+                      {forgotStep === 'done' && (
+                        <div className="space-y-3">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setForgotOpen(false);
+                              setResetCode('');
+                              setResetNewPin('');
+                              setResetIdentifier('');
+                            }}
+                            className="w-full h-[52px] bg-brand-600 hover:bg-brand-700 text-white rounded-full font-bold text-[15px] transition-all shadow-lg shadow-brand-500/30"
+                          >
+                            Continue to Sign In
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 )}
 
                 {/* 3. Register View */}
