@@ -238,6 +238,7 @@ export const DashboardView: React.FC<DashboardProps> = ({ onNavigate, user }) =>
   };
 
   const activeTasks = tasks.filter(t => !t.resolved);
+  const shouldShowActionItemsCard = activeTasks.length > 0 || reminders.length > 0;
 
   return (
     <div className="space-y-8 animate-fade-in-up">
@@ -539,6 +540,7 @@ export const DashboardView: React.FC<DashboardProps> = ({ onNavigate, user }) =>
         </div>
 
         {/* Task Tracker / Priority Queue */}
+        {shouldShowActionItemsCard && (
         <div className="bg-white dark:bg-[#1c1c1e] p-6 md:p-8 rounded-[2rem] shadow-sm flex flex-col border border-slate-100 dark:border-slate-800/50 max-h-[520px]">
            <div className="flex items-center justify-between mb-6">
              <h3 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">Action Items</h3>
@@ -620,6 +622,7 @@ export const DashboardView: React.FC<DashboardProps> = ({ onNavigate, user }) =>
              )}
            </div>
         </div>
+        )}
       </div>
     </div>
   );
