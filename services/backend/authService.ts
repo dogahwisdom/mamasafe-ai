@@ -27,6 +27,11 @@ export class AuthService {
     return !!(import.meta.env.DEV || v === 'true');
   }
 
+  private isDebugAuthEnabled(): boolean {
+    const v = import.meta.env.VITE_DEBUG_AUTH;
+    return !!(import.meta.env.DEV || v === 'true');
+  }
+
   public async loginAsDemo(role: UserRole): Promise<{ user: UserProfile }> {
     await delay(200);
 
@@ -294,12 +299,14 @@ export class AuthService {
 
     const rawInput = identifier.trim();
     const cleanPassword = password.trim();
+    const identifierLower = rawInput.toLowerCase();
+    const looksLikeEmail =
+      identifierLower.includes('@') && identifierLower.includes('.');
 
     // Use Supabase if configured
     if (isSupabaseConfigured()) {
       let users: any[] | null = null;
       let error: any = null;
-      const identifierLower = rawInput.toLowerCase();
 
       // Special handling for "admin" - check email first
       if (rawInput.toLowerCase() === "admin" || rawInput.toLowerCase() === "admin@mamasafe.ai") {
@@ -312,29 +319,40 @@ export class AuthService {
         error = err;
       } else {
         // Try email first (most common)
-        const { data: emailUsers, error: emailErr } = await supabase
-          .from('users')
-          .select('*')
-          // Email matching must be case-insensitive.
-          .ilike('email', identifierLower)
-          .limit(1);
-        
-        if (emailUsers && emailUsers.length > 0) {
-          users = emailUsers;
+        if (looksLikeEmail) {
+          // Prefer exact match (email is normalized on register), then fallback to case-insensitive match.
+          const { data: emailEqUsers, error: emailEqErr } = await supabase
+            .from('users')
+            .select('*')
+            .eq('email', identifierLower)
+            .limit(1);
+
+          if (emailEqErr) error = emailEqErr;
+
+          users = emailEqUsers && emailEqUsers.length > 0 ? emailEqUsers : null;
+
+          if (!users) {
+            const { data: emailILikeUsers, error: emailILikeErr } = await supabase
+              .from('users')
+              .select('*')
+              .ilike('email', identifierLower)
+              .limit(1);
+
+            if (emailILikeErr) error = emailILikeErr;
+            users = emailILikeUsers || null;
+          }
         } else {
           // Try phone
           const cleanIdentifier = normalizePhone(rawInput);
           if (cleanIdentifier) {
-            const { data: phoneUsers, error: phoneErr } = await supabase
+            const { data: phoneUsers } = await supabase
               .from('users')
               .select('*')
               .eq('phone', cleanIdentifier)
               .limit(1);
-            if (phoneUsers && phoneUsers.length > 0) {
-              users = phoneUsers;
-            }
+            users = phoneUsers || null;
           }
-          
+
           // If still not found, try name (case-insensitive)
           if (!users || users.length === 0) {
             const { data: nameUsers } = await supabase
@@ -342,14 +360,15 @@ export class AuthService {
               .select('*')
               .ilike('name', `%${rawInput}%`)
               .limit(1);
-            if (nameUsers && nameUsers.length > 0) {
-              users = nameUsers;
-            }
+            users = nameUsers || null;
           }
         }
       }
 
       if (error || !users || users.length === 0) {
+        if (this.isDebugAuthEnabled()) {
+          console.warn('[Auth] User not found:', { identifier: rawInput });
+        }
         throw new Error('Invalid credentials.');
       }
 
@@ -357,6 +376,9 @@ export class AuthService {
       
       // Verify password
       if (!Security.compare(cleanPassword, dbUser.pin_hash || '')) {
+        if (this.isDebugAuthEnabled()) {
+          console.warn('[Auth] Password mismatch:', { identifier: rawInput, userId: dbUser.id });
+        }
         throw new Error('Invalid credentials.');
       }
 
