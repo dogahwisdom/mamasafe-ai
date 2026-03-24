@@ -2,9 +2,9 @@
 import React, { useState, useEffect } from 'react';
 import { ActionCard } from '../components/ActionCard';
 import { backend } from '../services/backend';
-import { Users, AlertTriangle, Calendar, Activity, ChevronRight, Building2, TrendingUp, CheckCircle, Clock, MessageCircle, Workflow, FlaskConical, CreditCard, Stethoscope, FileText, Bot, DollarSign } from 'lucide-react';
+import { Users, AlertTriangle, Calendar, Activity, ChevronRight, Building2, TrendingUp, CheckCircle, Clock, Workflow, FlaskConical, CreditCard, Stethoscope, FileText, Bot, DollarSign } from 'lucide-react';
 import { AreaChart, Area, XAxis, Tooltip, ResponsiveContainer } from 'recharts';
-import { Patient, UserProfile, Task, Reminder, ClinicVisit } from '../types';
+import { Patient, UserProfile, Task, ClinicVisit } from '../types';
 import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
 
 // Mock Data for Analytics
@@ -42,7 +42,6 @@ export const DashboardView: React.FC<DashboardProps> = ({ onNavigate, user }) =>
   const [earlyEnrollmentRate, setEarlyEnrollmentRate] = useState<number | null>(null);
   const [followup24hRate, setFollowup24hRate] = useState<number | null>(null);
   const [engagementRate, setEngagementRate] = useState<number | null>(null);
-  const [reminders, setReminders] = useState<Reminder[]>([]);
   const [todayVisits, setTodayVisits] = useState<number>(0);
   const [pendingLabRequests, setPendingLabRequests] = useState<number>(0);
   const [completedLabTests, setCompletedLabTests] = useState<number>(0);
@@ -198,9 +197,12 @@ export const DashboardView: React.FC<DashboardProps> = ({ onNavigate, user }) =>
           setFollowup24hRate(null);
         }
 
-        await backend.reminders.generateDailyReminders();
-        const pending = await backend.reminders.getPending();
-        setReminders(pending.slice(0, 5));
+        // Keep generating reminder rows for WhatsApp/SMS cron; dashboard does not list them (Option A).
+        try {
+          await backend.reminders.generateDailyReminders();
+        } catch (e) {
+          console.warn('generateDailyReminders failed (non-blocking):', e);
+        }
 
         // Load AI usage and resolved tasks stats
         try {
@@ -238,7 +240,6 @@ export const DashboardView: React.FC<DashboardProps> = ({ onNavigate, user }) =>
   };
 
   const activeTasks = tasks.filter(t => !t.resolved);
-  const shouldShowActionItemsCard = activeTasks.length > 0 || reminders.length > 0;
 
   return (
     <div className="space-y-8 animate-fade-in-up">
@@ -539,8 +540,7 @@ export const DashboardView: React.FC<DashboardProps> = ({ onNavigate, user }) =>
           </div>
         </div>
 
-        {/* Task Tracker / Priority Queue */}
-        {shouldShowActionItemsCard && (
+        {/* Task tracker + patient entry (reminder queue hidden; generation still runs above) */}
         <div className="bg-white dark:bg-[#1c1c1e] p-6 md:p-8 rounded-[2rem] shadow-sm flex flex-col border border-slate-100 dark:border-slate-800/50 max-h-[520px]">
            <div className="flex items-center justify-between mb-6">
              <h3 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">Action Items</h3>
@@ -584,45 +584,7 @@ export const DashboardView: React.FC<DashboardProps> = ({ onNavigate, user }) =>
            <button onClick={() => onNavigate('patients')} className="w-full mt-6 py-3.5 text-sm font-bold text-slate-900 dark:text-white bg-slate-100 dark:bg-[#2c2c2e] rounded-xl hover:bg-slate-200 transition-colors">
              View All Patients
            </button>
-
-           {/* Reminders Preview */}
-           <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
-             <div className="flex items-center justify-between mb-2">
-               <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
-                 <MessageCircle size={12} /> Pending Reminders
-               </h4>
-               <span className="text-[10px] font-semibold text-slate-400">
-                 {reminders.length} queued
-               </span>
-             </div>
-             {reminders.length === 0 ? (
-               <p className="text-[11px] text-slate-400">
-                 No reminders queued. Patients are up to date.
-               </p>
-             ) : (
-               <div className="space-y-1 max-h-32 overflow-y-auto no-scrollbar">
-                 {reminders.map(r => (
-                   <div key={r.id} className="flex items-start gap-2 text-[11px] text-slate-600 dark:text-slate-300">
-                     <span className="w-1.5 h-1.5 rounded-full mt-1.5 bg-emerald-500" />
-                     <div>
-                       <p className="font-semibold">
-                         {r.patientName} • {r.type === 'appointment' ? 'Appointment' : 'Medication'}
-                       </p>
-                       <p className="text-slate-400">
-                         {new Date(r.scheduledFor).toLocaleTimeString('en-KE', {
-                           hour: '2-digit',
-                           minute: '2-digit',
-                         })}{' '}
-                         • {r.channel.toUpperCase()}
-                       </p>
-                     </div>
-                   </div>
-                 ))}
-               </div>
-             )}
-           </div>
         </div>
-        )}
       </div>
     </div>
   );
