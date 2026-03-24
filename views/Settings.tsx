@@ -49,6 +49,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ user, onBack, onUpda
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const isPatient = user?.role === 'patient';
+  const isSuperadmin = user?.role === 'superadmin';
+  const canManageSubscription = !isPatient && !isSuperadmin;
 
   const [formData, setFormData] = useState({
       name: user?.name || '',
@@ -106,6 +108,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ user, onBack, onUpda
   };
 
   const handlePlanChange = async (planId: string) => {
+      if (!canManageSubscription) return;
       if (user) {
           const selectedPlan = PLANS.find(p => p.id === planId);
           try {
@@ -165,7 +168,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ user, onBack, onUpda
       )}
 
       {/* Subscription Modal */}
-      {showSubscriptionModal && (
+      {canManageSubscription && showSubscriptionModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fade-in">
            <div className="bg-white dark:bg-[#1c1c1e] w-full max-w-2xl rounded-[2.5rem] p-8 shadow-2xl relative animate-scale-in max-h-[90vh] overflow-y-auto no-scrollbar">
               <div className="flex justify-between items-center mb-6">
@@ -429,8 +432,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ user, onBack, onUpda
 
           </div>
 
-          {/* Right Col: Subscription - Only for non-patients */}
-          {!isPatient && (
+          {/* Right Col: Subscription - hidden for patients and superadmin */}
+          {canManageSubscription && (
             <div className="space-y-6">
                 <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-0 px-2 md:hidden">Subscription</h3>
                 <div className={`
