@@ -234,10 +234,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ user, onBack, onUpda
         <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Settings</h1>
       </div>
 
-      <div className={`grid grid-cols-1 ${!isPatient ? 'md:grid-cols-3' : ''} gap-6`}>
+      <div className={`grid grid-cols-1 ${canManageSubscription ? 'md:grid-cols-3' : ''} gap-6`}>
           
           {/* Left Col: Profile & Menu */}
-          <div className={`${!isPatient ? 'md:col-span-2' : ''} space-y-6`}>
+          <div className={`${canManageSubscription ? 'md:col-span-2' : ''} space-y-6`}>
               
               {/* Profile Card */}
               <div className="bg-white dark:bg-[#1c1c1e] rounded-[2rem] p-6 shadow-sm border border-slate-100 dark:border-slate-800 relative overflow-hidden transition-all group">
@@ -406,7 +406,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ user, onBack, onUpda
               </div>
 
               <div>
-                  <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3 px-2">Support & Actions</h3>
+                  <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3 px-2">
+                    {isSuperadmin ? 'Account' : 'Support & Actions'}
+                  </h3>
+                  {isSuperadmin && (
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-3 px-2 leading-relaxed">
+                      Incoming support from facilities is handled in <strong className="text-slate-700 dark:text-slate-300">System Overview → Support</strong>.
+                    </p>
+                  )}
+                  {!isSuperadmin && (
                   <div className="rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden mb-6">
                     <a href="mailto:support@mamasafe.ai" className="block">
                         <SettingItem icon={Mail} title="Contact Support" value="support@mamasafe.ai" />
@@ -418,6 +426,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ user, onBack, onUpda
                         onClick={() => showToast('Feature request submitted to dev team')} 
                     />
                   </div>
+                  )}
 
                   <div className="rounded-2xl shadow-sm border border-red-100 dark:border-red-900/30 overflow-hidden">
                     <SettingItem 
