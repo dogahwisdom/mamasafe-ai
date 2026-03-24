@@ -147,12 +147,6 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({ onAddPatient }) 
   };
 
   const handleNext = () => {
-    // Check for existing patient before proceeding from step 2
-    if (step === 2 && existingPatient?.exists && existingPatient.facilityId) {
-      setShowTransferModal(true);
-      return;
-    }
-
     if (validateCurrentStep()) {
       setStep(s => Math.min(s + 1, 5));
     } else {
@@ -375,15 +369,23 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({ onAddPatient }) 
                   )}
                 </div>
                 {existingPatient?.exists && existingPatient.facilityId && (
-                  <div className="mt-2 p-3 bg-orange-50 dark:bg-orange-900/20 rounded-xl border border-orange-200 dark:border-orange-900/30 flex items-start gap-3">
-                    <AlertCircle className="text-orange-500 mt-0.5" size={18} />
+                  <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-900/30 flex items-start gap-3">
+                    <AlertCircle className="text-blue-500 mt-0.5" size={18} />
                     <div className="flex-1">
-                      <p className="text-sm font-semibold text-orange-800 dark:text-orange-300">
-                        Patient already enrolled at {existingPatient.facilityName}
+                      <p className="text-sm font-semibold text-blue-800 dark:text-blue-300">
+                        Existing record found at {existingPatient.facilityName}
                       </p>
-                      <p className="text-xs text-orange-700 dark:text-orange-400 mt-1">
-                        You'll need to request a transfer to continue enrollment.
+                      <p className="text-xs text-blue-700 dark:text-blue-400 mt-1">
+                        Enrollment is still allowed here. If needed, you can optionally request a transfer to keep care records aligned.
                       </p>
+                      <button
+                        type="button"
+                        onClick={() => setShowTransferModal(true)}
+                        className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-brand-600 dark:text-brand-400 hover:underline"
+                      >
+                        Request transfer (optional)
+                        <ArrowRight size={14} />
+                      </button>
                     </div>
                   </div>
                 )}
@@ -606,7 +608,7 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({ onAddPatient }) 
                   <strong>{existingPatient.patientName}</strong> is already enrolled at <strong>{existingPatient.facilityName}</strong>.
                 </p>
                 <p className="text-xs text-orange-700 dark:text-orange-400">
-                  To enroll this patient at your facility, you need to request a transfer from the original facility.
+                  This transfer is optional and is used to align records between facilities. You can continue enrollment without requesting it.
                 </p>
               </div>
 
