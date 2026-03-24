@@ -32,20 +32,10 @@ export const FacilityDetailsModal: React.FC<FacilityDetailsModalProps> = ({
 
     setLoading(true);
     try {
-      const allPatients = await service.searchPatients('');
-      const allTasks = await service.getAllTasks();
-
-      // Filter patients by location (matching facility location)
-      const facilityPatients = allPatients.filter(p =>
-        p.location.toLowerCase().includes(facility.location.toLowerCase())
-      );
-
-      // Get patient IDs for this facility
-      const facilityPatientIds = facilityPatients.map(p => p.id);
-
-      // Filter tasks for patients in this facility
-      const facilityTasks = allTasks.filter(t =>
-        facilityPatientIds.includes(t.patientId) && !t.resolved
+      const facilityPatients = await service.getPatientsForFacility(facility.id);
+      const facilityPatientIds = facilityPatients.map((p) => p.id);
+      const facilityTasks = await service.getOpenTasksForPatientIds(
+        facilityPatientIds
       );
 
       setPatients(facilityPatients);

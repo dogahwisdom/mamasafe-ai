@@ -64,6 +64,104 @@ export interface GeographicDistribution {
 }
 
 export class SuperadminService {
+  private mapPatientFromDb(p: any): Patient {
+    return {
+      id: p.id,
+      name: p.name,
+      age: p.age,
+      gestationalWeeks: p.gestational_weeks ?? undefined,
+      location: p.location,
+      phone: p.phone,
+      lastCheckIn: p.last_check_in || '',
+      riskStatus: p.risk_status as Patient['riskStatus'],
+      nextAppointment: p.next_appointment || '',
+      nextFollowUpDate: p.next_follow_up_date ?? undefined,
+      conditionType: p.condition_type ?? undefined,
+      medicalConditions: p.medical_conditions ?? undefined,
+      patientType: (p.patient_type as Patient['patientType']) ?? 'outpatient',
+      facilityId: p.facility_id ?? undefined,
+      primaryFacilityId: p.primary_facility_id ?? undefined,
+      primaryFacilityName: p.primary_facility_name ?? undefined,
+      alerts: (p.alerts as any) || [],
+      medications: (p.medications || []).map((m: any) => ({
+        id: m.id,
+        name: m.name,
+        dosage: m.dosage,
+        frequency: m.frequency,
+        time: m.time,
+        instructions: m.instructions || '',
+        type: m.type,
+        adherenceRate: m.adherence_rate,
+        taken: m.taken,
+      })),
+    };
+  }
+
+  /**
+   * Patients enrolled under a clinic/pharmacy facility (`patients.facility_id` = facility user id).
+   */
+  public async getPatientsForFacility(facilityUserId: string): Promise<Patient[]> {
+    if (!facilityUserId) return [];
+    if (isSupabaseConfigured()) {
+      const { data, error } = await supabase
+        .from('patients')
+        .select(`
+          *,
+          medications (*)
+        `)
+        .eq('facility_id', facilityUserId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching patients for facility:', error);
+        return [];
+      }
+
+      return (data || []).map((row: any) => this.mapPatientFromDb(row));
+    }
+
+    return storage
+      .get<Patient[]>(KEYS.PATIENTS, [])
+      .filter((p) => p.facilityId === facilityUserId);
+  }
+
+  /**
+   * Open tasks for a set of patient IDs (e.g. facility panel).
+   */
+  public async getOpenTasksForPatientIds(patientIds: string[]): Promise<Task[]> {
+    if (!patientIds.length) return [];
+    if (isSupabaseConfigured()) {
+      const { data, error } = await supabase
+        .from('tasks')
+        .select('*')
+        .in('patient_id', patientIds)
+        .eq('resolved', false)
+        .order('timestamp', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching tasks for facility patients:', error);
+        return [];
+      }
+
+      return (data || []).map((t: any) => ({
+        id: t.id,
+        patientId: t.patient_id,
+        patientName: t.patient_name,
+        type: t.type as Task['type'],
+        deadline: t.deadline,
+        resolved: t.resolved,
+        notes: t.notes,
+        timestamp: t.timestamp,
+        resolvedAt: t.resolved_at,
+      }));
+    }
+
+    const all = storage.get<Task[]>(KEYS.CLINIC_TASKS, []);
+    return all.filter(
+      (t) => patientIds.includes(t.patientId) && !t.resolved
+    );
+  }
+
   /**
    * Get comprehensive system metrics
    */
@@ -241,13 +339,11 @@ export class SuperadminService {
 
         // Process clinics
         for (const clinic of clinics) {
-          // Get actual patient count for this clinic from database
-          // Patients are linked to clinics via location matching (no direct clinic_id foreign key)
-          // Using location-based matching to count patients for this clinic
+          // Patients are scoped by enrolling facility (`patients.facility_id` = clinic user id).
           const { data: clinicPatientsData } = await supabase
             .from('patients')
             .select('id, created_at, updated_at, location')
-            .ilike('location', `%${clinic.location || ''}%`);
+            .eq('facility_id', clinic.id);
 
           const clinicPatientCount = clinicPatientsData?.length || 0;
 
@@ -312,7 +408,24 @@ export class SuperadminService {
 
         // Process pharmacies
         for (const pharmacy of pharmacies) {
-          // Get refill requests for this pharmacy (if we had pharmacy_id, for now use all pending refills)
+          const { data: pharmacyPatientsData } = await supabase
+            .from('patients')
+            .select('id, created_at, updated_at')
+            .eq('facility_id', pharmacy.id);
+
+          const pharmacyPatientCount = pharmacyPatientsData?.length || 0;
+          const pharmacyPatientIds =
+            pharmacyPatientsData?.map((p: { id: string }) => p.id) || [];
+          let pharmacyTaskCount = 0;
+          if (pharmacyPatientIds.length > 0) {
+            const { data: pharmacyTasksData } = await supabase
+              .from('tasks')
+              .select('id')
+              .in('patient_id', pharmacyPatientIds)
+              .eq('resolved', false);
+            pharmacyTaskCount = pharmacyTasksData?.length || 0;
+          }
+
           const { data: refillData } = await supabase
             .from('refill_requests')
             .select('created_at, updated_at')
@@ -320,9 +433,20 @@ export class SuperadminService {
             .order('updated_at', { ascending: false })
             .limit(1);
 
-          // Get last activity from pharmacy update or most recent refill request
           let lastActivity = pharmacy.updated_at || pharmacy.created_at || new Date().toISOString();
-          
+
+          if (pharmacyPatientsData && pharmacyPatientsData.length > 0) {
+            const mostRecent = [...pharmacyPatientsData].sort((a: any, b: any) => {
+              const dateA = new Date(a.updated_at || a.created_at || 0).getTime();
+              const dateB = new Date(b.updated_at || b.created_at || 0).getTime();
+              return dateB - dateA;
+            })[0];
+            const patientActivity = mostRecent.updated_at || mostRecent.created_at;
+            if (patientActivity && new Date(patientActivity) > new Date(lastActivity)) {
+              lastActivity = patientActivity;
+            }
+          }
+
           if (refillData && refillData.length > 0) {
             const refillActivity = refillData[0].updated_at || refillData[0].created_at;
             if (refillActivity && new Date(refillActivity) > new Date(lastActivity)) {
@@ -335,8 +459,8 @@ export class SuperadminService {
             name: pharmacy.name,
             type: 'pharmacy',
             location: pharmacy.location || 'Unknown',
-            patientCount: 0, // Pharmacies don't have direct patient relationships
-            activeTasks: 0,
+            patientCount: pharmacyPatientCount,
+            activeTasks: pharmacyTaskCount,
             lastActivity,
             status: 'active',
           });
@@ -491,29 +615,7 @@ export class SuperadminService {
         return [];
       }
 
-      return (data || []).map((p: any) => ({
-        id: p.id,
-        name: p.name,
-        age: p.age,
-        gestationalWeeks: p.gestational_weeks,
-        location: p.location,
-        phone: p.phone,
-        lastCheckIn: p.last_check_in || '',
-        riskStatus: p.risk_status,
-        nextAppointment: p.next_appointment || '',
-        alerts: (p.alerts as any) || [],
-        medications: (p.medications || []).map((m: any) => ({
-          id: m.id,
-          name: m.name,
-          dosage: m.dosage,
-          frequency: m.frequency,
-          time: m.time,
-          instructions: m.instructions || '',
-          type: m.type,
-          adherenceRate: m.adherence_rate,
-          taken: m.taken,
-        })),
-      }));
+      return (data || []).map((p: any) => this.mapPatientFromDb(p));
     }
 
     return storage.get<Patient[]>(KEYS.PATIENTS, []);
