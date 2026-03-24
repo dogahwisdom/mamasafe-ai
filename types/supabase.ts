@@ -347,6 +347,9 @@ export interface Database {
           stock: number
           min_level: number
           unit: string
+          unit_price_kes: number | null
+          supplier: string | null
+          expiry_date: string | null
           created_at: string
           updated_at: string
         }
@@ -356,6 +359,9 @@ export interface Database {
           stock?: number
           min_level?: number
           unit: string
+          unit_price_kes?: number | null
+          supplier?: string | null
+          expiry_date?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -365,6 +371,9 @@ export interface Database {
           stock?: number
           min_level?: number
           unit?: string
+          unit_price_kes?: number | null
+          supplier?: string | null
+          expiry_date?: string | null
           created_at?: string
           updated_at?: string
         }

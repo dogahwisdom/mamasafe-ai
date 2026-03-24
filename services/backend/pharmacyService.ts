@@ -56,6 +56,10 @@ export class PharmacyService {
         stock: i.stock,
         minLevel: i.min_level,
         unit: i.unit,
+        unitPriceKes:
+          i.unit_price_kes != null ? Number(i.unit_price_kes) : null,
+        supplier: i.supplier ?? null,
+        expiryDate: i.expiry_date ?? null,
       }));
     }
 
@@ -71,6 +75,9 @@ export class PharmacyService {
     unit: string;
     stock: number;
     minLevel: number;
+    unitPriceKes?: number | null;
+    supplier?: string | null;
+    expiryDate?: string | null;
   }): Promise<InventoryItem> {
     const name = item.name.trim();
     if (!name) {
@@ -79,16 +86,37 @@ export class PharmacyService {
     const unit = item.unit.trim() || "units";
     const stock = Math.max(0, Math.floor(item.stock));
     const minLevel = Math.max(0, Math.floor(item.minLevel));
+    let unitPriceKes: number | null = null;
+    if (item.unitPriceKes != null && item.unitPriceKes !== undefined) {
+      const n = Number(item.unitPriceKes);
+      if (Number.isNaN(n) || n < 0) {
+        throw new Error("Unit price must be a valid non-negative number.");
+      }
+      unitPriceKes = n;
+    }
+    const supplier =
+      item.supplier != null && String(item.supplier).trim() !== ""
+        ? String(item.supplier).trim()
+        : null;
+    const expiryDate =
+      item.expiryDate != null && String(item.expiryDate).trim() !== ""
+        ? String(item.expiryDate).trim()
+        : null;
 
     if (isSupabaseConfigured()) {
+      const insertRow: Record<string, unknown> = {
+        name,
+        unit,
+        stock,
+        min_level: minLevel,
+      };
+      if (unitPriceKes != null) insertRow.unit_price_kes = unitPriceKes;
+      if (supplier != null) insertRow.supplier = supplier;
+      if (expiryDate != null) insertRow.expiry_date = expiryDate;
+
       const { data, error } = await supabase
         .from("inventory")
-        .insert({
-          name,
-          unit,
-          stock,
-          min_level: minLevel,
-        })
+        .insert(insertRow)
         .select()
         .single();
 
@@ -108,6 +136,10 @@ export class PharmacyService {
         stock: data.stock,
         minLevel: data.min_level,
         unit: data.unit,
+        unitPriceKes:
+          data.unit_price_kes != null ? Number(data.unit_price_kes) : null,
+        supplier: data.supplier ?? null,
+        expiryDate: data.expiry_date ?? null,
       };
     }
 
@@ -123,6 +155,9 @@ export class PharmacyService {
       unit,
       stock,
       minLevel,
+      unitPriceKes: unitPriceKes ?? undefined,
+      supplier: supplier ?? undefined,
+      expiryDate: expiryDate ?? undefined,
     };
     storage.set(KEYS.PHARMACY_INVENTORY, [...inventory, newItem]);
     return newItem;
@@ -130,7 +165,18 @@ export class PharmacyService {
 
   public async updateInventoryItem(
     id: string,
-    updates: Partial<Pick<InventoryItem, "stock" | "minLevel" | "name" | "unit">>
+    updates: Partial<
+      Pick<
+        InventoryItem,
+        | "stock"
+        | "minLevel"
+        | "name"
+        | "unit"
+        | "unitPriceKes"
+        | "supplier"
+        | "expiryDate"
+      >
+    >
   ): Promise<void> {
     if (isSupabaseConfigured()) {
       const payload: Record<string, unknown> = {};
@@ -138,6 +184,24 @@ export class PharmacyService {
       if (updates.minLevel !== undefined) payload.min_level = updates.minLevel;
       if (updates.name !== undefined) payload.name = updates.name;
       if (updates.unit !== undefined) payload.unit = updates.unit;
+      if (updates.unitPriceKes !== undefined) {
+        payload.unit_price_kes =
+          updates.unitPriceKes === null || updates.unitPriceKes === undefined
+            ? null
+            : updates.unitPriceKes;
+      }
+      if (updates.supplier !== undefined) {
+        payload.supplier =
+          updates.supplier === null || updates.supplier === ""
+            ? null
+            : String(updates.supplier).trim();
+      }
+      if (updates.expiryDate !== undefined) {
+        payload.expiry_date =
+          updates.expiryDate === null || updates.expiryDate === ""
+            ? null
+            : String(updates.expiryDate).trim();
+      }
 
       if (Object.keys(payload).length === 0) return;
 

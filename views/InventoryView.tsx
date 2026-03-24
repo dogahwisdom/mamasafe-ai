@@ -9,16 +9,41 @@ interface InventoryViewProps {
   onBack: () => void;
 }
 
+type InventoryDraft = {
+  stock: string;
+  minLevel: string;
+  unitPriceKes: string;
+  supplier: string;
+  expiryDate: string;
+};
+
+/** FEFO-style expiry hint (expired / within 30 days). */
+function expiryStatusLabel(iso: string): string | null {
+  if (!iso) return null;
+  const d = new Date(`${iso}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const diff = Math.round((d.getTime() - today.getTime()) / 86400000);
+  if (diff < 0) return 'Expired';
+  if (diff === 0) return 'Due today';
+  if (diff <= 30) return `${diff}d to expiry`;
+  return null;
+}
+
 export const InventoryView: React.FC<InventoryViewProps> = ({ user, onBack }) => {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
-  const [drafts, setDrafts] = useState<Record<string, { stock: string; minLevel: string }>>({});
+  const [drafts, setDrafts] = useState<Record<string, InventoryDraft>>({});
   const [addForm, setAddForm] = useState({
     name: '',
     unit: 'tablets',
     stock: '0',
     minLevel: '0',
+    unitPriceKes: '',
+    supplier: '',
+    expiryDate: '',
   });
   const [adding, setAdding] = useState(false);
 
@@ -27,9 +52,18 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user, onBack }) =>
     try {
       const data = await backend.pharmacy.getInventory();
       setItems(data);
-      const d: Record<string, { stock: string; minLevel: string }> = {};
+      const d: Record<string, InventoryDraft> = {};
       for (const row of data) {
-        d[row.id] = { stock: String(row.stock), minLevel: String(row.minLevel) };
+        d[row.id] = {
+          stock: String(row.stock),
+          minLevel: String(row.minLevel),
+          unitPriceKes:
+            row.unitPriceKes != null && !Number.isNaN(Number(row.unitPriceKes))
+              ? String(row.unitPriceKes)
+              : '',
+          supplier: row.supplier ?? '',
+          expiryDate: row.expiryDate ?? '',
+        };
       }
       setDrafts(d);
     } catch (e) {
@@ -44,7 +78,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user, onBack }) =>
     load();
   }, []);
 
-  const handleDraft = (id: string, field: 'stock' | 'minLevel', value: string) => {
+  const handleDraft = (id: string, field: keyof InventoryDraft, value: string) => {
     setDrafts((prev) => ({
       ...prev,
       [id]: { ...prev[id], [field]: value },
@@ -60,9 +94,28 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user, onBack }) =>
       alert('Enter valid non-negative numbers for stock and min level.');
       return;
     }
+    const priceRaw = d.unitPriceKes.trim();
+    let unitPriceKes: number | null = null;
+    if (priceRaw !== '') {
+      const p = parseFloat(priceRaw.replace(/,/g, ''));
+      if (Number.isNaN(p) || p < 0) {
+        alert('Enter a valid unit price (KES) or leave blank.');
+        return;
+      }
+      unitPriceKes = p;
+    }
+    const supplier = d.supplier.trim() || null;
+    const expiryDate = d.expiryDate.trim() || null;
+
     setSavingId(item.id);
     try {
-      await backend.pharmacy.updateInventoryItem(item.id, { stock, minLevel });
+      await backend.pharmacy.updateInventoryItem(item.id, {
+        stock,
+        minLevel,
+        unitPriceKes,
+        supplier,
+        expiryDate,
+      });
       await load();
     } catch (e) {
       console.error(e);
@@ -88,6 +141,17 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user, onBack }) =>
       alert('Enter valid stock and min level (0 or more).');
       return;
     }
+    let unitPriceKes: number | null = null;
+    const pr = addForm.unitPriceKes.trim();
+    if (pr !== '') {
+      const p = parseFloat(pr.replace(/,/g, ''));
+      if (Number.isNaN(p) || p < 0) {
+        alert('Enter a valid unit price (KES) or leave blank.');
+        return;
+      }
+      unitPriceKes = p;
+    }
+
     setAdding(true);
     try {
       await backend.pharmacy.addInventoryItem({
@@ -95,8 +159,19 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user, onBack }) =>
         unit: addForm.unit.trim() || 'units',
         stock,
         minLevel,
+        unitPriceKes,
+        supplier: addForm.supplier.trim() || null,
+        expiryDate: addForm.expiryDate.trim() || null,
       });
-      setAddForm({ name: '', unit: 'tablets', stock: '0', minLevel: '0' });
+      setAddForm({
+        name: '',
+        unit: 'tablets',
+        stock: '0',
+        minLevel: '0',
+        unitPriceKes: '',
+        supplier: '',
+        expiryDate: '',
+      });
       await load();
     } catch (e: unknown) {
       console.error(e);
@@ -186,7 +261,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user, onBack }) =>
         <div className="p-4 md:p-5 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1c1c1e]">
           <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-3">Add medication</h3>
           <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
-            Register a new line in stock (name must be unique). Then adjust quantities in the table below.
+            Register a new line in stock (name must be unique). Optional: unit trade price, supplier, and expiry for
+            procurement and FEFO monitoring—then fine-tune in the table.
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-end">
             <div className="lg:col-span-4">
@@ -231,12 +307,46 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user, onBack }) =>
                 onChange={(e) => setAddForm((f) => ({ ...f, minLevel: e.target.value }))}
               />
             </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-end mt-3">
             <div className="lg:col-span-2">
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                Unit price (KES)
+              </label>
+              <input
+                type="text"
+                inputMode="decimal"
+                className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-[#2c2c2e] text-slate-900 dark:text-white"
+                placeholder="e.g. 120.00"
+                value={addForm.unitPriceKes}
+                onChange={(e) => setAddForm((f) => ({ ...f, unitPriceKes: e.target.value }))}
+              />
+            </div>
+            <div className="lg:col-span-4">
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">Supplier</label>
+              <input
+                type="text"
+                className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-[#2c2c2e] text-slate-900 dark:text-white"
+                placeholder="Vendor or wholesaler"
+                value={addForm.supplier}
+                onChange={(e) => setAddForm((f) => ({ ...f, supplier: e.target.value }))}
+              />
+            </div>
+            <div className="lg:col-span-2">
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">Expiry</label>
+              <input
+                type="date"
+                className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-[#2c2c2e] text-slate-900 dark:text-white"
+                value={addForm.expiryDate}
+                onChange={(e) => setAddForm((f) => ({ ...f, expiryDate: e.target.value }))}
+              />
+            </div>
+            <div className="lg:col-span-4">
               <button
                 type="button"
                 onClick={handleAddMedication}
                 disabled={adding || loading}
-                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-semibold text-sm disabled:opacity-50"
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-semibold text-sm disabled:opacity-50 min-h-[42px]"
               >
                 {adding ? <Loader2 size={18} className="animate-spin" /> : <Plus size={18} />}
                 Add medication
@@ -256,38 +366,101 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user, onBack }) =>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[72rem]">
               <thead>
                 <tr className="bg-slate-50 dark:bg-[#2c2c2e] text-left border-b border-slate-200 dark:border-slate-700">
-                  <th className="px-4 py-3 font-bold text-slate-700 dark:text-slate-200">Code</th>
-                  <th className="px-4 py-3 font-bold text-slate-700 dark:text-slate-200">Medication</th>
-                  <th className="px-4 py-3 font-bold text-slate-700 dark:text-slate-200 text-right">Current stock</th>
-                  <th className="px-4 py-3 font-bold text-slate-700 dark:text-slate-200 text-right">Min level</th>
-                  <th className="px-4 py-3 font-bold text-slate-700 dark:text-slate-200 w-28"></th>
+                  <th className="px-3 py-3 font-bold text-slate-700 dark:text-slate-200 whitespace-nowrap">Code</th>
+                  <th className="px-3 py-3 font-bold text-slate-700 dark:text-slate-200 min-w-[10rem]">Medication</th>
+                  <th className="px-3 py-3 font-bold text-slate-700 dark:text-slate-200 text-right whitespace-nowrap">
+                    Unit price (KES)
+                  </th>
+                  <th className="px-3 py-3 font-bold text-slate-700 dark:text-slate-200 min-w-[8rem]">Supplier</th>
+                  <th className="px-3 py-3 font-bold text-slate-700 dark:text-slate-200 whitespace-nowrap">Expiry</th>
+                  <th className="px-3 py-3 font-bold text-slate-700 dark:text-slate-200 text-right whitespace-nowrap">
+                    Current stock
+                  </th>
+                  <th className="px-3 py-3 font-bold text-slate-700 dark:text-slate-200 text-right whitespace-nowrap">
+                    Min level
+                  </th>
+                  <th className="px-3 py-3 font-bold text-slate-700 dark:text-slate-200 w-28"></th>
                 </tr>
               </thead>
               <tbody>
                 {items.map((item) => {
-                  const d = drafts[item.id] || {
-                    stock: String(item.stock),
-                    minLevel: String(item.minLevel),
-                  };
+                  const d =
+                    drafts[item.id] ||
+                    ({
+                      stock: String(item.stock),
+                      minLevel: String(item.minLevel),
+                      unitPriceKes:
+                        item.unitPriceKes != null && !Number.isNaN(Number(item.unitPriceKes))
+                          ? String(item.unitPriceKes)
+                          : '',
+                      supplier: item.supplier ?? '',
+                      expiryDate: item.expiryDate ?? '',
+                    } satisfies InventoryDraft);
                   const low = item.stock <= item.minLevel;
+                  const expHint = expiryStatusLabel(d.expiryDate);
+                  const expired = expHint === 'Expired';
+                  const soon = expHint !== null && expHint !== 'Expired';
                   return (
                     <tr
                       key={item.id}
                       className={`border-b border-slate-100 dark:border-slate-800 ${
                         low ? 'bg-amber-50/60 dark:bg-amber-900/10' : ''
-                      }`}
+                      } ${expired ? 'bg-red-50/50 dark:bg-red-950/20' : ''}`}
                     >
-                      <td className="px-4 py-3 font-mono text-xs text-slate-600 dark:text-slate-400">
+                      <td className="px-3 py-3 font-mono text-xs text-slate-600 dark:text-slate-400 whitespace-nowrap">
                         {item.id.replace(/-/g, '').slice(0, 12).toUpperCase()}
                       </td>
-                      <td className="px-4 py-3 text-slate-900 dark:text-white">
+                      <td className="px-3 py-3 text-slate-900 dark:text-white">
                         {item.name}
                         <span className="text-slate-500 dark:text-slate-400"> · {item.unit}</span>
                       </td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-3 py-3 text-right">
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          className="w-28 min-w-[7rem] px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-[#2c2c2e] text-right text-sm"
+                          placeholder="—"
+                          value={d.unitPriceKes}
+                          onChange={(e) => handleDraft(item.id, 'unitPriceKes', e.target.value)}
+                          aria-label="Unit price KES"
+                        />
+                      </td>
+                      <td className="px-3 py-3">
+                        <input
+                          type="text"
+                          className="w-full min-w-[140px] max-w-[220px] px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-[#2c2c2e] text-sm"
+                          placeholder="—"
+                          value={d.supplier}
+                          onChange={(e) => handleDraft(item.id, 'supplier', e.target.value)}
+                          aria-label="Supplier"
+                        />
+                      </td>
+                      <td className="px-3 py-3 align-top">
+                        <input
+                          type="date"
+                          className="w-36 max-w-full px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-[#2c2c2e] text-sm"
+                          value={d.expiryDate}
+                          onChange={(e) => handleDraft(item.id, 'expiryDate', e.target.value)}
+                          aria-label="Expiry date"
+                        />
+                        {expHint && (
+                          <p
+                            className={`text-[10px] mt-1 font-semibold ${
+                              expired
+                                ? 'text-red-600 dark:text-red-400'
+                                : soon
+                                  ? 'text-amber-600 dark:text-amber-400'
+                                  : 'text-slate-500'
+                            }`}
+                          >
+                            {expHint}
+                          </p>
+                        )}
+                      </td>
+                      <td className="px-3 py-3 text-right">
                         <input
                           type="number"
                           min={0}
@@ -296,7 +469,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user, onBack }) =>
                           onChange={(e) => handleDraft(item.id, 'stock', e.target.value)}
                         />
                       </td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-3 py-3 text-right">
                         <input
                           type="number"
                           min={0}
@@ -305,7 +478,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user, onBack }) =>
                           onChange={(e) => handleDraft(item.id, 'minLevel', e.target.value)}
                         />
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-3">
                         <button
                           type="button"
                           onClick={() => handleSaveRow(item)}

@@ -106,6 +106,12 @@ export interface InventoryItem {
   stock: number;
   minLevel: number;
   unit: string;
+  /** Trade / list price per stock unit (KES), optional */
+  unitPriceKes?: number | null;
+  /** Supplier or vendor name */
+  supplier?: string | null;
+  /** ISO date YYYY-MM-DD — expiry for this line (FEFO) */
+  expiryDate?: string | null;
 }
 
 export interface PharmacyExpense {

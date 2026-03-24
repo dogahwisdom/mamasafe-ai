@@ -19,6 +19,26 @@ function shortCode(id: string): string {
   return compact.length <= 12 ? compact.toUpperCase() : compact.slice(0, 12).toUpperCase();
 }
 
+function formatKesAmount(n: number): string {
+  return n.toLocaleString('en-KE', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+function formatExpiryPdf(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  try {
+    return new Date(`${iso}T12:00:00`).toLocaleDateString('en-KE', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  } catch {
+    return iso;
+  }
+}
+
 function drawFacilityHeader(
   doc: jsPDF,
   facility: UserProfile,
@@ -89,28 +109,44 @@ export function downloadInventoryStockPdf(
   items: InventoryItem[],
   title = 'INVENTORY STOCK LIST'
 ): void {
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
   const year = new Date().getFullYear().toString();
   let y = drawFacilityHeader(doc, facility, title, year);
 
   const body = items.map((row) => [
     shortCode(row.id),
     `${row.name} (${row.unit})`,
+    row.unitPriceKes != null && !Number.isNaN(Number(row.unitPriceKes))
+      ? formatKesAmount(Number(row.unitPriceKes))
+      : '—',
+    (row.supplier && String(row.supplier).trim()) || '—',
+    formatExpiryPdf(row.expiryDate),
     String(row.stock),
     String(row.minLevel),
   ]);
 
   autoTable(doc, {
     startY: y,
-    head: [['CODE', 'PRODUCT / ITEM', 'CURRENT STOCK', 'MIN LEVEL']],
+    head: [
+      [
+        'CODE',
+        'PRODUCT / ITEM',
+        'UNIT PRICE (KES)',
+        'SUPPLIER',
+        'EXPIRY',
+        'CURRENT STOCK',
+        'MIN LEVEL',
+      ],
+    ],
     body,
     theme: 'grid',
-    styles: { fontSize: 8, cellPadding: 2 },
+    styles: { fontSize: 7.5, cellPadding: 1.8 },
     headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: 'bold' },
     columnStyles: {
-      0: { cellWidth: 32 },
+      0: { cellWidth: 28 },
       2: { halign: 'right' },
-      3: { halign: 'right' },
+      5: { halign: 'right' },
+      6: { halign: 'right' },
     },
     margin: { left: PAGE_MARGIN, right: PAGE_MARGIN },
   });
