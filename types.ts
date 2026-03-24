@@ -77,6 +77,8 @@ export interface Patient {
   alerts: Alert[];
   medications?: Medication[];
   facilityId?: string; // Current facility managing this patient
+  primaryFacilityId?: string; // Preferred care coordination facility
+  primaryFacilityName?: string; // Display name of preferred facility
 }
 
 export interface Alert {

@@ -456,7 +456,7 @@ export const App: React.FC = () => {
         )}
 
         {currentView === 'enrollment' && (
-          <EnrollmentView onAddPatient={handleAddPatient} />
+          <EnrollmentView onAddPatient={handleAddPatient} currentFacility={currentUser} />
         )}
 
         {currentView === 'workflow' && currentUser && (

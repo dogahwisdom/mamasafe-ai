@@ -52,6 +52,8 @@ export class PatientService {
         medicalConditions: p.medical_conditions || undefined,
         patientType: p.patient_type || 'outpatient',
         facilityId: p.facility_id || undefined,
+        primaryFacilityId: p.primary_facility_id || undefined,
+        primaryFacilityName: p.primary_facility_name || undefined,
         alerts: (p.alerts as any) || [],
         medications: (p.medications || []).map((m: any) => ({
           id: m.id,
@@ -167,6 +169,8 @@ export class PatientService {
         patient_type: patient.patientType || 'outpatient',
         alerts: JSON.parse(JSON.stringify(patient.alerts || [])),
         facility_id: facilityId,
+        primary_facility_id: patient.primaryFacilityId || facilityId,
+        primary_facility_name: patient.primaryFacilityName || currentUser?.name || null,
       };
 
       let finalPatientId: string;
@@ -302,6 +306,8 @@ export class PatientService {
         lastCheckIn: fullPatient.last_check_in || '',
         riskStatus: fullPatient.risk_status as any,
         nextAppointment: fullPatient.next_appointment || '',
+        primaryFacilityId: fullPatient.primary_facility_id || undefined,
+        primaryFacilityName: fullPatient.primary_facility_name || undefined,
         alerts: (fullPatient.alerts as any) || [],
         medications: (fullPatient.medications || []).map((m: any) => ({
           id: m.id,

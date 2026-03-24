@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { UserPlus, Calendar, MapPin, CheckCircle, ChevronRight, ChevronLeft, Phone, User, Activity, Heart, FileText, Baby, Lock, CheckSquare, Loader2, MessageSquare, AlertCircle, ArrowRight } from 'lucide-react';
-import { Patient, RiskLevel, ConditionType } from '../types';
+import { Patient, RiskLevel, ConditionType, UserProfile } from '../types';
 import { backend } from '../services/backend';
 
 interface InputGroupProps {
@@ -22,9 +22,13 @@ const InputGroup: React.FC<InputGroupProps> = ({ label, icon: Icon, children }) 
 
 interface EnrollmentViewProps {
   onAddPatient?: (patient: Patient) => Promise<void>;
+  currentFacility?: UserProfile | null;
 }
 
-export const EnrollmentView: React.FC<EnrollmentViewProps> = ({ onAddPatient }) => {
+export const EnrollmentView: React.FC<EnrollmentViewProps> = ({
+  onAddPatient,
+  currentFacility,
+}) => {
   const [step, setStep] = useState(1);
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -41,6 +45,7 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({ onAddPatient }) 
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [transferReason, setTransferReason] = useState('');
   const [requestingTransfer, setRequestingTransfer] = useState(false);
+  const [primaryFacilityChoice, setPrimaryFacilityChoice] = useState<'current' | 'existing'>('current');
   
   // Comprehensive State
   const [formData, setFormData] = useState({
@@ -117,6 +122,14 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({ onAddPatient }) 
     const timeoutId = setTimeout(checkExistingPatient, 1000); // Debounce
     return () => clearTimeout(timeoutId);
   }, [formData.phone]);
+
+  useEffect(() => {
+    if (existingPatient?.exists && existingPatient.facilityId) {
+      setPrimaryFacilityChoice('current');
+      return;
+    }
+    setPrimaryFacilityChoice('current');
+  }, [existingPatient?.exists, existingPatient?.facilityId]);
 
   const validateCurrentStep = () => {
     switch (step) {
@@ -224,7 +237,15 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({ onAddPatient }) 
               // detailed assessment, severity and notes are recorded later in the clinical workflow
               diagnosisDate: formData.diagnosisDate || undefined,
             }] : undefined,
-            alerts: []
+            alerts: [],
+            primaryFacilityId:
+              primaryFacilityChoice === 'existing'
+                ? existingPatient?.facilityId
+                : currentFacility?.id,
+            primaryFacilityName:
+              primaryFacilityChoice === 'existing'
+                ? existingPatient?.facilityName
+                : currentFacility?.name,
         };
         
         try {
@@ -386,6 +407,28 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({ onAddPatient }) 
                         Request transfer (optional)
                         <ArrowRight size={14} />
                       </button>
+                      <div className="mt-3">
+                        <label className="block text-[11px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300 mb-1">
+                          Primary facility for care coordination
+                        </label>
+                        <select
+                          className="w-full p-2 rounded-lg border border-blue-200 dark:border-blue-800 bg-white dark:bg-[#2c2c2e] text-sm text-slate-900 dark:text-white"
+                          value={primaryFacilityChoice}
+                          onChange={(e) =>
+                            setPrimaryFacilityChoice(e.target.value as 'current' | 'existing')
+                          }
+                        >
+                          <option value="current">
+                            {currentFacility?.name || 'Current facility'} (recommended for this intake)
+                          </option>
+                          <option value="existing">
+                            {existingPatient.facilityName || 'Existing facility'} (continuity owner)
+                          </option>
+                        </select>
+                        <p className="text-[11px] text-blue-700/90 dark:text-blue-300/90 mt-1">
+                          This setting is for coordination only and does not restrict where the patient can receive care.
+                        </p>
+                      </div>
                     </div>
                   </div>
                 )}

@@ -74,6 +74,8 @@ export interface Database {
           last_check_in: string | null
           risk_status: 'Low' | 'Medium' | 'High' | 'Critical'
           next_appointment: string | null
+          primary_facility_id: string | null
+          primary_facility_name: string | null
           alerts: Json
           created_at: string
           updated_at: string
@@ -89,6 +91,8 @@ export interface Database {
           last_check_in?: string | null
           risk_status: 'Low' | 'Medium' | 'High' | 'Critical'
           next_appointment?: string | null
+          primary_facility_id?: string | null
+          primary_facility_name?: string | null
           alerts?: Json
           created_at?: string
           updated_at?: string
@@ -104,6 +108,8 @@ export interface Database {
           last_check_in?: string | null
           risk_status?: 'Low' | 'Medium' | 'High' | 'Critical'
           next_appointment?: string | null
+          primary_facility_id?: string | null
+          primary_facility_name?: string | null
           alerts?: Json
           created_at?: string
           updated_at?: string
