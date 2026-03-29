@@ -7,7 +7,9 @@ The enrollment **Department** and **Sub-category** fields are defined in code:
 
 ## PDF copy
 
-To produce a printable departmental services list for staff (similar to other project PDFs), generate a PDF from this file:
+If your facility keeps a branded departmental services PDF in the repo (for example `docs/Deparmental Services.pdf`), keep it alongside this markdown; the **in-app** intake list is driven by `departmentalServicesCatalog.ts`, which should stay aligned with that document.
+
+To produce a printable list from this markdown (similar to other project PDFs), run:
 
 ```bash
 cd /path/to/mamasafe-ai
