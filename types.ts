@@ -304,12 +304,13 @@ export interface Payment {
   paymentType: 'consultation' | 'lab' | 'pharmacy' | 'procedure' | 'other';
   amount: number;
   currency: string;
-  paymentMethod: 'cash' | 'mpesa' | 'card' | 'insurance' | 'nhif' | 'waiver';
+  paymentMethod: 'cash' | 'mpesa' | 'card' | 'insurance' | 'shif' | 'waiver';
   paymentStatus: 'pending' | 'partial' | 'paid' | 'refunded';
   transactionReference?: string;
   insuranceProvider?: string;
   insuranceNumber?: string;
-  nhifNumber?: string;
+  /** SHIF (Social Health Insurance Fund) membership / contribution number */
+  shifNumber?: string;
   notes?: string;
   paidBy?: string;
   paymentDate: string;

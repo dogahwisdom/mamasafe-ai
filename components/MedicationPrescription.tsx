@@ -30,6 +30,7 @@ export const MedicationPrescription: React.FC<MedicationPrescriptionProps> = ({ 
   const [formData, setFormData] = useState({
     name: '',
     dosage: '',
+    quantity: '1',
     frequency: 'Once daily',
     time: '08:00 AM',
     type: 'morning' as 'morning' | 'afternoon' | 'evening',
@@ -44,6 +45,7 @@ export const MedicationPrescription: React.FC<MedicationPrescriptionProps> = ({ 
     setFormData({
       name: '',
       dosage: '',
+      quantity: '1',
       frequency: 'Once daily',
       time: '08:00 AM',
       type: 'morning',
@@ -58,8 +60,28 @@ export const MedicationPrescription: React.FC<MedicationPrescriptionProps> = ({ 
       return;
     }
 
+    const qtyRaw = formData.quantity.trim();
+    const qtyParsed = parseInt(qtyRaw, 10);
+    const quantityUnits =
+      qtyRaw === '' || Number.isNaN(qtyParsed) || qtyParsed < 1
+        ? 1
+        : Math.min(1_000_000, Math.floor(qtyParsed));
+
     setLoading(true);
     try {
+      if (!editingId) {
+        const inv = await backend.pharmacy.checkPrescriptionInventory(
+          formData.name.trim(),
+          quantityUnits
+        );
+        if (!inv.ok) {
+          alert(
+            `Insufficient stock for "${inv.itemName}": ${inv.available} available, ${inv.requested} requested. Reduce quantity or restock.`
+          );
+          return;
+        }
+      }
+
       const medicationData: Medication = editingId
         ? {
             id: editingId,
@@ -95,6 +117,19 @@ export const MedicationPrescription: React.FC<MedicationPrescriptionProps> = ({ 
       };
 
       await backend.patients.add(updatedPatient);
+
+      if (!editingId) {
+        const deduction = await backend.pharmacy.deductStockForPrescription(
+          formData.name.trim(),
+          quantityUnits
+        );
+        if (deduction.variant === 'failed_concurrent') {
+          alert(
+            `Prescription saved, but inventory for "${deduction.itemName}" changed while saving. Refresh the inventory screen and adjust stock if needed.`
+          );
+        }
+      }
+
       setMedications(updatedMedications);
       resetForm();
       await onUpdate();
@@ -132,6 +167,7 @@ export const MedicationPrescription: React.FC<MedicationPrescriptionProps> = ({ 
     setFormData({
       name: med.name,
       dosage: med.dosage,
+      quantity: '1',
       frequency: med.frequency,
       time: med.time,
       type: med.type,
@@ -145,6 +181,7 @@ export const MedicationPrescription: React.FC<MedicationPrescriptionProps> = ({ 
     setFormData({
       name: med.name,
       dosage: med.dosage,
+      quantity: '1',
       frequency: med.frequency,
       time: '08:00 AM',
       type: 'morning',
@@ -231,7 +268,7 @@ export const MedicationPrescription: React.FC<MedicationPrescriptionProps> = ({ 
               />
             </div>
 
-            {/* Dosage & Frequency */}
+            {/* Dosage, quantity & frequency */}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
@@ -261,6 +298,25 @@ export const MedicationPrescription: React.FC<MedicationPrescriptionProps> = ({ 
                 </select>
               </div>
             </div>
+
+            {!editingId && (
+              <div>
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
+                  Quantity (stock units)
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={formData.quantity}
+                  onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
+                  className="w-full px-4 py-3 bg-white dark:bg-[#1c1c1e] border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition-all"
+                />
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5">
+                  Deducts from facility inventory when the medication name matches a stocked item (new prescriptions only).
+                </p>
+              </div>
+            )}
 
             {/* Time Selection */}
             <div>

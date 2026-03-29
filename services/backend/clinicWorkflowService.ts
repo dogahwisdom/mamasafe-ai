@@ -335,7 +335,7 @@ export class ClinicWorkflowService {
     patientId: string,
     paymentType: 'consultation' | 'lab' | 'pharmacy' | 'procedure' | 'other',
     amount: number,
-    paymentMethod: 'cash' | 'mpesa' | 'card' | 'insurance' | 'nhif' | 'waiver',
+    paymentMethod: 'cash' | 'mpesa' | 'card' | 'insurance' | 'shif' | 'waiver',
     data?: Partial<Payment>
   ): Promise<Payment> {
     if (isSupabaseConfigured()) {
@@ -390,7 +390,7 @@ export class ClinicWorkflowService {
         transaction_reference: data?.transactionReference || null,
         insurance_provider: data?.insuranceProvider || null,
         insurance_number: data?.insuranceNumber || null,
-        nhif_number: data?.nhifNumber || null,
+        shif_number: data?.shifNumber || null,
         notes: data?.notes || null,
         paid_by: currentUser.id,
       };
@@ -522,6 +522,9 @@ export class ClinicWorkflowService {
   }
 
   private mapPaymentFromDB(data: any): Payment {
+    const rawMethod = data.payment_method as string;
+    const paymentMethod =
+      rawMethod === 'nhif' ? 'shif' : (rawMethod as Payment['paymentMethod']);
     return {
       id: data.id,
       visitId: data.visit_id,
@@ -530,12 +533,12 @@ export class ClinicWorkflowService {
       paymentType: data.payment_type,
       amount: parseFloat(data.amount),
       currency: data.currency,
-      paymentMethod: data.payment_method,
+      paymentMethod,
       paymentStatus: data.payment_status,
       transactionReference: data.transaction_reference,
       insuranceProvider: data.insurance_provider,
       insuranceNumber: data.insurance_number,
-      nhifNumber: data.nhif_number,
+      shifNumber: data.shif_number ?? data.nhif_number,
       notes: data.notes,
       paidBy: data.paid_by,
       paymentDate: data.payment_date,

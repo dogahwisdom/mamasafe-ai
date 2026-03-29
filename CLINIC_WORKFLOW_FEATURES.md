@@ -51,10 +51,10 @@ All requested features have been implemented and are functional. Here's how to a
    - Record payments with:
      - Payment type (Consultation, Lab, Pharmacy, Procedure, Other)
      - Amount (KES)
-     - Payment method (Cash, M-Pesa, Card, Insurance, NHIF, Waiver)
+     - Payment method (Cash, M-Pesa, Card, Insurance, SHIF, Waiver)
      - Transaction reference (for M-Pesa)
      - Insurance details (if applicable)
-     - NHIF number (if applicable)
+     - SHIF number (Social Health Insurance Fund, if applicable)
    - View payment history
    - See total paid amount
 

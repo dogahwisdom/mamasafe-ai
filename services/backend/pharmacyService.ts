@@ -1,4 +1,4 @@
-import { RefillRequest, InventoryItem } from "../types";
+import { RefillRequest, InventoryItem, UserProfile } from "../types";
 import {
   KEYS,
   storage,
@@ -6,8 +6,157 @@ import {
   DEFAULT_INVENTORY,
 } from "./shared";
 import { supabase, isSupabaseConfigured } from "../supabaseClient";
+import { InventoryMedicationMatcher } from "../inventoryMedicationMatcher";
+
+export type PrescriptionInventoryCheck =
+  | { ok: true; variant: "no_match" }
+  | {
+      ok: true;
+      variant: "sufficient";
+      itemId: string;
+      itemName: string;
+      available: number;
+    }
+  | {
+      ok: false;
+      variant: "insufficient";
+      itemName: string;
+      available: number;
+      requested: number;
+    };
+
+export type PrescriptionInventoryDeductionResult =
+  | { variant: "skipped_no_match" }
+  | { variant: "skipped_not_facility_staff" }
+  | { variant: "deducted"; itemName: string; newStock: number }
+  | { variant: "failed_concurrent"; itemName: string };
 
 export class PharmacyService {
+  private canAdjustInventoryForPrescription(): boolean {
+    const user = storage.get<UserProfile | null>(KEYS.CURRENT_USER, null);
+    return (
+      user?.role === "clinic" ||
+      user?.role === "pharmacy" ||
+      user?.role === "superadmin"
+    );
+  }
+
+  /**
+   * Before saving a new prescription line: ensure we are not over-dispensing
+   * when the medication name matches an inventory item.
+   */
+  public async checkPrescriptionInventory(
+    medicationName: string,
+    quantity: number
+  ): Promise<PrescriptionInventoryCheck> {
+    if (!this.canAdjustInventoryForPrescription()) {
+      return { ok: true, variant: "no_match" };
+    }
+    const qty = Math.max(1, Math.floor(quantity));
+    const items = await this.getInventory();
+    const match = InventoryMedicationMatcher.findMatch(
+      items,
+      medicationName.trim()
+    );
+    if (!match) {
+      return { ok: true, variant: "no_match" };
+    }
+    if (match.stock < qty) {
+      return {
+        ok: false,
+        variant: "insufficient",
+        itemName: match.name,
+        available: match.stock,
+        requested: qty,
+      };
+    }
+    return {
+      ok: true,
+      variant: "sufficient",
+      itemId: match.id,
+      itemName: match.name,
+      available: match.stock,
+    };
+  }
+
+  /**
+   * After a new prescription line is persisted: decrement stock when the name
+   * matches inventory. Idempotent with respect to "no match" (no-op).
+   */
+  public async deductStockForPrescription(
+    medicationName: string,
+    quantity: number
+  ): Promise<PrescriptionInventoryDeductionResult> {
+    if (!this.canAdjustInventoryForPrescription()) {
+      return { variant: "skipped_not_facility_staff" };
+    }
+    const qty = Math.max(1, Math.floor(quantity));
+    const items = await this.getInventory();
+    const match = InventoryMedicationMatcher.findMatch(
+      items,
+      medicationName.trim()
+    );
+    if (!match) {
+      return { variant: "skipped_no_match" };
+    }
+
+    if (isSupabaseConfigured()) {
+      const { data: row, error: readErr } = await supabase
+        .from("inventory")
+        .select("stock")
+        .eq("id", match.id)
+        .maybeSingle();
+
+      if (readErr || !row) {
+        console.error("inventory read before deduct:", readErr);
+        return { variant: "failed_concurrent", itemName: match.name };
+      }
+      const current = Math.floor(Number(row.stock));
+      if (current < qty) {
+        return { variant: "failed_concurrent", itemName: match.name };
+      }
+      const next = current - qty;
+      const { data: updated, error: updErr } = await supabase
+        .from("inventory")
+        .update({ stock: next })
+        .eq("id", match.id)
+        .eq("stock", current)
+        .select("stock")
+        .maybeSingle();
+
+      if (updErr) {
+        console.error("inventory deduct:", updErr);
+        return { variant: "failed_concurrent", itemName: match.name };
+      }
+      if (!updated) {
+        return { variant: "failed_concurrent", itemName: match.name };
+      }
+      return {
+        variant: "deducted",
+        itemName: match.name,
+        newStock: Number(updated.stock),
+      };
+    }
+
+    const inventory = storage.get<InventoryItem[]>(
+      KEYS.PHARMACY_INVENTORY,
+      DEFAULT_INVENTORY
+    );
+    const idx = inventory.findIndex((i) => i.id === match.id);
+    if (idx < 0) {
+      return { variant: "skipped_no_match" };
+    }
+    const current = Math.floor(Number(inventory[idx].stock));
+    if (current < qty) {
+      return { variant: "failed_concurrent", itemName: match.name };
+    }
+    const next = current - qty;
+    const nextInv = [...inventory];
+    nextInv[idx] = { ...nextInv[idx], stock: next };
+    storage.set(KEYS.PHARMACY_INVENTORY, nextInv);
+    return { variant: "deducted", itemName: match.name, newStock: next };
+  }
+
   public async getRefills(): Promise<RefillRequest[]> {
     // Use Supabase if configured
     if (isSupabaseConfigured()) {

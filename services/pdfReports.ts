@@ -10,6 +10,7 @@ import type {
   Task,
   Reminder,
 } from '../types';
+import { formatPaymentMethodLabel } from './paymentMethodLabels';
 
 const PAGE_MARGIN = 14;
 const HEADER_BOX_WIDTH = 120;
@@ -262,7 +263,7 @@ export function downloadVisitPaymentSummaryPdf(
   const body = payments.map((p) => [
     p.paymentType,
     p.amount.toFixed(2),
-    p.paymentMethod,
+    formatPaymentMethodLabel(p.paymentMethod),
     p.paymentStatus,
     p.paymentDate ? String(p.paymentDate).slice(0, 16).replace('T', ' ') : '—',
   ]);

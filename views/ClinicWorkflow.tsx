@@ -6,6 +6,7 @@ import {
   CheckCircle, Clock, AlertCircle, Loader2, X, ChevronRight, Plus, Save, Download
 } from 'lucide-react';
 import { downloadPatientDiagnosisPdf, downloadVisitPaymentSummaryPdf } from '../services/pdfReports';
+import { formatPaymentMethodLabel } from '../services/paymentMethodLabels';
 
 interface ClinicWorkflowProps {
   user: UserProfile;
@@ -70,11 +71,11 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
   const [paymentForm, setPaymentForm] = useState({
     paymentType: 'consultation' as 'consultation' | 'lab' | 'pharmacy' | 'procedure' | 'other',
     amount: '',
-    paymentMethod: 'cash' as 'cash' | 'mpesa' | 'card' | 'insurance' | 'nhif' | 'waiver',
+    paymentMethod: 'cash' as 'cash' | 'mpesa' | 'card' | 'insurance' | 'shif' | 'waiver',
     transactionReference: '',
     insuranceProvider: '',
     insuranceNumber: '',
-    nhifNumber: '',
+    shifNumber: '',
     notes: '',
   });
 
@@ -340,7 +341,7 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
           transactionReference: paymentForm.transactionReference || undefined,
           insuranceProvider: paymentForm.insuranceProvider || undefined,
           insuranceNumber: paymentForm.insuranceNumber || undefined,
-          nhifNumber: paymentForm.nhifNumber || undefined,
+          shifNumber: paymentForm.shifNumber || undefined,
           notes: paymentForm.notes || undefined,
         }
       );
@@ -352,7 +353,7 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
         transactionReference: '',
         insuranceProvider: '',
         insuranceNumber: '',
-        nhifNumber: '',
+        shifNumber: '',
         notes: '',
       });
       alert('Payment recorded successfully');
@@ -1145,7 +1146,7 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
                         <option value="mpesa">M-Pesa</option>
                         <option value="card">Card</option>
                         <option value="insurance">Insurance</option>
-                        <option value="nhif">NHIF</option>
+                        <option value="shif">SHIF (Social Health Insurance Fund)</option>
                         <option value="waiver">Waiver</option>
                       </select>
                     </div>
@@ -1188,16 +1189,16 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
                         </div>
                       </>
                     )}
-                    {paymentForm.paymentMethod === 'nhif' && (
+                    {paymentForm.paymentMethod === 'shif' && (
                       <div>
                         <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
-                          NHIF Number
+                          SHIF number
                         </label>
                         <input
                           type="text"
                           className="w-full p-3 rounded-xl bg-white dark:bg-[#1c1c1e] border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
-                          value={paymentForm.nhifNumber}
-                          onChange={e => setPaymentForm({...paymentForm, nhifNumber: e.target.value})}
+                          value={paymentForm.shifNumber}
+                          onChange={e => setPaymentForm({...paymentForm, shifNumber: e.target.value})}
                         />
                       </div>
                     )}
@@ -1234,7 +1235,7 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
                               {payment.paymentType} • KES {payment.amount.toLocaleString()}
                             </div>
                             <div className="text-sm text-slate-500 dark:text-slate-400">
-                              {payment.paymentMethod}
+                              {formatPaymentMethodLabel(payment.paymentMethod)}
                               {payment.transactionReference && ` • Ref: ${payment.transactionReference}`}
                             </div>
                           </div>
