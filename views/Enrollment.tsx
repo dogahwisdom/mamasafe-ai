@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { UserPlus, Calendar, MapPin, CheckCircle, ChevronRight, ChevronLeft, Phone, User, Activity, Heart, FileText, Baby, Lock, CheckSquare, Loader2, MessageSquare, AlertCircle, ArrowRight } from 'lucide-react';
+import { UserPlus, Calendar, MapPin, CheckCircle, ChevronRight, ChevronLeft, Phone, User, Activity, Heart, FileText, Baby, Lock, CheckSquare, Loader2, MessageSquare, AlertCircle, ArrowRight, ShieldAlert, X } from 'lucide-react';
 import { Patient, RiskLevel, ConditionType, UserProfile } from '../types';
 import { backend } from '../services/backend';
 
@@ -41,6 +41,7 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({
     patientName?: string;
     facilityId?: string;
     facilityName?: string;
+    location?: string | null;
   } | null>(null);
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [transferReason, setTransferReason] = useState('');
@@ -131,40 +132,85 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({
     setPrimaryFacilityChoice('current');
   }, [existingPatient?.exists, existingPatient?.facilityId]);
 
-  const validateCurrentStep = () => {
-    switch (step) {
-      case 1: // Identity
-        return formData.firstName && formData.lastName && formData.dob;
-      case 2: // Contact
-        const baseContactValid = formData.phone && formData.county && formData.subCounty;
-        // Next of Kin only required for inpatient
+  /** When an existing record is found, pre-fill county / sub-county from stored location (if fields still empty). */
+  useEffect(() => {
+    const loc = existingPatient?.location?.trim();
+    if (!existingPatient?.exists || !loc) return;
+
+    setFormData((prev) => {
+      if (prev.county.trim() && prev.subCounty.trim()) return prev;
+      const commaIdx = loc.indexOf(',');
+      if (commaIdx === -1) {
+        return {
+          ...prev,
+          county: prev.county.trim() || loc,
+          subCounty: prev.subCounty.trim() || loc,
+        };
+      }
+      const countyPart = loc.slice(0, commaIdx).trim();
+      const subPart = loc.slice(commaIdx + 1).trim();
+      return {
+        ...prev,
+        county: prev.county.trim() || countyPart,
+        subCounty: prev.subCounty.trim() || subPart,
+      };
+    });
+  }, [existingPatient?.exists, existingPatient?.location]);
+
+  const getStepValidationError = (forStep: number): string | null => {
+    switch (forStep) {
+      case 1:
+        if (!formData.firstName?.trim() || !formData.lastName?.trim() || !formData.dob) {
+          return 'Please enter first name, last name, and date of birth.';
+        }
+        return null;
+      case 2: {
+        const missing: string[] = [];
+        if (!formData.phone?.trim()) missing.push('Patient WhatsApp number');
+        if (!formData.county?.trim()) missing.push('County');
+        if (!formData.subCounty?.trim()) missing.push('Sub-County / Estate');
         if (formData.patientType === 'inpatient') {
-          return baseContactValid && formData.nokName && formData.nokPhone;
+          if (!formData.nokName?.trim()) missing.push('Next of kin name');
+          if (!formData.nokPhone?.trim()) missing.push('Next of kin phone');
         }
-        return baseContactValid;
-      case 3: // Condition & History
-        return formData.conditionType && 
-               (formData.conditionType !== 'pregnancy' || (formData.gravida && formData.parity));
-      case 4: // Condition-Specific
+        if (missing.length > 0) {
+          return `Complete the following to continue: ${missing.join(', ')}.`;
+        }
+        return null;
+      }
+      case 3:
+        if (!formData.conditionType) {
+          return 'Please select a primary condition.';
+        }
+        if (formData.conditionType === 'pregnancy' && (!formData.gravida || !formData.parity)) {
+          return 'Please enter gravida and parity for pregnancy.';
+        }
+        return null;
+      case 4:
         if (formData.conditionType === 'pregnancy') {
-          return formData.lmp && formData.gestationalWeeks;
+          if (!formData.lmp || !formData.gestationalWeeks) {
+            return 'Please enter last menstrual period and gestational age.';
+          }
         } else if (formData.conditionType) {
-          // For non-pregnancy conditions, only require diagnosis date;
-          // severity will be assessed and captured by clinician in the workflow
-          return formData.diagnosisDate;
+          if (!formData.diagnosisDate) {
+            return 'Please enter the diagnosis date.';
+          }
+        } else {
+          return 'Please complete condition details.';
         }
-        return false;
+        return null;
       default:
-        return true;
+        return null;
     }
   };
 
   const handleNext = () => {
-    if (validateCurrentStep()) {
-      setStep(s => Math.min(s + 1, 5));
-    } else {
-      alert("Please fill in all required fields to proceed.");
+    const err = getStepValidationError(step);
+    if (err) {
+      alert(err);
+      return;
     }
+    setStep((s) => Math.min(s + 1, 5));
   };
 
   const handleRequestTransfer = async () => {
@@ -434,18 +480,6 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({
                 )}
              </InputGroup>
 
-             <InputGroup label="Patient Type" icon={User}>
-                <select 
-                  required 
-                  className={inputClasses} 
-                  value={formData.patientType} 
-                  onChange={e => setFormData({...formData, patientType: e.target.value as 'outpatient' | 'inpatient'})}
-                >
-                  <option value="outpatient">Outpatient</option>
-                  <option value="inpatient">Inpatient</option>
-                </select>
-             </InputGroup>
-             
              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <InputGroup label="County" icon={MapPin}>
                    <input type="text" required className={inputClasses} placeholder="e.g. Nairobi" value={formData.county} onChange={e => setFormData({...formData, county: e.target.value})} />
@@ -453,6 +487,28 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({
                 <InputGroup label="Sub-County / Estate" icon={MapPin}>
                    <input type="text" required className={inputClasses} placeholder="e.g. Westlands" value={formData.subCounty} onChange={e => setFormData({...formData, subCounty: e.target.value})} />
                 </InputGroup>
+             </div>
+             {existingPatient?.exists && existingPatient.location && (
+               <p className="text-xs text-slate-500 dark:text-slate-400 -mt-2">
+                 Location pre-filled from the existing patient record when available — you can edit if needed.
+               </p>
+             )}
+
+             <div>
+               <InputGroup label="Patient Type" icon={User}>
+                  <select 
+                    required 
+                    className={inputClasses} 
+                    value={formData.patientType} 
+                    onChange={e => setFormData({...formData, patientType: e.target.value as 'outpatient' | 'inpatient'})}
+                  >
+                    <option value="outpatient">Outpatient</option>
+                    <option value="inpatient">Inpatient</option>
+                  </select>
+               </InputGroup>
+               <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 ml-1">
+                 Outpatient and inpatient both require county and sub-county above. Inpatient also requires next of kin below.
+               </p>
              </div>
 
              {formData.patientType === 'inpatient' && (

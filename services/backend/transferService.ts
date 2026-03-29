@@ -13,6 +13,8 @@ export class TransferService {
     patientName?: string;
     facilityId?: string;
     facilityName?: string;
+    /** e.g. "Nairobi, Westlands" — used to pre-fill enrollment location */
+    location?: string | null;
   }> {
     if (isSupabaseConfigured()) {
       // Normalize phone number for comparison
@@ -35,7 +37,7 @@ export class TransferService {
       for (const phoneVar of phoneVariations) {
         const { data, error } = await supabase
           .from('patients')
-          .select('id, name, facility_id')
+          .select('id, name, facility_id, location')
           .eq('phone', phoneVar)
           .limit(1)
           .maybeSingle();
@@ -65,6 +67,7 @@ export class TransferService {
           patientName: foundPatient.name,
           facilityId: foundPatient.facility_id,
           facilityName: facilityName,
+          location: foundPatient.location ?? null,
         };
       }
     }
