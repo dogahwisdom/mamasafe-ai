@@ -11,6 +11,7 @@ import type {
   Reminder,
 } from '../types';
 import { formatPaymentMethodLabel } from './paymentMethodLabels';
+import { DepartmentalServicesCatalog } from './departmentalServicesCatalog';
 
 const PAGE_MARGIN = 14;
 const HEADER_BOX_WIDTH = 120;
@@ -260,17 +261,22 @@ export function downloadVisitPaymentSummaryPdf(
   );
   y += 12;
 
-  const body = payments.map((p) => [
-    p.paymentType,
-    p.amount.toFixed(2),
-    formatPaymentMethodLabel(p.paymentMethod),
-    p.paymentStatus,
-    p.paymentDate ? String(p.paymentDate).slice(0, 16).replace('T', ' ') : '—',
-  ]);
+  const body = payments.map((p) => {
+    const isInsurance = p.paymentMethod === 'insurance';
+    const provider = p.insuranceProvider?.trim();
+    return [
+      p.paymentType,
+      p.amount.toFixed(2),
+      formatPaymentMethodLabel(p.paymentMethod),
+      isInsurance && provider ? provider : '—',
+      p.paymentStatus,
+      p.paymentDate ? String(p.paymentDate).slice(0, 16).replace('T', ' ') : '—',
+    ];
+  });
 
   autoTable(doc, {
     startY: y,
-    head: [['TYPE', 'AMOUNT PAID', 'METHOD', 'STATUS', 'DATE']],
+    head: [['TYPE', 'AMOUNT PAID', 'METHOD', 'INSURANCE PROVIDER', 'STATUS', 'DATE']],
     body,
     theme: 'grid',
     styles: { fontSize: 8, cellPadding: 2 },
@@ -331,7 +337,14 @@ export function downloadPatientInformationPdf(
     y
   );
   y += 4;
-  if (patient.conditionType) {
+  const deptLine = DepartmentalServicesCatalog.formatIntakeLine(
+    patient.departmentServiceId,
+    patient.departmentSubcategoryId
+  );
+  if (deptLine) {
+    doc.text(`Departmental intake: ${deptLine}`, PAGE_MARGIN, y);
+    y += 4;
+  } else if (patient.conditionType) {
     doc.text(`Primary condition: ${String(patient.conditionType)}`, PAGE_MARGIN, y);
     y += 4;
   }

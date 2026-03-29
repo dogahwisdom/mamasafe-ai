@@ -146,16 +146,11 @@ All requested features have been implemented and are functional. Here's how to a
 ## 7. Condition-Agnostic Patient Management
 
 ### Enrollment Form:
-- **Primary Condition** dropdown includes:
-  - Pregnancy / ANC
-  - Diabetes
-  - Hypertension
-  - Tuberculosis
-  - Other
+- **Departmental services** (department + sub-category) replace the legacy “primary condition” list. Options are defined in `services/departmentalServicesCatalog.ts` and documented in `docs/DEPARTMENTAL_SERVICES.md`.
 
 - **Conditional Fields:**
-  - Pregnancy-specific fields (LMP, EDD, Gestational Weeks) only show for pregnancy
-  - Other conditions show diagnosis date and severity
+  - **Maternity → Antenatal care (ANC):** gravida/parity, LMP, EDD, gestational weeks, ANC profile
+  - **Other departments:** visit / diagnosis date
 
 - **Dashboard Updates:**
   - "Early Enrollment Rate" works for all conditions

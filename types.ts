@@ -66,7 +66,11 @@ export interface Patient {
   riskStatus: RiskLevel;
   nextAppointment: string; // ISO date
   nextFollowUpDate?: string; // ISO date - for pharmacy/clinic follow-up
-  conditionType?: ConditionType; // Primary condition
+  conditionType?: ConditionType; // Legacy / derived primary condition flag
+  /** Enrollment: departmental service id (see `departmentalServicesCatalog`) */
+  departmentServiceId?: string;
+  /** Enrollment: sub-category under `departmentServiceId` */
+  departmentSubcategoryId?: string;
   patientType?: 'outpatient' | 'inpatient'; // Patient type
   medicalConditions?: Array<{
     type: ConditionType;

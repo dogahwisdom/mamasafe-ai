@@ -4,6 +4,7 @@ import { Patient, RiskLevel, Referral, Task, Reminder, UserProfile } from '../ty
 import { MedicationPrescription } from '../components/MedicationPrescription';
 import { backend } from '../services/backend';
 import { downloadPatientInformationPdf } from '../services/pdfReports';
+import { DepartmentalServicesCatalog } from '../services/departmentalServicesCatalog';
 
 interface PatientsViewProps {
   onNavigate: (view: string) => void;
@@ -420,17 +421,37 @@ export const PatientsView: React.FC<PatientsViewProps> = ({ onNavigate, patients
                   </div>
                 </div>
 
-                {/* Medical Condition Section */}
-                {selectedPatient.conditionType && (
+                {/* Medical Condition / departmental intake */}
+                {(selectedPatient.conditionType ||
+                  selectedPatient.departmentServiceId ||
+                  selectedPatient.medicalConditions?.length) && (
                   <div>
                     <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
                       <Activity size={16} /> Medical Condition
                     </h3>
                     <div className="grid grid-cols-2 gap-4">
+                      {DepartmentalServicesCatalog.formatIntakeLine(
+                        selectedPatient.departmentServiceId,
+                        selectedPatient.departmentSubcategoryId
+                      ) && (
+                        <div className="p-4 bg-slate-50 dark:bg-[#2c2c2e] rounded-2xl col-span-2">
+                          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+                            Departmental intake
+                          </p>
+                          <p className="font-bold text-slate-900 dark:text-white">
+                            {DepartmentalServicesCatalog.formatIntakeLine(
+                              selectedPatient.departmentServiceId,
+                              selectedPatient.departmentSubcategoryId
+                            )}
+                          </p>
+                        </div>
+                      )}
+                      {selectedPatient.conditionType && (
                       <div className="p-4 bg-slate-50 dark:bg-[#2c2c2e] rounded-2xl">
-                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Primary Condition</p>
+                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Primary condition (record)</p>
                         <p className="font-bold text-slate-900 dark:text-white capitalize">{selectedPatient.conditionType}</p>
                       </div>
+                      )}
                       {selectedPatient.gestationalWeeks && (
                         <div className="p-4 bg-slate-50 dark:bg-[#2c2c2e] rounded-2xl">
                           <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Gestational Weeks</p>

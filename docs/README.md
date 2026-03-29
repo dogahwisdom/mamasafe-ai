@@ -9,6 +9,7 @@ Welcome to the MamaSafe AI documentation. This comprehensive guide covers everyt
 - **[Quick Start Guide](./QUICK_START.md)** - Get started in 5 minutes
 - **[Role-Specific Guides](./ROLES/)** - Detailed guides for each user type
 - **[Inventory reference (price list layout sample)](./INVENTORY_REFERENCE_PRICE_LIST.md)** - Stock list layout guide for pharmacies and clinics
+- **[Departmental services (enrollment)](./DEPARTMENTAL_SERVICES.md)** - Department + sub-category intake; PDF generation note
 
 ### Technical Documentation
 - **[API Documentation](./API.md)** - Backend API reference

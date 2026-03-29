@@ -1,8 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
-import { UserPlus, Calendar, MapPin, CheckCircle, ChevronRight, ChevronLeft, Phone, User, Activity, Heart, FileText, Baby, Lock, CheckSquare, Loader2, MessageSquare, AlertCircle, ArrowRight, ShieldAlert, X } from 'lucide-react';
+import { UserPlus, Calendar, MapPin, CheckCircle, ChevronRight, ChevronLeft, Phone, User, FileText, Lock, Loader2, MessageSquare, AlertCircle, ArrowRight, ShieldAlert, X } from 'lucide-react';
 import { Patient, RiskLevel, ConditionType, UserProfile } from '../types';
 import { backend } from '../services/backend';
+import { DepartmentalServicesCatalog } from '../services/departmentalServicesCatalog';
+import { EnrollmentDepartmentPanels } from '../components/enrollment/EnrollmentDepartmentPanels';
+import type { EnrollmentFormData } from '../components/enrollment/enrollmentFormTypes';
 
 interface InputGroupProps {
   label: string;
@@ -48,58 +51,53 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({
   const [requestingTransfer, setRequestingTransfer] = useState(false);
   const [primaryFacilityChoice, setPrimaryFacilityChoice] = useState<'current' | 'existing'>('current');
   
-  // Comprehensive State
-  const [formData, setFormData] = useState({
-    // Step 1: Personal
+  const [formData, setFormData] = useState<EnrollmentFormData>({
     firstName: '',
     lastName: '',
     dob: '',
     nationalId: '',
-    
-    // Step 2: Contact & Location
     phone: '',
-    patientType: 'outpatient' as 'outpatient' | 'inpatient',
+    patientType: 'outpatient',
     nokName: '',
     nokPhone: '',
     county: '',
     subCounty: '',
     ward: '',
-    
-    // Step 3: Condition & Medical History
-    conditionType: '' as ConditionType | '',
-    gravida: '', // Total pregnancies including current
-    parity: '',  // Previous viable births
-    
-    // Step 4: Condition-Specific Details
+    departmentServiceId: '',
+    departmentSubcategoryId: '',
+    gravida: '',
+    parity: '',
     lmp: '',
-    edd: '', // Estimated Date of Delivery
+    edd: '',
     gestationalWeeks: '',
-    ancProfile: 'Not Started', // Started, Not Started
+    ancProfile: 'Not Started',
     referralHospital: '',
     diagnosisDate: '',
   });
 
-  // Auto-calculate EDD and Gestational Weeks when LMP changes
+  // Auto-calculate EDD and gestational weeks when LMP changes (ANC path)
   useEffect(() => {
-    if (formData.lmp && formData.conditionType === 'pregnancy') {
+    const anc = DepartmentalServicesCatalog.requiresPregnancyDetails(
+      formData.departmentServiceId,
+      formData.departmentSubcategoryId
+    );
+    if (formData.lmp && anc) {
       const lmpDate = new Date(formData.lmp);
       if (!isNaN(lmpDate.getTime())) {
-        // EDD = LMP + 280 days (40 weeks)
         const eddDate = new Date(lmpDate.getTime() + 280 * 24 * 60 * 60 * 1000);
-        
-        // Weeks = (Now - LMP) / 7 days
         const now = new Date();
         const diffTime = now.getTime() - lmpDate.getTime();
         const diffWeeks = Math.floor(diffTime / (1000 * 60 * 60 * 24 * 7));
 
-        setFormData(prev => ({
+        setFormData((prev) => ({
           ...prev,
           edd: eddDate.toISOString().split('T')[0],
-          gestationalWeeks: diffWeeks > 0 && diffWeeks < 45 ? diffWeeks.toString() : prev.gestationalWeeks
+          gestationalWeeks:
+            diffWeeks > 0 && diffWeeks < 45 ? diffWeeks.toString() : prev.gestationalWeeks,
         }));
       }
     }
-  }, [formData.lmp, formData.conditionType]);
+  }, [formData.lmp, formData.departmentServiceId, formData.departmentSubcategoryId]);
 
   // Check for existing patient when phone number is entered
   useEffect(() => {
@@ -179,24 +177,35 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({
         return null;
       }
       case 3:
-        if (!formData.conditionType) {
-          return 'Please select a primary condition.';
+        if (!formData.departmentServiceId || !formData.departmentSubcategoryId) {
+          return 'Please select a department and sub-category.';
         }
-        if (formData.conditionType === 'pregnancy' && (!formData.gravida || !formData.parity)) {
-          return 'Please enter gravida and parity for pregnancy.';
+        if (
+          DepartmentalServicesCatalog.requiresPregnancyDetails(
+            formData.departmentServiceId,
+            formData.departmentSubcategoryId
+          ) &&
+          (!formData.gravida || !formData.parity)
+        ) {
+          return 'Please enter gravida and parity for ANC.';
         }
         return null;
       case 4:
-        if (formData.conditionType === 'pregnancy') {
+        if (
+          DepartmentalServicesCatalog.requiresPregnancyDetails(
+            formData.departmentServiceId,
+            formData.departmentSubcategoryId
+          )
+        ) {
           if (!formData.lmp || !formData.gestationalWeeks) {
             return 'Please enter last menstrual period and gestational age.';
           }
-        } else if (formData.conditionType) {
+        } else if (formData.departmentServiceId) {
           if (!formData.diagnosisDate) {
-            return 'Please enter the diagnosis date.';
+            return 'Please enter the visit or diagnosis date.';
           }
         } else {
-          return 'Please complete condition details.';
+          return 'Please complete intake details.';
         }
         return null;
       default:
@@ -263,26 +272,34 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({
             ? new Date().getFullYear() - new Date(formData.dob).getFullYear() 
             : 0;
 
-        // Enrollment should not decide the next appointment.
-        // This will be set later by the clinician in the workflow.
+        const anc = DepartmentalServicesCatalog.requiresPregnancyDetails(
+          formData.departmentServiceId,
+          formData.departmentSubcategoryId
+        );
+        const mcType: ConditionType = anc ? 'pregnancy' : 'other';
+
         const newPatient: Patient = {
             id: Date.now().toString(),
             name: `${formData.firstName} ${formData.lastName}`.trim(),
             age: age,
-            gestationalWeeks: formData.conditionType === 'pregnancy' ? (parseInt(formData.gestationalWeeks) || undefined) : undefined,
+            gestationalWeeks: anc ? (parseInt(formData.gestationalWeeks) || undefined) : undefined,
             location: `${formData.county}${formData.subCounty ? ', ' + formData.subCounty : ''}`,
             phone: formData.phone,
             lastCheckIn: new Date().toISOString().split('T')[0],
             riskStatus: RiskLevel.LOW, // Default low risk until triage
             nextAppointment: '',
-            conditionType: formData.conditionType || undefined,
+            conditionType: mcType,
+            departmentServiceId: formData.departmentServiceId || undefined,
+            departmentSubcategoryId: formData.departmentSubcategoryId || undefined,
             patientType: formData.patientType,
-            medicalConditions: formData.conditionType ? [{
-              type: formData.conditionType,
-              // Diagnosis date is captured here as a patient-reported date;
-              // detailed assessment, severity and notes are recorded later in the clinical workflow
-              diagnosisDate: formData.diagnosisDate || undefined,
-            }] : undefined,
+            medicalConditions: formData.departmentServiceId
+              ? [
+                  {
+                    type: mcType,
+                    diagnosisDate: formData.diagnosisDate || undefined,
+                  },
+                ]
+              : undefined,
             alerts: [],
             primaryFacilityId:
               primaryFacilityChoice === 'existing'
@@ -339,7 +356,8 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({
             setFormData({
               firstName: '', lastName: '', dob: '', nationalId: '',
               phone: '', patientType: 'outpatient', nokName: '', nokPhone: '', county: '', subCounty: '', ward: '',
-              conditionType: '', gravida: '', parity: '',
+              departmentServiceId: '', departmentSubcategoryId: '',
+              gravida: '', parity: '',
               lmp: '', edd: '', gestationalWeeks: '', ancProfile: 'Not Started', referralHospital: '',
               diagnosisDate: ''
             });
@@ -525,97 +543,12 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({
           </div>
         </div>
 
-        {/* Step 3: Condition & Medical History */}
-        <div className={`transition-all duration-500 absolute inset-0 p-6 md:p-10 overflow-y-auto pb-24 ${step === 3 ? 'translate-x-0 opacity-100 z-10' : step < 3 ? 'translate-x-full opacity-0 pointer-events-none' : '-translate-x-full opacity-0 pointer-events-none'}`}>
-          <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2"><FileText className="text-brand-500" /> Condition & Medical History</h3>
-          <div className="space-y-6">
-            <InputGroup label="Primary Condition" icon={Activity}>
-              <select 
-                required 
-                className={inputClasses} 
-                value={formData.conditionType} 
-                onChange={e => setFormData({...formData, conditionType: e.target.value as ConditionType})}
-              >
-                <option value="">Select condition...</option>
-                <option value="pregnancy">Pregnancy / ANC</option>
-                <option value="diabetes">Diabetes</option>
-                <option value="hypertension">Hypertension</option>
-                <option value="tuberculosis">Tuberculosis</option>
-                <option value="other">Other</option>
-              </select>
-            </InputGroup>
-
-            {formData.conditionType === 'pregnancy' && (
-              <div className="grid grid-cols-2 gap-6">
-                <InputGroup label="Gravida (Total Pregnancies)" icon={Activity}>
-                  <input type="number" min="1" required className={inputClasses} placeholder="e.g. 2" value={formData.gravida} onChange={e => setFormData({...formData, gravida: e.target.value})} />
-                </InputGroup>
-                <InputGroup label="Parity (Viable Births)" icon={Baby}>
-                  <input type="number" min="0" required className={inputClasses} placeholder="e.g. 1" value={formData.parity} onChange={e => setFormData({...formData, parity: e.target.value})} />
-                </InputGroup>
-              </div>
-            )}
-            
-          </div>
-        </div>
-
-        {/* Step 4: Condition-Specific Details */}
-        <div className={`transition-all duration-500 absolute inset-0 p-6 md:p-10 overflow-y-auto pb-24 ${step === 4 ? 'translate-x-0 opacity-100 z-10' : step < 4 ? 'translate-x-full opacity-0 pointer-events-none' : '-translate-x-full opacity-0 pointer-events-none'}`}>
-          <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
-            <Heart className="text-brand-500" /> 
-            {formData.conditionType === 'pregnancy' ? 'Current Pregnancy Details' : 'Condition Details'}
-          </h3>
-          <div className="space-y-6">
-            {formData.conditionType === 'pregnancy' ? (
-              <>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <InputGroup label="Last Menstrual Period (LMP)" icon={Calendar}>
-                    <input type="date" required className={inputClasses} value={formData.lmp} onChange={e => setFormData({...formData, lmp: e.target.value})} />
-                  </InputGroup>
-                  <InputGroup label="Expected Delivery (EDD)" icon={Calendar}>
-                    <input type="date" readOnly className={`${inputClasses} bg-slate-100 dark:bg-slate-800 cursor-not-allowed text-slate-500`} value={formData.edd} />
-                  </InputGroup>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <InputGroup label="Gestational Age (Weeks)" icon={Activity}>
-                    <input 
-                      type="number" 
-                      min="0" 
-                      max="45" 
-                      required
-                      className={inputClasses} 
-                      placeholder="Auto-calculated from LMP"
-                      value={formData.gestationalWeeks} 
-                      onChange={e => setFormData({...formData, gestationalWeeks: e.target.value})}
-                    />
-                  </InputGroup>
-                  <InputGroup label="ANC Profile Status" icon={FileText}>
-                    <select className={inputClasses} value={formData.ancProfile} onChange={e => setFormData({...formData, ancProfile: e.target.value})}>
-                      <option value="Not Started">Not Started</option>
-                      <option value="Started">Started</option>
-                      <option value="Defaulted">Defaulted</option>
-                    </select>
-                  </InputGroup>
-                </div>
-              </>
-            ) : formData.conditionType ? (
-              <>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <InputGroup label="Diagnosis Date" icon={Calendar}>
-                    <input 
-                      type="date" 
-                      required 
-                      className={inputClasses} 
-                      value={formData.diagnosisDate} 
-                      onChange={e => setFormData({...formData, diagnosisDate: e.target.value})} 
-                    />
-                  </InputGroup>
-                </div>
-              </>
-            ) : null}
-          </div>
-        </div>
+        <EnrollmentDepartmentPanels
+          step={step}
+          formData={formData}
+          setFormData={setFormData}
+          inputClasses={inputClasses}
+        />
 
         {/* Step 5: Consent & Compliance */}
         <div className={`transition-all duration-500 absolute inset-0 p-6 md:p-10 overflow-y-auto pb-24 ${step === 5 ? 'translate-x-0 opacity-100 z-10' : 'translate-x-full opacity-0 pointer-events-none'}`}>

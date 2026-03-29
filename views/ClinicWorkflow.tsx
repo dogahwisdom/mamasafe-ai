@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { downloadPatientDiagnosisPdf, downloadVisitPaymentSummaryPdf } from '../services/pdfReports';
 import { formatPaymentMethodLabel } from '../services/paymentMethodLabels';
+import { DepartmentalServicesCatalog } from '../services/departmentalServicesCatalog';
 
 interface ClinicWorkflowProps {
   user: UserProfile;
@@ -461,7 +462,13 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
                 <div className="font-bold text-slate-900 dark:text-white">{patient.name}</div>
                 <div className="text-sm text-slate-500 dark:text-slate-400 mt-1">{patient.phone}</div>
                 <div className="text-xs text-slate-400 dark:text-slate-500 mt-1">
-                  {patient.conditionType || 'No condition'} • {patient.patientType || 'outpatient'}
+                  {DepartmentalServicesCatalog.formatIntakeLine(
+                    patient.departmentServiceId,
+                    patient.departmentSubcategoryId
+                  ) ||
+                    patient.conditionType ||
+                    'No intake'}{' '}
+                  • {patient.patientType || 'outpatient'}
                 </div>
               </button>
             ))}

@@ -54,6 +54,8 @@ export class PatientService {
         facilityId: p.facility_id || undefined,
         primaryFacilityId: p.primary_facility_id || undefined,
         primaryFacilityName: p.primary_facility_name || undefined,
+        departmentServiceId: p.department_service_id || undefined,
+        departmentSubcategoryId: p.department_subcategory_id || undefined,
         alerts: (p.alerts as any) || [],
         medications: (p.medications || []).map((m: any) => ({
           id: m.id,
@@ -165,6 +167,8 @@ export class PatientService {
         next_appointment: patient.nextAppointment || null,
         next_follow_up_date: patient.nextFollowUpDate || null,
         condition_type: patient.conditionType || null,
+        department_service_id: patient.departmentServiceId || null,
+        department_subcategory_id: patient.departmentSubcategoryId || null,
         medical_conditions: patient.medicalConditions ? JSON.parse(JSON.stringify(patient.medicalConditions)) : null,
         patient_type: patient.patientType || 'outpatient',
         alerts: JSON.parse(JSON.stringify(patient.alerts || [])),

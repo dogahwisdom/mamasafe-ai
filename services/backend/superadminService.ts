@@ -82,6 +82,8 @@ export class SuperadminService {
       facilityId: p.facility_id ?? undefined,
       primaryFacilityId: p.primary_facility_id ?? undefined,
       primaryFacilityName: p.primary_facility_name ?? undefined,
+      departmentServiceId: p.department_service_id ?? undefined,
+      departmentSubcategoryId: p.department_subcategory_id ?? undefined,
       alerts: (p.alerts as any) || [],
       medications: (p.medications || []).map((m: any) => ({
         id: m.id,
