@@ -25,3 +25,29 @@ export interface EnrollmentFormData {
   referralHospital: string;
   diagnosisDate: string;
 }
+
+export function createEmptyEnrollmentForm(): EnrollmentFormData {
+  return {
+    firstName: "",
+    lastName: "",
+    dob: "",
+    nationalId: "",
+    phone: "",
+    patientType: "outpatient",
+    nokName: "",
+    nokPhone: "",
+    county: "",
+    subCounty: "",
+    ward: "",
+    departmentServiceId: "",
+    departmentSubcategoryId: "",
+    gravida: "",
+    parity: "",
+    lmp: "",
+    edd: "",
+    gestationalWeeks: "",
+    ancProfile: "Not Started",
+    referralHospital: "",
+    diagnosisDate: "",
+  };
+}
