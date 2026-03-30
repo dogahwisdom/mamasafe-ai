@@ -50,6 +50,22 @@ export const normalizePhone = (phone: string) => {
   return clean;
 };
 
+/**
+ * Possible `users.phone` values in the database (legacy rows may omit + or use 254…).
+ * Used for login lookup with the anon client.
+ */
+export const phoneLookupVariants = (phone: string): string[] => {
+  const n = normalizePhone(phone);
+  if (!n) return [];
+  const v = new Set<string>([n]);
+  if (n.startsWith("+254") && n.length >= 12) {
+    const rest = n.slice(4);
+    v.add("254" + rest);
+    v.add("0" + rest);
+  }
+  return [...v];
+};
+
 export const delay = (ms: number) =>
   new Promise((resolve) => setTimeout(resolve, ms));
 

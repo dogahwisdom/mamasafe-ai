@@ -7,6 +7,7 @@ import {
 import {
   KEYS,
   normalizePhone,
+  phoneLookupVariants,
   delay,
   Security,
   storage,
@@ -84,14 +85,16 @@ export class AuthService {
 
     const cleanIdentifier = normalizePhone(rawInput);
     if (cleanIdentifier) {
-      const { data: phoneUsers } = await supabase
-        .from('users')
-        .select('id, phone')
-        .eq('phone', cleanIdentifier)
-        .limit(1);
+      for (const phone of phoneLookupVariants(rawInput)) {
+        const { data: phoneUsers } = await supabase
+          .from("users")
+          .select("id, phone")
+          .eq("phone", phone)
+          .limit(1);
 
-      if (phoneUsers && phoneUsers.length > 0) {
-        return { userId: phoneUsers[0].id, phone: phoneUsers[0].phone };
+        if (phoneUsers && phoneUsers.length > 0) {
+          return { userId: phoneUsers[0].id, phone: phoneUsers[0].phone };
+        }
       }
     }
 
@@ -513,15 +516,21 @@ export class AuthService {
             users = emailILikeUsers || null;
           }
         } else {
-          // Try phone
+          // Try phone (multiple stored formats: +254…, 254…, 07…)
           const cleanIdentifier = normalizePhone(rawInput);
           if (cleanIdentifier) {
-            const { data: phoneUsers } = await supabase
-              .from('users')
-              .select('*')
-              .eq('phone', cleanIdentifier)
-              .limit(1);
-            users = phoneUsers || null;
+            for (const phone of phoneLookupVariants(rawInput)) {
+              const { data: phoneUsers, error: phoneErr } = await supabase
+                .from("users")
+                .select("*")
+                .eq("phone", phone)
+                .limit(1);
+              if (phoneErr) error = phoneErr;
+              if (phoneUsers && phoneUsers.length > 0) {
+                users = phoneUsers;
+                break;
+              }
+            }
           }
 
           // If still not found, try name (case-insensitive)
@@ -536,11 +545,17 @@ export class AuthService {
         }
       }
 
-      if (error || !users || users.length === 0) {
-        if (this.isDebugAuthEnabled()) {
-          console.warn('[Auth] User not found:', { identifier: rawInput });
+      if (!users || users.length === 0) {
+        if (error) {
+          console.error("[Auth] Supabase users query error:", error);
+          throw new Error(
+            "Sign-in service is temporarily unavailable. Please try again in a moment."
+          );
         }
-        throw new Error('Invalid credentials.');
+        if (this.isDebugAuthEnabled()) {
+          console.warn("[Auth] User not found:", { identifier: rawInput });
+        }
+        throw new Error("Invalid credentials.");
       }
 
       const dbUser = users[0];

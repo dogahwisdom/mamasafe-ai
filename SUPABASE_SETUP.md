@@ -84,6 +84,10 @@ The app will now connect to Supabase!
 - Verify your Project URL is correct (no trailing slash)
 - Check that your anon key is the full string (starts with `eyJ`)
 
+**PIN login always says "Invalid credentials" (but users exist)?**
+- The app uses **custom PIN** auth with the **anon** key (no Supabase Auth session). RLS policies that only allow `auth.uid() = id` block all reads for login.
+- Apply migrations from `supabase/migrations/` (including `20260329210000_users_rls_allow_pin_login.sql`), or run `supabase/fix-rls-policies.sql` in the SQL Editor so `users` allows the SELECT needed for sign-in.
+
 ##  What's Next?
 
 After setup, we'll:
