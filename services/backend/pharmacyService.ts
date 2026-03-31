@@ -376,6 +376,26 @@ export class PharmacyService {
     storage.set(KEYS.PHARMACY_INVENTORY, next);
   }
 
+  public async deleteInventoryItem(id: string): Promise<void> {
+    if (isSupabaseConfigured()) {
+      const { error } = await supabase.from("inventory").delete().eq("id", id);
+      if (error) {
+        console.error("Error deleting inventory item:", error);
+        throw error;
+      }
+      return;
+    }
+
+    const inventory = storage.get<InventoryItem[]>(
+      KEYS.PHARMACY_INVENTORY,
+      DEFAULT_INVENTORY
+    );
+    storage.set(
+      KEYS.PHARMACY_INVENTORY,
+      inventory.filter((i) => i.id !== id)
+    );
+  }
+
   public async dispense(refillId: string): Promise<void> {
     // Use Supabase if configured
     if (isSupabaseConfigured()) {

@@ -3,19 +3,14 @@ import { UserProfile, InventoryItem } from '../types';
 import { backend } from '../services/backend';
 import { downloadInventoryStockPdf } from '../services/pdfReports';
 import { ArrowLeft, BookOpen, Download, Loader2, Package, Plus, Save, FileText } from 'lucide-react';
+import { InventoryTableRow, type InventoryDraft } from '../components/inventory/InventoryTableRow';
 
 interface InventoryViewProps {
   user: UserProfile;
   onBack: () => void;
 }
 
-type InventoryDraft = {
-  stock: string;
-  minLevel: string;
-  unitPriceKes: string;
-  supplier: string;
-  expiryDate: string;
-};
+// InventoryDraft is defined in InventoryTableRow for reuse.
 
 /** FEFO-style expiry hint (expired / within 30 days). */
 function expiryStatusLabel(iso: string): string | null {
@@ -55,6 +50,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user, onBack }) =>
       const d: Record<string, InventoryDraft> = {};
       for (const row of data) {
         d[row.id] = {
+          name: row.name,
+          unit: row.unit,
           stock: String(row.stock),
           minLevel: String(row.minLevel),
           unitPriceKes:
@@ -88,6 +85,12 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user, onBack }) =>
   const handleSaveRow = async (item: InventoryItem) => {
     const d = drafts[item.id];
     if (!d) return;
+    const name = d.name.trim();
+    const unit = d.unit.trim() || 'units';
+    if (!name) {
+      alert('Medication name is required.');
+      return;
+    }
     const stock = parseInt(d.stock, 10);
     const minLevel = parseInt(d.minLevel, 10);
     if (Number.isNaN(stock) || stock < 0 || Number.isNaN(minLevel) || minLevel < 0) {
@@ -110,6 +113,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user, onBack }) =>
     setSavingId(item.id);
     try {
       await backend.pharmacy.updateInventoryItem(item.id, {
+        name,
+        unit,
         stock,
         minLevel,
         unitPriceKes,
@@ -119,7 +124,23 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user, onBack }) =>
       await load();
     } catch (e) {
       console.error(e);
-      alert('Failed to update stock.');
+      const msg = e instanceof Error ? e.message : 'Failed to update inventory.';
+      alert(msg);
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  const handleDeleteRow = async (item: InventoryItem) => {
+    if (!confirm(`Remove "${item.name}" from inventory?\n\nThis cannot be undone.`)) return;
+    setSavingId(item.id);
+    try {
+      await backend.pharmacy.deleteInventoryItem(item.id);
+      await load();
+    } catch (e) {
+      console.error(e);
+      const msg = e instanceof Error ? e.message : 'Failed to remove item.';
+      alert(msg);
     } finally {
       setSavingId(null);
     }
@@ -390,6 +411,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user, onBack }) =>
                   const d =
                     drafts[item.id] ||
                     ({
+                      name: item.name,
+                      unit: item.unit,
                       stock: String(item.stock),
                       minLevel: String(item.minLevel),
                       unitPriceKes:
@@ -404,96 +427,19 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user, onBack }) =>
                   const expired = expHint === 'Expired';
                   const soon = expHint !== null && expHint !== 'Expired';
                   return (
-                    <tr
+                    <InventoryTableRow
                       key={item.id}
-                      className={`border-b border-slate-100 dark:border-slate-800 ${
-                        low ? 'bg-amber-50/60 dark:bg-amber-900/10' : ''
-                      } ${expired ? 'bg-red-50/50 dark:bg-red-950/20' : ''}`}
-                    >
-                      <td className="px-3 py-3 font-mono text-xs text-slate-600 dark:text-slate-400 whitespace-nowrap">
-                        {item.id.replace(/-/g, '').slice(0, 12).toUpperCase()}
-                      </td>
-                      <td className="px-3 py-3 text-slate-900 dark:text-white">
-                        {item.name}
-                        <span className="text-slate-500 dark:text-slate-400"> · {item.unit}</span>
-                      </td>
-                      <td className="px-3 py-3 text-right">
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          className="w-28 min-w-[7rem] px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-[#2c2c2e] text-right text-sm"
-                          placeholder="—"
-                          value={d.unitPriceKes}
-                          onChange={(e) => handleDraft(item.id, 'unitPriceKes', e.target.value)}
-                          aria-label="Unit price KES"
-                        />
-                      </td>
-                      <td className="px-3 py-3">
-                        <input
-                          type="text"
-                          className="w-full min-w-[140px] max-w-[220px] px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-[#2c2c2e] text-sm"
-                          placeholder="—"
-                          value={d.supplier}
-                          onChange={(e) => handleDraft(item.id, 'supplier', e.target.value)}
-                          aria-label="Supplier"
-                        />
-                      </td>
-                      <td className="px-3 py-3 align-top">
-                        <input
-                          type="date"
-                          className="w-36 max-w-full px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-[#2c2c2e] text-sm"
-                          value={d.expiryDate}
-                          onChange={(e) => handleDraft(item.id, 'expiryDate', e.target.value)}
-                          aria-label="Expiry date"
-                        />
-                        {expHint && (
-                          <p
-                            className={`text-[10px] mt-1 font-semibold ${
-                              expired
-                                ? 'text-red-600 dark:text-red-400'
-                                : soon
-                                  ? 'text-amber-600 dark:text-amber-400'
-                                  : 'text-slate-500'
-                            }`}
-                          >
-                            {expHint}
-                          </p>
-                        )}
-                      </td>
-                      <td className="px-3 py-3 text-right">
-                        <input
-                          type="number"
-                          min={0}
-                          className="w-24 px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-[#2c2c2e] text-right"
-                          value={d.stock}
-                          onChange={(e) => handleDraft(item.id, 'stock', e.target.value)}
-                        />
-                      </td>
-                      <td className="px-3 py-3 text-right">
-                        <input
-                          type="number"
-                          min={0}
-                          className="w-24 px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-[#2c2c2e] text-right"
-                          value={d.minLevel}
-                          onChange={(e) => handleDraft(item.id, 'minLevel', e.target.value)}
-                        />
-                      </td>
-                      <td className="px-3 py-3">
-                        <button
-                          type="button"
-                          onClick={() => handleSaveRow(item)}
-                          disabled={savingId === item.id}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-brand-600 text-white text-xs font-semibold hover:bg-brand-700 disabled:opacity-50"
-                        >
-                          {savingId === item.id ? (
-                            <Loader2 size={14} className="animate-spin" />
-                          ) : (
-                            <Save size={14} />
-                          )}
-                          Save
-                        </button>
-                      </td>
-                    </tr>
+                      item={item}
+                      draft={d}
+                      saving={savingId === item.id}
+                      expiryHint={expHint}
+                      expired={expired}
+                      soon={soon}
+                      low={low}
+                      onDraft={(field, value) => handleDraft(item.id, field, value)}
+                      onSave={() => handleSaveRow(item)}
+                      onDelete={() => handleDeleteRow(item)}
+                    />
                   );
                 })}
               </tbody>
