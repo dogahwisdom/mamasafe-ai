@@ -171,21 +171,41 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
   };
 
   const handleSaveHistory = async () => {
+    const missingVitals: string[] = [];
+    if (!historyForm.temperature.trim()) missingVitals.push('Temperature (°C)');
+    if (!historyForm.bp.trim()) missingVitals.push('Blood pressure (mmHg)');
+    if (!historyForm.pulse.trim()) missingVitals.push('Pulse (bpm)');
+    if (!historyForm.weight.trim()) missingVitals.push('Weight (kg)');
+    if (!historyForm.height.trim()) missingVitals.push('Height (cm)');
+
     if (!currentVisit || !historyForm.chiefComplaint.trim()) {
       alert('Please fill in at least the chief complaint');
+      return;
+    }
+    if (missingVitals.length > 0) {
+      alert(`Vitals are required for every patient: ${missingVitals.join(', ')}.`);
       return;
     }
 
     setSaving(true);
     try {
       const vitalSigns: any = {};
-      if (historyForm.temperature) vitalSigns.temperature = parseFloat(historyForm.temperature);
-      if (historyForm.bp) vitalSigns.bp = historyForm.bp;
-      if (historyForm.pulse) vitalSigns.pulse = parseInt(historyForm.pulse);
+      const temp = parseFloat(historyForm.temperature);
+      const pulse = parseInt(historyForm.pulse, 10);
+      const weight = parseFloat(historyForm.weight);
+      const height = parseFloat(historyForm.height);
+      if (Number.isNaN(temp)) throw new Error('Temperature must be a valid number.');
+      if (Number.isNaN(pulse)) throw new Error('Pulse must be a valid number.');
+      if (Number.isNaN(weight)) throw new Error('Weight must be a valid number.');
+      if (Number.isNaN(height)) throw new Error('Height must be a valid number.');
+
+      vitalSigns.temperature = temp;
+      vitalSigns.bp = historyForm.bp.trim();
+      vitalSigns.pulse = pulse;
       if (historyForm.respiratoryRate) vitalSigns.respiratoryRate = parseInt(historyForm.respiratoryRate);
       if (historyForm.oxygenSaturation) vitalSigns.oxygenSaturation = parseFloat(historyForm.oxygenSaturation);
-      if (historyForm.weight) vitalSigns.weight = parseFloat(historyForm.weight);
-      if (historyForm.height) vitalSigns.height = parseFloat(historyForm.height);
+      vitalSigns.weight = weight;
+      vitalSigns.height = height;
       if (vitalSigns.weight && vitalSigns.height) {
         const heightInMeters = vitalSigns.height / 100;
         vitalSigns.bmi = parseFloat((vitalSigns.weight / (heightInMeters * heightInMeters)).toFixed(2));
@@ -210,7 +230,8 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
       alert('Clinical history saved successfully');
     } catch (error) {
       console.error('Error saving history:', error);
-      alert('Failed to save clinical history');
+      const msg = error instanceof Error ? error.message : 'Failed to save clinical history';
+      alert(msg);
     } finally {
       setSaving(false);
     }
@@ -734,7 +755,15 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
 
                 <button
                   onClick={handleSaveHistory}
-                  disabled={saving || !historyForm.chiefComplaint.trim()}
+                  disabled={
+                    saving ||
+                    !historyForm.chiefComplaint.trim() ||
+                    !historyForm.temperature.trim() ||
+                    !historyForm.bp.trim() ||
+                    !historyForm.pulse.trim() ||
+                    !historyForm.weight.trim() ||
+                    !historyForm.height.trim()
+                  }
                   className="px-6 py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-semibold transition-colors flex items-center gap-2 disabled:opacity-50"
                 >
                   {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
