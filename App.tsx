@@ -19,6 +19,7 @@ import { SuperadminDashboard } from './views/SuperadminDashboard';
 import { ClinicWorkflow } from './views/ClinicWorkflow';
 import { backend } from './services/backend';
 import { ViewState, Alert, Patient, UserProfile } from './types';
+import { Permissions } from './services/permissions';
 import { LayoutDashboard, UserPlus, Stethoscope, Sun, Moon, Bell, LogOut, Users, X, HelpCircle, Book, ExternalLink, MessageSquare, Phone, Clock, FileText, Settings, Loader2, CheckCircle, Workflow, BarChart2, Package, Receipt } from 'lucide-react';
 
 export const App: React.FC = () => {
@@ -168,21 +169,33 @@ export const App: React.FC = () => {
       ];
     } else if (currentUser.role === 'pharmacy') {
       return [
-        { id: 'dashboard', label: 'Pharmacy', icon: LayoutDashboard },
+        ...(Permissions.canAccess(currentUser, 'overview')
+          ? [{ id: 'dashboard', label: 'Pharmacy', icon: LayoutDashboard }]
+          : []),
         { id: 'patients', label: 'Patients', icon: Users },
-        { id: 'pharmacy_inventory', label: 'Inventory', icon: Package },
+        ...(Permissions.canAccess(currentUser, 'inventory')
+          ? [{ id: 'pharmacy_inventory', label: 'Inventory', icon: Package }]
+          : []),
         { id: 'pharmacy_reports', label: 'Reports', icon: BarChart2 },
-        { id: 'expenses', label: 'Expenses', icon: Receipt },
+        ...(Permissions.canAccess(currentUser, 'expenses')
+          ? [{ id: 'expenses', label: 'Expenses', icon: Receipt }]
+          : []),
         { id: 'enrollment', label: 'Register', icon: UserPlus },
       ];
     } else {
       // Clinic / Default
       return [
-        { id: 'dashboard', label: 'Overview', icon: LayoutDashboard },
+        ...(Permissions.canAccess(currentUser, 'overview')
+          ? [{ id: 'dashboard', label: 'Overview', icon: LayoutDashboard }]
+          : []),
         { id: 'workflow', label: 'Workflow', icon: Workflow },
         { id: 'patients', label: 'Patients', icon: Users },
-        { id: 'pharmacy_inventory', label: 'Inventory', icon: Package },
-        { id: 'expenses', label: 'Expenses', icon: Receipt },
+        ...(Permissions.canAccess(currentUser, 'inventory')
+          ? [{ id: 'pharmacy_inventory', label: 'Inventory', icon: Package }]
+          : []),
+        ...(Permissions.canAccess(currentUser, 'expenses')
+          ? [{ id: 'expenses', label: 'Expenses', icon: Receipt }]
+          : []),
         { id: 'enrollment', label: 'Enroll', icon: UserPlus },
         { id: 'triage', label: 'Triage', icon: Stethoscope },
         { id: 'referrals', label: 'Referrals', icon: FileText },
@@ -447,15 +460,33 @@ export const App: React.FC = () => {
         {currentView === 'pharmacy_inventory' &&
           currentUser &&
           (currentUser.role === 'pharmacy' || currentUser.role === 'clinic') && (
-            <InventoryView user={currentUser} onBack={() => setCurrentView('dashboard')} />
+            Permissions.canAccess(currentUser, 'inventory') ? (
+              <InventoryView user={currentUser} onBack={() => setCurrentView('dashboard')} />
+            ) : (
+              <div className="p-8 bg-white dark:bg-[#1c1c1e] rounded-3xl border border-slate-200 dark:border-slate-800">
+                <div className="text-lg font-bold text-slate-900 dark:text-white">Access restricted</div>
+                <div className="text-sm text-slate-500 dark:text-slate-400 mt-2">
+                  You do not have permission to view Inventory. Ask an Admin/Owner to grant access.
+                </div>
+              </div>
+            )
           )}
 
         {currentView === 'expenses' && currentUser && (
-          <ExpensesView
-            user={currentUser}
-            portal={currentUser.role === 'pharmacy' ? 'pharmacy' : 'clinic'}
-            onBack={() => setCurrentView('dashboard')}
-          />
+          Permissions.canAccess(currentUser, 'expenses') ? (
+            <ExpensesView
+              user={currentUser}
+              portal={currentUser.role === 'pharmacy' ? 'pharmacy' : 'clinic'}
+              onBack={() => setCurrentView('dashboard')}
+            />
+          ) : (
+            <div className="p-8 bg-white dark:bg-[#1c1c1e] rounded-3xl border border-slate-200 dark:border-slate-800">
+              <div className="text-lg font-bold text-slate-900 dark:text-white">Access restricted</div>
+              <div className="text-sm text-slate-500 dark:text-slate-400 mt-2">
+                You do not have permission to view Expenses. Ask an Admin/Owner to grant access.
+              </div>
+            </div>
+          )
         )}
 
         {currentView === 'dashboard' && currentUser?.role === 'superadmin' && (
@@ -463,7 +494,16 @@ export const App: React.FC = () => {
         )}
 
         {currentView === 'dashboard' && (!currentUser?.role || currentUser.role === 'clinic') && (
-          <DashboardView user={currentUser} onNavigate={setCurrentView} />
+          Permissions.canAccess(currentUser, 'overview') ? (
+            <DashboardView user={currentUser} onNavigate={setCurrentView} />
+          ) : (
+            <div className="p-8 bg-white dark:bg-[#1c1c1e] rounded-3xl border border-slate-200 dark:border-slate-800">
+              <div className="text-lg font-bold text-slate-900 dark:text-white">Access restricted</div>
+              <div className="text-sm text-slate-500 dark:text-slate-400 mt-2">
+                You do not have permission to view Overview. Ask an Admin/Owner to grant access.
+              </div>
+            </div>
+          )
         )}
 
         {currentView === 'enrollment' && (

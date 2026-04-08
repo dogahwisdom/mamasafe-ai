@@ -931,5 +931,43 @@ export class AuthService {
     }
     return user;
   }
+
+  /**
+   * Admin utility: resolve and fetch a user profile by phone/email/name identifier.
+   * Returns null when not found.
+   */
+  public async getUserProfileByIdentifier(
+    identifier: string
+  ): Promise<UserProfile | null> {
+    if (!isSupabaseConfigured()) return null;
+    const resolved = await this.resolveUserIdByIdentifier(identifier);
+    if (!resolved) return null;
+
+    const { data: dbUser, error } = await supabase
+      .from("users")
+      .select("*")
+      .eq("id", resolved.userId)
+      .maybeSingle();
+
+    if (error) {
+      console.error("[Auth] getUserProfileByIdentifier:", error);
+      throw error;
+    }
+    if (!dbUser) return null;
+
+    return {
+      id: dbUser.id,
+      role: dbUser.role as UserRole,
+      name: dbUser.name,
+      phone: dbUser.phone,
+      email: dbUser.email || undefined,
+      location: dbUser.location,
+      avatar: dbUser.avatar || undefined,
+      countryCode: dbUser.country_code,
+      subscriptionPlan: dbUser.subscription_plan || undefined,
+      patientData: dbUser.patient_data as any,
+      facilityData: dbUser.facility_data as any,
+    };
+  }
 }
 

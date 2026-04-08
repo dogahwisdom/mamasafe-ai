@@ -38,6 +38,14 @@ export interface PatientExtension {
 export interface FacilityExtension {
   managerName: string;
   licenseNumber?: string;
+  /** Fine-grained staff role inside a facility (not the top-level app role). */
+  permissionRole?: 'owner' | 'admin' | 'tech' | 'attendant';
+  /** Page-level permissions for staff accounts. */
+  permissions?: {
+    overview?: boolean;
+    inventory?: boolean;
+    expenses?: boolean;
+  };
 }
 
 export interface Medication {
@@ -83,6 +91,11 @@ export interface Patient {
   facilityId?: string; // Current facility managing this patient
   primaryFacilityId?: string; // Preferred care coordination facility
   primaryFacilityName?: string; // Display name of preferred facility
+
+  /** Billing: per-patient expected payment plans (KES). */
+  paymentPlanDailyKes?: number | null;
+  paymentPlanMonthlyKes?: number | null;
+  paymentPlanAnnualKes?: number | null;
 }
 
 export interface Alert {

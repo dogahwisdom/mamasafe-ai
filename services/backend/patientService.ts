@@ -56,6 +56,9 @@ export class PatientService {
         primaryFacilityName: p.primary_facility_name || undefined,
         departmentServiceId: p.department_service_id || undefined,
         departmentSubcategoryId: p.department_subcategory_id || undefined,
+        paymentPlanDailyKes: p.payment_plan_daily_kes ?? null,
+        paymentPlanMonthlyKes: p.payment_plan_monthly_kes ?? null,
+        paymentPlanAnnualKes: p.payment_plan_annual_kes ?? null,
         alerts: (p.alerts as any) || [],
         medications: (p.medications || []).map((m: any) => ({
           id: m.id,
@@ -175,6 +178,9 @@ export class PatientService {
         facility_id: facilityId,
         primary_facility_id: patient.primaryFacilityId || facilityId,
         primary_facility_name: patient.primaryFacilityName || currentUser?.name || null,
+        payment_plan_daily_kes: patient.paymentPlanDailyKes ?? null,
+        payment_plan_monthly_kes: patient.paymentPlanMonthlyKes ?? null,
+        payment_plan_annual_kes: patient.paymentPlanAnnualKes ?? null,
       };
 
       let finalPatientId: string;

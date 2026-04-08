@@ -85,6 +85,12 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
     notes: '',
   });
 
+  const [paymentPlanDraft, setPaymentPlanDraft] = useState({
+    daily: '',
+    monthly: '',
+    annual: '',
+  });
+
   /** Full bill for treatment; instalments recorded as separate payment lines. */
   const [totalTreatmentInput, setTotalTreatmentInput] = useState('');
 
@@ -96,6 +102,27 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
   useEffect(() => {
     loadPatients();
   }, []);
+
+  useEffect(() => {
+    if (!selectedPatient) {
+      setPaymentPlanDraft({ daily: '', monthly: '', annual: '' });
+      return;
+    }
+    setPaymentPlanDraft({
+      daily:
+        selectedPatient.paymentPlanDailyKes != null
+          ? String(selectedPatient.paymentPlanDailyKes)
+          : '',
+      monthly:
+        selectedPatient.paymentPlanMonthlyKes != null
+          ? String(selectedPatient.paymentPlanMonthlyKes)
+          : '',
+      annual:
+        selectedPatient.paymentPlanAnnualKes != null
+          ? String(selectedPatient.paymentPlanAnnualKes)
+          : '',
+    });
+  }, [selectedPatient?.id]);
 
   useEffect(() => {
     const visitId = currentVisit?.id;
@@ -129,6 +156,37 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
       }
     } catch (error) {
       console.error('Error loading visit data:', error);
+    }
+  };
+
+  const handleSavePaymentPlans = async () => {
+    if (!selectedPatient) return;
+    const parseOrNull = (s: string): number | null => {
+      const t = s.trim();
+      if (!t) return null;
+      const n = parseFloat(t);
+      if (!Number.isFinite(n) || n < 0) {
+        throw new Error('Payment plan values must be valid numbers (KES).');
+      }
+      return n;
+    };
+
+    setSaving(true);
+    try {
+      const updated: Patient = {
+        ...selectedPatient,
+        paymentPlanDailyKes: parseOrNull(paymentPlanDraft.daily),
+        paymentPlanMonthlyKes: parseOrNull(paymentPlanDraft.monthly),
+        paymentPlanAnnualKes: parseOrNull(paymentPlanDraft.annual),
+      };
+      await backend.patients.add(updated);
+      setSelectedPatient(updated);
+      alert('Payment plans saved.');
+    } catch (e: any) {
+      console.error('Error saving payment plans:', e);
+      alert(e?.message || 'Failed to save payment plans.');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -1072,6 +1130,64 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
                   </div>
                 </div>
                 
+                <div className="p-4 bg-white dark:bg-[#1c1c1e] rounded-xl border border-slate-200 dark:border-slate-700 mb-4">
+                  <h4 className="font-semibold text-slate-900 dark:text-white mb-2">Patient payment plans</h4>
+                  <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">
+                    Optional: set expected daily/monthly/annual plans for this patient (KES).
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                        Daily (KES)
+                      </label>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        className="w-full p-3 rounded-xl bg-slate-50 dark:bg-[#2c2c2e] border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                        placeholder="e.g. 200"
+                        value={paymentPlanDraft.daily}
+                        onChange={(e) => setPaymentPlanDraft((p) => ({ ...p, daily: e.target.value.replace(/[^\d.]/g, '') }))}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                        Monthly (KES)
+                      </label>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        className="w-full p-3 rounded-xl bg-slate-50 dark:bg-[#2c2c2e] border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                        placeholder="e.g. 5000"
+                        value={paymentPlanDraft.monthly}
+                        onChange={(e) => setPaymentPlanDraft((p) => ({ ...p, monthly: e.target.value.replace(/[^\d.]/g, '') }))}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                        Annual (KES)
+                      </label>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        className="w-full p-3 rounded-xl bg-slate-50 dark:bg-[#2c2c2e] border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                        placeholder="e.g. 60000"
+                        value={paymentPlanDraft.annual}
+                        onChange={(e) => setPaymentPlanDraft((p) => ({ ...p, annual: e.target.value.replace(/[^\d.]/g, '') }))}
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <button
+                      type="button"
+                      onClick={handleSavePaymentPlans}
+                      disabled={saving || !selectedPatient}
+                      className="px-4 py-2.5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-black font-semibold text-sm disabled:opacity-50"
+                    >
+                      Save plans
+                    </button>
+                  </div>
+                </div>
+
                 {/* Add Payment Form */}
                 <div className="p-4 bg-slate-50 dark:bg-[#2c2c2e] rounded-xl border border-slate-200 dark:border-slate-700 mb-4">
                   <h4 className="font-semibold text-slate-900 dark:text-white mb-3">Record payment instalment</h4>
