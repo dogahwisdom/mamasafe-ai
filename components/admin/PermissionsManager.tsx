@@ -41,6 +41,10 @@ export const PermissionsManager: React.FC<PermissionsManagerProps> = ({ currentU
 
   const updateTarget = async (updates: Partial<UserProfile["facilityData"]>) => {
     if (!target) return;
+    if (!canManage) {
+      alert("Access restricted. Only Owners/Admins can manage permissions.");
+      return;
+    }
     setLoading(true);
     try {
       const next: UserProfile = {
@@ -60,8 +64,6 @@ export const PermissionsManager: React.FC<PermissionsManagerProps> = ({ currentU
     }
   };
 
-  if (!canManage) return null;
-
   return (
     <div className="bg-white dark:bg-[#1c1c1e] rounded-3xl border border-slate-200 dark:border-slate-800 p-6">
       <div className="flex items-start justify-between gap-4">
@@ -75,6 +77,20 @@ export const PermissionsManager: React.FC<PermissionsManagerProps> = ({ currentU
           </p>
         </div>
       </div>
+
+      {!canManage && (
+        <div className="mt-4 p-4 rounded-2xl border border-amber-200 dark:border-amber-900/40 bg-amber-50/70 dark:bg-amber-900/15">
+          <div className="text-sm font-bold text-slate-900 dark:text-white">
+            Access restricted
+          </div>
+          <div className="text-sm text-slate-700 dark:text-slate-300 mt-1">
+            This account cannot manage permissions yet.
+          </div>
+          <div className="text-xs text-slate-600 dark:text-slate-400 mt-2">
+            Detected: role=<span className="font-mono">{String(currentUser.role)}</span>, permissionRole=<span className="font-mono">{String(currentUser.facilityData?.permissionRole || "—")}</span>
+          </div>
+        </div>
+      )}
 
       <div className="mt-4 flex flex-col md:flex-row gap-3">
         <div className="flex-1">
@@ -92,7 +108,7 @@ export const PermissionsManager: React.FC<PermissionsManagerProps> = ({ currentU
         <button
           type="button"
           onClick={findUser}
-          disabled={loading || !query.trim()}
+          disabled={loading || !query.trim() || !canManage}
           className="self-end inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-slate-900 dark:bg-white text-white dark:text-black font-semibold text-sm disabled:opacity-50"
         >
           {loading ? <Loader2 className="animate-spin" size={18} /> : <Search size={18} />}
@@ -122,6 +138,7 @@ export const PermissionsManager: React.FC<PermissionsManagerProps> = ({ currentU
               <select
                 className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1c1c1e] text-slate-900 dark:text-white"
                 value={target.facilityData?.permissionRole || ""}
+                disabled={!canManage}
                 onChange={(e) =>
                   updateTarget({ permissionRole: e.target.value as any })
                 }
@@ -141,6 +158,7 @@ export const PermissionsManager: React.FC<PermissionsManagerProps> = ({ currentU
                 <input
                   type="checkbox"
                   checked={!!(targetPermissions as any)[k]}
+                  disabled={!canManage}
                   onChange={(e) =>
                     updateTarget({
                       permissions: {
