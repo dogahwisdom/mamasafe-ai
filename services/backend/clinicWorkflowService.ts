@@ -249,7 +249,8 @@ export class ClinicWorkflowService {
     testName: string,
     testType: 'blood' | 'urine' | 'stool' | 'imaging' | 'other',
     priority: 'routine' | 'urgent' | 'stat' = 'routine',
-    clinicalIndication?: string
+    clinicalIndication?: string,
+    testCategory?: string
   ): Promise<LabRequest> {
     if (isSupabaseConfigured()) {
       const currentUser = storage.get<UserProfile | null>(KEYS.CURRENT_USER, null);
@@ -266,6 +267,7 @@ export class ClinicWorkflowService {
           facility_id: currentUser.id,
           test_name: testName,
           test_type: testType,
+          test_category: testCategory || null,
           priority: priority,
           clinical_indication: clinicalIndication || null,
           status: 'requested',

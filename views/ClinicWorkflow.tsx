@@ -8,6 +8,7 @@ import {
 import { downloadPatientDiagnosisPdf, downloadVisitPaymentSummaryPdf } from '../services/pdfReports';
 import { formatPaymentMethodLabel } from '../services/paymentMethodLabels';
 import { DepartmentalServicesCatalog } from '../services/departmentalServicesCatalog';
+import { LabRequestsPanel, type LabRequestDraft } from '../components/workflow/LabRequestsPanel';
 
 interface ClinicWorkflowProps {
   user: UserProfile;
@@ -46,11 +47,14 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
     physicalExamination: '',
   });
 
-  const [labForm, setLabForm] = useState({
+  const [labForm, setLabForm] = useState<LabRequestDraft>({
+    search: '',
+    selectedIds: [],
     testName: '',
-    testType: 'blood' as 'blood' | 'urine' | 'stool' | 'imaging' | 'other',
-    priority: 'routine' as 'routine' | 'urgent' | 'stat',
+    testType: 'blood',
+    priority: 'routine',
     clinicalIndication: '',
+    doctorNotes: '',
   });
 
   const [diagnosisForm, setDiagnosisForm] = useState({
@@ -212,25 +216,28 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
     }
   };
 
-  const handleAddLabRequest = async () => {
-    if (!currentVisit || !labForm.testName.trim()) {
-      alert('Please enter a test name');
-      return;
-    }
-
+  const handleAddLabRequests = async (
+    items: Array<{ name: string; type: 'blood' | 'urine' | 'stool' | 'imaging' | 'other'; category?: string; indication?: string }>,
+    priority: 'routine' | 'urgent' | 'stat'
+  ) => {
+    if (!currentVisit || items.length === 0) return;
     setSaving(true);
     try {
-      const labRequest = await backend.workflow.createLabRequest(
-        currentVisit.id,
-        currentVisit.patientId,
-        labForm.testName,
-        labForm.testType,
-        labForm.priority,
-        labForm.clinicalIndication || undefined
-      );
-      setLabRequests([...labRequests, labRequest]);
-      setLabForm({ testName: '', testType: 'blood', priority: 'routine', clinicalIndication: '' });
-      alert('Lab request added successfully');
+      const created = [];
+      for (const it of items) {
+        const lr = await backend.workflow.createLabRequest(
+          currentVisit.id,
+          currentVisit.patientId,
+          it.name,
+          it.type,
+          priority,
+          it.indication,
+          it.category
+        );
+        created.push(lr);
+      }
+      setLabRequests([...labRequests, ...created]);
+      alert(created.length > 1 ? 'Lab requests added successfully' : 'Lab request added successfully');
     } catch (error) {
       console.error('Error creating lab request:', error);
       alert('Failed to add lab request');
@@ -738,104 +745,13 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
 
             {/* Lab Stage */}
             {activeStage === 'lab' && currentVisit && (
-              <div className="space-y-4">
-                <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Lab Requests</h3>
-                
-                {/* Add Lab Request Form */}
-                <div className="p-4 bg-slate-50 dark:bg-[#2c2c2e] rounded-xl border border-slate-200 dark:border-slate-700 mb-4">
-                  <h4 className="font-semibold text-slate-900 dark:text-white mb-3">Add Lab Request</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
-                        Test Name *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        className="w-full p-3 rounded-xl bg-white dark:bg-[#1c1c1e] border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
-                        placeholder="e.g., Complete Blood Count"
-                        value={labForm.testName}
-                        onChange={e => setLabForm({...labForm, testName: e.target.value})}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
-                        Test Type *
-                      </label>
-                      <select
-                        className="w-full p-3 rounded-xl bg-white dark:bg-[#1c1c1e] border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
-                        value={labForm.testType}
-                        onChange={e => setLabForm({...labForm, testType: e.target.value as any})}
-                      >
-                        <option value="blood">Blood</option>
-                        <option value="urine">Urine</option>
-                        <option value="stool">Stool</option>
-                        <option value="imaging">Imaging</option>
-                        <option value="other">Other</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
-                        Priority *
-                      </label>
-                      <select
-                        className="w-full p-3 rounded-xl bg-white dark:bg-[#1c1c1e] border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
-                        value={labForm.priority}
-                        onChange={e => setLabForm({...labForm, priority: e.target.value as any})}
-                      >
-                        <option value="routine">Routine</option>
-                        <option value="urgent">Urgent</option>
-                        <option value="stat">STAT</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
-                        Clinical Indication
-                      </label>
-                      <input
-                        type="text"
-                        className="w-full p-3 rounded-xl bg-white dark:bg-[#1c1c1e] border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
-                        value={labForm.clinicalIndication}
-                        onChange={e => setLabForm({...labForm, clinicalIndication: e.target.value})}
-                      />
-                    </div>
-                  </div>
-                  <button
-                    onClick={handleAddLabRequest}
-                    disabled={saving || !labForm.testName.trim()}
-                    className="mt-4 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-semibold transition-colors flex items-center gap-2 disabled:opacity-50"
-                  >
-                    <Plus size={16} />
-                    Add Lab Request
-                  </button>
-                </div>
-
-                {/* Lab Requests List */}
-                {labRequests.length > 0 && (
-                  <div className="space-y-2">
-                    <h4 className="font-semibold text-slate-900 dark:text-white">Requested Tests</h4>
-                    {labRequests.map((lab) => (
-                      <div key={lab.id} className="p-4 bg-slate-50 dark:bg-[#2c2c2e] rounded-xl border border-slate-200 dark:border-slate-700">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="font-semibold text-slate-900 dark:text-white">{lab.testName}</div>
-                            <div className="text-sm text-slate-500 dark:text-slate-400">
-                              {lab.testType} • {lab.priority}
-                            </div>
-                          </div>
-                          <span className={`px-3 py-1 rounded-lg text-xs font-semibold ${
-                            lab.status === 'completed' ? 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400' :
-                            lab.status === 'in_progress' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-400' :
-                            'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400'
-                          }`}>
-                            {lab.status}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <LabRequestsPanel
+                saving={saving}
+                draft={labForm}
+                setDraft={setLabForm}
+                requested={labRequests}
+                onAddRequests={handleAddLabRequests}
+              />
             )}
 
             {/* Diagnosis & Plan Stage */}
