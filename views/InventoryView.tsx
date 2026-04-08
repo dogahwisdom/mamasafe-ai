@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { UserProfile, InventoryItem } from '../types';
 import { backend } from '../services/backend';
 import { downloadInventoryStockPdf } from '../services/pdfReports';
-import { ArrowLeft, BookOpen, Download, Loader2, Package, Plus, Save, FileText } from 'lucide-react';
+import { ArrowLeft, Download, Loader2, Package, Plus, Save, FileText } from 'lucide-react';
 import { InventoryTableRow, type InventoryDraft } from '../components/inventory/InventoryTableRow';
 
 interface InventoryViewProps {
@@ -237,44 +237,23 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user, onBack }) =>
 
       <div className="bg-white dark:bg-[#1c1c1e] rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
         <div className="p-4 md:p-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/40">
-          <div className="flex flex-col lg:flex-row gap-5 lg:items-start">
-            <div className="flex-1 space-y-2">
-              <div className="flex items-center gap-2 text-slate-900 dark:text-white font-bold text-sm">
-                <BookOpen size={18} className="text-brand-600 shrink-0" />
-                Reference layout (price list layout sample)
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <div className="text-sm font-bold text-slate-900 dark:text-white">
+                Inventory documents
               </div>
-              <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-                Use this familiar <strong className="text-slate-800 dark:text-slate-200">code + product + table</strong> format as a guide when updating stock.
-                You create inventory rows in the platform using <strong>Add medication</strong>; the reference download is only for layout/price-sheet reconciliation.
-                Your <strong>Download PDF</strong> export uses the same kind of header and bordered grid; see{' '}
-                <code className="text-xs bg-slate-200/80 dark:bg-slate-800 px-1.5 py-0.5 rounded">docs/INVENTORY_REFERENCE_PRICE_LIST.md</code> for details.
-              </p>
-              <a
-                href="/inventory-reference/comprehensive-price-list-2023.pdf"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 mt-2 text-sm font-semibold text-brand-600 dark:text-brand-400 hover:underline"
-              >
-                <FileText size={16} />
-                Open comprehensive price list PDF (2023)
-              </a>
+              <div className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                Download your facility stock list, or keep a reference price list PDF.
+              </div>
             </div>
             <a
-              href="/inventory-reference/price-list-layout-reference.png"
+              href="/inventory-reference/comprehensive-price-list-2023.pdf"
               target="_blank"
               rel="noopener noreferrer"
-              className="shrink-0 block w-full max-w-sm mx-auto lg:mx-0 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden bg-white shadow-sm hover:opacity-95 transition-opacity"
-              title="Open reference image full size"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-[#1c1c1e] border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-semibold text-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
             >
-              <img
-                src="/inventory-reference/price-list-layout-reference.png"
-                alt="Sample professional price list layout: branded header and three-column table"
-                className="w-full h-auto object-contain max-h-48 object-top"
-                loading="lazy"
-              />
-              <div className="px-3 py-2 text-[11px] text-center text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-800">
-                Tap to open full size · example layout only
-              </div>
+              <FileText size={16} />
+              Download reference PDF
             </a>
           </div>
         </div>
