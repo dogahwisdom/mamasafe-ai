@@ -6,6 +6,8 @@ import { Users, AlertTriangle, Calendar, Activity, ChevronRight, Building2, Tren
 import { AreaChart, Area, XAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { Patient, UserProfile, Task, ClinicVisit } from '../types';
 import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
+import { AgeGroupReport } from '../components/reports/AgeGroupReport';
+import { FinancialReportsPanel } from '../components/reports/FinancialReportsPanel';
 
 // Mock Data for Analytics
 const visitData = [
@@ -53,6 +55,17 @@ export const DashboardView: React.FC<DashboardProps> = ({ onNavigate, user }) =>
   const [aiConversationsToday, setAiConversationsToday] = useState<number>(0);
   const [resolvedTasksToday, setResolvedTasksToday] = useState<number>(0);
   const [totalAiCost, setTotalAiCost] = useState<number>(0);
+  const [visitAgeCounts, setVisitAgeCounts] = useState({
+    under5: 0,
+    '5to18': 0,
+    above18: 0,
+    above35: 0,
+  });
+  const [financialReports, setFinancialReports] = useState({
+    week: { totalKes: 0, byMethod: {} as Record<string, number> },
+    month: { totalKes: 0, byMethod: {} as Record<string, number> },
+    year: { totalKes: 0, byMethod: {} as Record<string, number> },
+  });
   
   useEffect(() => {
     const loadData = async () => {
@@ -129,6 +142,54 @@ export const DashboardView: React.FC<DashboardProps> = ({ onNavigate, user }) =>
           setTodayPayments(0);
         }
 
+        // Financial reports: weekly/monthly/annual by payment method.
+        if (isSupabaseConfigured() && user?.id) {
+          try {
+            const now = new Date();
+            const startOfWeek = new Date(now);
+            startOfWeek.setDate(now.getDate() - 7);
+            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+            const startOfYear = new Date(now.getFullYear(), 0, 1);
+
+            const ranges = [
+              { key: 'week' as const, from: startOfWeek },
+              { key: 'month' as const, from: startOfMonth },
+              { key: 'year' as const, from: startOfYear },
+            ];
+
+            const nextReports: any = { week: { totalKes: 0, byMethod: {} }, month: { totalKes: 0, byMethod: {} }, year: { totalKes: 0, byMethod: {} } };
+
+            for (const r of ranges) {
+              const { data: payRows, error: payErr } = await supabase
+                .from('payments')
+                .select('amount, payment_method, payment_status, payment_date, facility_id')
+                .eq('facility_id', user.id)
+                .eq('payment_status', 'paid')
+                .gte('payment_date', r.from.toISOString());
+
+              if (payErr) throw payErr;
+              const by: Record<string, number> = {};
+              let total = 0;
+              for (const row of payRows || []) {
+                const amt = parseFloat(String((row as any).amount));
+                if (!Number.isFinite(amt)) continue;
+                const method = String((row as any).payment_method || 'unknown');
+                by[method] = (by[method] || 0) + amt;
+                total += amt;
+              }
+              nextReports[r.key] = { totalKes: total, byMethod: by };
+            }
+            setFinancialReports(nextReports);
+          } catch (e) {
+            console.warn('Failed to load financial reports:', e);
+            setFinancialReports({
+              week: { totalKes: 0, byMethod: {} },
+              month: { totalKes: 0, byMethod: {} },
+              year: { totalKes: 0, byMethod: {} },
+            });
+          }
+        }
+
         // Get total diagnoses and completed visits
         if (isSupabaseConfigured() && allVisitIds.length > 0) {
           try {
@@ -184,6 +245,37 @@ export const DashboardView: React.FC<DashboardProps> = ({ onNavigate, user }) =>
         } else {
           setEarlyEnrollmentRate(null);
           setEngagementRate(null);
+        }
+
+        // Patient reports: age groups derived from workflow visits.
+        try {
+          const ageByPatientId = new Map<string, number>();
+          for (const p of patients) {
+            if (typeof p.age === 'number' && Number.isFinite(p.age)) {
+              ageByPatientId.set(p.id, p.age);
+            }
+          }
+          let under5 = 0;
+          let fiveTo18 = 0;
+          let above18 = 0;
+          let above35 = 0;
+          for (const v of visits) {
+            const age = ageByPatientId.get(v.patientId);
+            if (age == null) continue;
+            if (age < 5) under5 += 1;
+            if (age >= 5 && age <= 18) fiveTo18 += 1;
+            if (age > 18) above18 += 1;
+            if (age >= 35) above35 += 1;
+          }
+          setVisitAgeCounts({
+            under5,
+            '5to18': fiveTo18,
+            above18,
+            above35,
+          });
+        } catch (e) {
+          console.warn('Failed to compute age-group report:', e);
+          setVisitAgeCounts({ under5: 0, '5to18': 0, above18: 0, above35: 0 });
         }
 
         const missed = taskData.filter((t) => t.type === 'Missed Visit');
@@ -430,6 +522,17 @@ export const DashboardView: React.FC<DashboardProps> = ({ onNavigate, user }) =>
               </div>
             </div>
           </div>
+        </div>
+
+        <div className="mt-6">
+          <AgeGroupReport
+            counts={visitAgeCounts}
+            subtitle="Derived from workflow visits (counts by age at enrollment for patients visible to this facility)."
+          />
+        </div>
+
+        <div className="mt-6">
+          <FinancialReportsPanel data={financialReports} />
         </div>
 
         {/* AI Usage & Resolved Tasks Section */}
