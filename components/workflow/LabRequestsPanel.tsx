@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import { LabRequest } from "../../types";
 import { LabTestsCatalog, type LabTestType } from "../../services/labTestsCatalog";
 import { Loader2, Plus } from "lucide-react";
+import { backend } from "../../services/backend";
 
 export type LabPriority = "routine" | "urgent" | "stat";
 
@@ -38,6 +39,13 @@ export const LabRequestsPanel: React.FC<LabRequestsPanelProps> = ({
   onAddRequests,
 }) => {
   const results = useMemo(() => LabTestsCatalog.search(draft.search).slice(0, 25), [draft.search]);
+  const selectedTests = useMemo(
+    () => draft.selectedIds.map((id) => LabTestsCatalog.findById(id)).filter(Boolean),
+    [draft.selectedIds]
+  );
+  const [editingResultsForId, setEditingResultsForId] = useState<string | null>(null);
+  const [resultsDraft, setResultsDraft] = useState<Record<string, string>>({});
+  const [resultsParamsDraft, setResultsParamsDraft] = useState<Record<string, Record<string, string>>>({});
 
   const canAdd =
     (draft.selectedIds.length > 0 || draft.testName.trim().length > 0) && !saving;
@@ -81,6 +89,36 @@ export const LabRequestsPanel: React.FC<LabRequestsPanelProps> = ({
       clinicalIndication: "",
       doctorNotes: "",
     }));
+  };
+
+  const getCatalogParams = (lab: LabRequest) => {
+    const m = LabTestsCatalog.search(lab.testName).find((t) => t.name === lab.testName);
+    return m?.parameters ?? [];
+  };
+
+  const buildResultsText = (lab: LabRequest): string => {
+    const p = resultsParamsDraft[lab.id] || {};
+    const lines = Object.entries(p)
+      .filter(([, v]) => String(v).trim().length > 0)
+      .map(([k, v]) => `${k}: ${String(v).trim()}`);
+    const free = (resultsDraft[lab.id] || "").trim();
+    return [...lines, free].filter(Boolean).join("\n");
+  };
+
+  const handleSaveResults = async (lab: LabRequest) => {
+    const text = buildResultsText(lab);
+    try {
+      const updated = await backend.workflow.completeLabRequest(lab.id, text);
+      // Update parent list in-place (requested is owned by parent; we can't set it here).
+      // So we rely on the parent refresh on stage changes or show results immediately via lab.results.
+      setEditingResultsForId(null);
+      setResultsDraft((prev) => ({ ...prev, [lab.id]: "" }));
+      setResultsParamsDraft((prev) => ({ ...prev, [lab.id]: {} }));
+      alert(`Results saved for "${updated.testName}".`);
+    } catch (e: any) {
+      console.error(e);
+      alert(e?.message || "Failed to save results.");
+    }
   };
 
   return (
@@ -211,6 +249,37 @@ export const LabRequestsPanel: React.FC<LabRequestsPanelProps> = ({
           </div>
         </div>
 
+        {selectedTests.length > 0 && (
+          <div className="mt-4 p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1c1c1e]">
+            <div className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+              Parameters (for selected tests)
+            </div>
+            <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
+              {selectedTests.map((t) => (
+                <div key={t!.id} className="p-3 rounded-xl bg-slate-50 dark:bg-[#2c2c2e] border border-slate-200 dark:border-slate-700">
+                  <div className="text-sm font-semibold text-slate-900 dark:text-white">{t!.name}</div>
+                  {(t!.parameters || []).length === 0 ? (
+                    <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">No standard parameters configured.</div>
+                  ) : (
+                    <ul className="mt-2 space-y-1 text-xs text-slate-600 dark:text-slate-300">
+                      {(t!.parameters || []).slice(0, 8).map((p) => (
+                        <li key={p.name}>
+                          {p.name}
+                          {p.unit ? ` (${p.unit})` : ""}
+                          {p.reference ? ` — ${p.reference}` : ""}
+                        </li>
+                      ))}
+                      {(t!.parameters || []).length > 8 && (
+                        <li className="text-slate-500 dark:text-slate-400">…and more</li>
+                      )}
+                    </ul>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <button
           type="button"
           onClick={handleAdd}
@@ -242,6 +311,11 @@ export const LabRequestsPanel: React.FC<LabRequestsPanelProps> = ({
                       {lab.clinicalIndication}
                     </div>
                   )}
+                  {lab.results && (
+                    <pre className="mt-2 text-xs whitespace-pre-wrap text-slate-700 dark:text-slate-200 bg-white dark:bg-[#1c1c1e] border border-slate-200 dark:border-slate-700 rounded-xl p-3">
+                      {lab.results}
+                    </pre>
+                  )}
                 </div>
                 <span
                   className={`px-3 py-1 rounded-lg text-xs font-semibold ${
@@ -255,6 +329,78 @@ export const LabRequestsPanel: React.FC<LabRequestsPanelProps> = ({
                   {lab.status}
                 </span>
               </div>
+
+              {lab.status !== "completed" && (
+                <div className="mt-3">
+                  {editingResultsForId === lab.id ? (
+                    <div className="space-y-3">
+                      {(getCatalogParams(lab).length > 0) && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {getCatalogParams(lab).map((p) => (
+                            <div key={p.name}>
+                              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                                {p.name}{p.unit ? ` (${p.unit})` : ""}
+                              </label>
+                              <input
+                                type="text"
+                                className="w-full p-2.5 rounded-xl bg-white dark:bg-[#1c1c1e] border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                                value={(resultsParamsDraft[lab.id] || {})[p.name] || ""}
+                                onChange={(e) =>
+                                  setResultsParamsDraft((prev) => ({
+                                    ...prev,
+                                    [lab.id]: {
+                                      ...(prev[lab.id] || {}),
+                                      [p.name]: e.target.value,
+                                    },
+                                  }))
+                                }
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                          Notes / interpretation
+                        </label>
+                        <textarea
+                          className="w-full p-3 rounded-xl bg-white dark:bg-[#1c1c1e] border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white resize-none h-20"
+                          value={resultsDraft[lab.id] || ""}
+                          onChange={(e) => setResultsDraft((prev) => ({ ...prev, [lab.id]: e.target.value }))}
+                          placeholder="Optional comments, organism/sensitivity details, etc."
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          disabled={saving}
+                          onClick={() => handleSaveResults(lab)}
+                          className="px-4 py-2 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold text-sm"
+                        >
+                          Save results
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingResultsForId(null)}
+                          className="px-4 py-2 rounded-xl bg-white dark:bg-[#1c1c1e] border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-sm"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setEditingResultsForId(lab.id)}
+                      className="px-4 py-2 rounded-xl bg-white dark:bg-[#1c1c1e] border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-semibold text-sm hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                    >
+                      Record results
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>

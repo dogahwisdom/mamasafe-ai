@@ -288,6 +288,39 @@ export class ClinicWorkflowService {
   }
 
   /**
+   * Record lab results and mark request completed.
+   * Uses the existing `lab_requests.results` TEXT field.
+   */
+  public async completeLabRequest(
+    labRequestId: string,
+    resultsText: string
+  ): Promise<LabRequest> {
+    if (!isSupabaseConfigured()) throw new Error('Supabase not configured');
+    const currentUser = storage.get<UserProfile | null>(KEYS.CURRENT_USER, null);
+    if (!currentUser || (currentUser.role !== 'clinic' && currentUser.role !== 'pharmacy')) {
+      throw new Error('Only facilities can complete lab requests');
+    }
+
+    const { data, error } = await supabase
+      .from('lab_requests')
+      .update({
+        results: resultsText.trim() ? resultsText.trim() : null,
+        status: 'completed',
+        completed_by: currentUser.id,
+        completed_at: new Date().toISOString(),
+      })
+      .eq('id', labRequestId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error completing lab request:', error);
+      throw error;
+    }
+    return this.mapLabRequestFromDB(data);
+  }
+
+  /**
    * Create diagnosis
    */
   public async createDiagnosis(

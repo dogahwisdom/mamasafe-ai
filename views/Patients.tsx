@@ -26,8 +26,12 @@ export const PatientsView: React.FC<PatientsViewProps> = ({ onNavigate, patients
   const [loadingHistory, setLoadingHistory] = useState(false);
 
   const filteredPatients = patients.filter(p => {
-    const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          p.location.toLowerCase().includes(searchTerm.toLowerCase());
+    const q = searchTerm.toLowerCase().trim();
+    const matchesSearch =
+      !q ||
+      p.name.toLowerCase().includes(q) ||
+      p.location.toLowerCase().includes(q) ||
+      (p.phone || '').toLowerCase().includes(q);
     const matchesFilter = filter === 'all' || (filter === 'high_risk' && (p.riskStatus === RiskLevel.HIGH || p.riskStatus === RiskLevel.CRITICAL));
     return matchesSearch && matchesFilter;
   });
@@ -98,7 +102,7 @@ export const PatientsView: React.FC<PatientsViewProps> = ({ onNavigate, patients
           <Search className="absolute left-3 top-3 text-slate-400 group-focus-within:text-brand-500 transition-colors" size={20} />
           <input 
             type="text" 
-            placeholder="Search by name or location" 
+            placeholder="Search by name, location, or phone" 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-3 bg-slate-200/60 dark:bg-[#1c1c1e] border-none rounded-xl text-slate-900 dark:text-white placeholder-slate-500 focus:ring-2 focus:ring-brand-500/50 transition-all"
