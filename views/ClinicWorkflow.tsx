@@ -22,6 +22,7 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
   const [activeStage, setActiveStage] = useState<'registration' | 'history' | 'lab' | 'diagnosis' | 'pharmacy' | 'payment'>('registration');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [patientSearch, setPatientSearch] = useState('');
 
   // Form states
   const [visitForm, setVisitForm] = useState({
@@ -476,8 +477,29 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
       {!currentVisit && (
         <div className="bg-white dark:bg-[#1c1c1e] p-6 rounded-2xl border border-slate-100 dark:border-slate-800">
           <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Select Patient</h2>
+          <div className="mb-4">
+            <input
+              type="text"
+              className="w-full p-3 rounded-xl bg-slate-50 dark:bg-[#2c2c2e] border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+              placeholder="Find returning patient by name or phone…"
+              value={patientSearch}
+              onChange={(e) => setPatientSearch(e.target.value)}
+            />
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+              Returning patients do not need re-registration—search here, select, then start the visit.
+            </p>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {patients.map((patient) => (
+            {patients
+              .filter((p) => {
+                const q = patientSearch.trim().toLowerCase();
+                if (!q) return true;
+                return (
+                  p.name.toLowerCase().includes(q) ||
+                  (p.phone || '').toLowerCase().includes(q)
+                );
+              })
+              .map((patient) => (
               <button
                 key={patient.id}
                 onClick={() => setSelectedPatient(patient)}
