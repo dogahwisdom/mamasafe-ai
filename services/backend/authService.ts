@@ -894,7 +894,42 @@ export class AuthService {
     // Fallback to localStorage session
     const session = localStorage.getItem(KEYS.SESSION);
     if (session !== "true") return null;
-    return storage.get<UserProfile | null>(KEYS.CURRENT_USER, null);
+    const cached = storage.get<UserProfile | null>(KEYS.CURRENT_USER, null);
+    if (!cached) return null;
+
+    // If Supabase is configured, refresh from DB so server-side updates (e.g. permissions)
+    // are reflected without requiring users to manually clear storage.
+    if (isSupabaseConfigured()) {
+      try {
+        const { data: dbUser, error } = await supabase
+          .from("users")
+          .select("*")
+          .eq("id", cached.id)
+          .maybeSingle();
+
+        if (!error && dbUser) {
+          const refreshed: UserProfile = {
+            id: dbUser.id,
+            role: dbUser.role as UserRole,
+            name: dbUser.name,
+            phone: dbUser.phone,
+            email: dbUser.email || undefined,
+            location: dbUser.location || "",
+            avatar: dbUser.avatar || undefined,
+            countryCode: dbUser.country_code || "KE",
+            subscriptionPlan: dbUser.subscription_plan || undefined,
+            patientData: dbUser.patient_data as any,
+            facilityData: dbUser.facility_data as any,
+          };
+          storage.set(KEYS.CURRENT_USER, refreshed);
+          return refreshed;
+        }
+      } catch (e) {
+        console.warn("[Auth] Session refresh failed, using cached user:", e);
+      }
+    }
+
+    return cached;
   }
 
   public async updateProfile(user: UserProfile): Promise<UserProfile> {
