@@ -133,6 +133,18 @@ export interface PharmacyExpense {
   createdAt: string;
 }
 
+export interface Expense {
+  id: string;
+  facilityId: string;
+  portal: 'clinic' | 'pharmacy';
+  category: string;
+  amountKes: number;
+  notes?: string | null;
+  expenseDate: string; // ISO datetime
+  createdAt: string;
+  updatedAt: string;
+}
+
 // Patient Transfer Types
 export interface PatientTransfer {
   id: string;

@@ -15,6 +15,7 @@ import { ClinicWorkflowService } from "./backend/clinicWorkflowService";
 import { AIUsageService } from "./backend/aiUsageService";
 import { AppointmentPlanningService } from "./backend/appointmentPlanningService";
 import { PharmacyReportsService } from "./backend/pharmacyReportsService";
+import { ExpenseService } from "./backend/expenseService";
 
 class BackendFacade {
   public readonly auth: AuthService;
@@ -34,6 +35,7 @@ class BackendFacade {
   public readonly aiUsage: AIUsageService;
   public readonly appointmentPlanning: AppointmentPlanningService;
   public readonly pharmacyReports: PharmacyReportsService;
+  public readonly expenses: ExpenseService;
 
   constructor() {
     this.auth = new AuthService();
@@ -53,6 +55,7 @@ class BackendFacade {
     this.aiUsage = new AIUsageService();
     this.appointmentPlanning = new AppointmentPlanningService();
     this.pharmacyReports = new PharmacyReportsService();
+    this.expenses = new ExpenseService();
   }
 }
 
