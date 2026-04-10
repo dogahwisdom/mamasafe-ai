@@ -337,9 +337,40 @@ export function downloadLabResultsPdf(
   });
 
   const finalY = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? y + 40;
+  const pageW = doc.internal.pageSize.getWidth();
+  const sigStartY = Math.min(finalY + 12, 245);
+
+  // Signature and facility authorization block (print-ready)
+  doc.setDrawColor(180, 180, 180);
+  doc.setLineWidth(0.2);
+  doc.line(PAGE_MARGIN, sigStartY, pageW - PAGE_MARGIN, sigStartY);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(0, 0, 0);
+  doc.text('LAB AUTHORIZATION', PAGE_MARGIN, sigStartY + 6);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  const leftX = PAGE_MARGIN;
+  const midX = PAGE_MARGIN + 66;
+  const rightX = PAGE_MARGIN + 132;
+  const rowY = sigStartY + 13;
+  doc.text('Performed by: ______________________', leftX, rowY);
+  doc.text('Reviewed by: ______________________', midX, rowY);
+  doc.text('Authorized signatory: _____________', rightX, rowY);
+
+  const row2Y = rowY + 7;
+  doc.text('Date: ____________________________', leftX, row2Y);
+  doc.text(`Facility: ${facility.name || '—'}`, midX, row2Y);
+  doc.text('Stamp: ___________________________', rightX, row2Y);
+
   doc.setFontSize(8);
   doc.setTextColor(100, 100, 100);
-  doc.text(`Generated ${new Date().toLocaleString()} · Confidential clinical record.`, PAGE_MARGIN, finalY + 8);
+  doc.text(
+    `Generated ${new Date().toLocaleString()} · Confidential clinical record.`,
+    PAGE_MARGIN,
+    Math.min(row2Y + 8, 286)
+  );
 
   triggerDownload(doc, `mamasafe-lab-results-${patient.name.replace(/\s+/g, '-')}-${Date.now()}.pdf`);
 }
