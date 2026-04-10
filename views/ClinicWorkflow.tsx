@@ -859,6 +859,8 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
                 draft={labForm}
                 setDraft={setLabForm}
                 requested={labRequests}
+                facility={user}
+                patient={selectedPatient ?? undefined}
                 onAddRequests={handleAddLabRequests}
               />
             )}

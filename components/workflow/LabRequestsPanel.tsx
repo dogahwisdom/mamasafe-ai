@@ -1,8 +1,9 @@
 import React, { useMemo, useState } from "react";
-import { LabRequest } from "../../types";
+import { LabRequest, Patient, UserProfile } from "../../types";
 import { LabTestsCatalog, type LabTestType } from "../../services/labTestsCatalog";
-import { Loader2, Plus } from "lucide-react";
+import { Download, Loader2, Plus } from "lucide-react";
 import { backend } from "../../services/backend";
+import { downloadLabResultsPdf } from "../../services/pdfReports";
 
 export type LabPriority = "routine" | "urgent" | "stat";
 
@@ -21,6 +22,8 @@ interface LabRequestsPanelProps {
   draft: LabRequestDraft;
   setDraft: React.Dispatch<React.SetStateAction<LabRequestDraft>>;
   requested: LabRequest[];
+  facility?: UserProfile;
+  patient?: Patient;
   onAddRequests: (items: Array<{ name: string; type: LabTestType; category?: string; indication?: string }>, priority: LabPriority) => Promise<void>;
 }
 
@@ -36,6 +39,8 @@ export const LabRequestsPanel: React.FC<LabRequestsPanelProps> = ({
   draft,
   setDraft,
   requested,
+  facility,
+  patient,
   onAddRequests,
 }) => {
   const results = useMemo(() => LabTestsCatalog.search(draft.search).slice(0, 25), [draft.search]);
@@ -119,6 +124,11 @@ export const LabRequestsPanel: React.FC<LabRequestsPanelProps> = ({
       console.error(e);
       alert(e?.message || "Failed to save results.");
     }
+  };
+
+  const handleDownloadLab = (list: LabRequest[], title?: string) => {
+    if (!facility || !patient || list.length === 0) return;
+    downloadLabResultsPdf(facility, patient, list, title);
   };
 
   return (
@@ -293,7 +303,24 @@ export const LabRequestsPanel: React.FC<LabRequestsPanelProps> = ({
 
       {requested.length > 0 && (
         <div className="space-y-2">
-          <h4 className="font-semibold text-slate-900 dark:text-white">Requested Tests</h4>
+          <div className="flex items-center justify-between gap-2">
+            <h4 className="font-semibold text-slate-900 dark:text-white">Requested Tests</h4>
+            {facility && patient && requested.some((r) => !!r.results?.trim()) && (
+              <button
+                type="button"
+                onClick={() =>
+                  handleDownloadLab(
+                    requested.filter((r) => !!r.results?.trim()),
+                    "LAB RESULTS REPORT"
+                  )
+                }
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white dark:bg-[#1c1c1e] border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800"
+              >
+                <Download size={14} />
+                Download all results
+              </button>
+            )}
+          </div>
           {requested.map((lab) => (
             <div
               key={lab.id}
@@ -399,6 +426,18 @@ export const LabRequestsPanel: React.FC<LabRequestsPanelProps> = ({
                       Record results
                     </button>
                   )}
+                </div>
+              )}
+              {lab.results?.trim() && facility && patient && (
+                <div className="mt-3">
+                  <button
+                    type="button"
+                    onClick={() => handleDownloadLab([lab], "LAB RESULT REPORT")}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white dark:bg-[#1c1c1e] border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800"
+                  >
+                    <Download size={14} />
+                    Download result
+                  </button>
                 </div>
               )}
             </div>

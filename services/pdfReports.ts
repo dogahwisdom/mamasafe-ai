@@ -9,6 +9,7 @@ import type {
   Referral,
   Task,
   Reminder,
+  LabRequest,
 } from '../types';
 import { formatPaymentMethodLabel } from './paymentMethodLabels';
 import { DepartmentalServicesCatalog } from './departmentalServicesCatalog';
@@ -293,6 +294,50 @@ export function downloadVisitPaymentSummaryPdf(
   doc.text(`Generated ${new Date().toLocaleString()}`, PAGE_MARGIN, finalY + 8);
 
   triggerDownload(doc, `mamasafe-payments-${patient.name.replace(/\s+/g, '-')}-${Date.now()}.pdf`);
+}
+
+export function downloadLabResultsPdf(
+  facility: UserProfile,
+  patient: Patient,
+  labRequests: LabRequest[],
+  title = 'LAB RESULTS REPORT'
+): void {
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  let y = drawFacilityHeader(doc, facility, title);
+
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Patient', PAGE_MARGIN, y);
+  doc.setFont('helvetica', 'normal');
+  y += 5;
+  doc.text(`${patient.name} · ${patient.phone || '—'} · ${patient.location || '—'}`, PAGE_MARGIN, y);
+  y += 8;
+
+  const body = labRequests.map((l) => [
+    l.orderedAt ? String(l.orderedAt).slice(0, 10) : '—',
+    `${l.testName}${l.testCategory ? ` (${l.testCategory})` : ''}`,
+    l.priority,
+    l.status,
+    (l.results || '—').slice(0, 600),
+  ]);
+
+  autoTable(doc, {
+    startY: y,
+    head: [['DATE', 'TEST', 'PRIORITY', 'STATUS', 'RESULTS']],
+    body,
+    theme: 'grid',
+    styles: { fontSize: 7.5, cellPadding: 2, overflow: 'linebreak' },
+    headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: 'bold' },
+    margin: { left: PAGE_MARGIN, right: PAGE_MARGIN },
+    columnStyles: { 0: { cellWidth: 24 }, 2: { cellWidth: 18 }, 3: { cellWidth: 20 } },
+  });
+
+  const finalY = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? y + 40;
+  doc.setFontSize(8);
+  doc.setTextColor(100, 100, 100);
+  doc.text(`Generated ${new Date().toLocaleString()} · Confidential clinical record.`, PAGE_MARGIN, finalY + 8);
+
+  triggerDownload(doc, `mamasafe-lab-results-${patient.name.replace(/\s+/g, '-')}-${Date.now()}.pdf`);
 }
 
 function clipCell(s: string, max = 120): string {
