@@ -54,6 +54,11 @@ export const LabRequestsPanel: React.FC<LabRequestsPanelProps> = ({
   const [resultsMetaDraft, setResultsMetaDraft] = useState<
     Record<string, { performedBy: string; reviewedBy: string; reportedOn: string }>
   >({});
+  const [updatedRows, setUpdatedRows] = useState<Record<string, LabRequest>>({});
+  const visibleRequested = useMemo(
+    () => requested.map((r) => updatedRows[r.id] || r),
+    [requested, updatedRows]
+  );
 
   const canAdd =
     (draft.selectedIds.length > 0 || draft.testName.trim().length > 0) && !saving;
@@ -121,16 +126,18 @@ export const LabRequestsPanel: React.FC<LabRequestsPanelProps> = ({
       .join("\n");
   };
 
-  const handleSaveResults = async (lab: LabRequest) => {
+  const handleSaveResults = async (lab: LabRequest, downloadAfter = false) => {
     const text = buildResultsText(lab);
     try {
       const updated = await backend.workflow.completeLabRequest(lab.id, text);
-      // Update parent list in-place (requested is owned by parent; we can't set it here).
-      // So we rely on the parent refresh on stage changes or show results immediately via lab.results.
+      setUpdatedRows((prev) => ({ ...prev, [updated.id]: updated }));
       setEditingResultsForId(null);
       setResultsDraft((prev) => ({ ...prev, [lab.id]: "" }));
       setResultsParamsDraft((prev) => ({ ...prev, [lab.id]: {} }));
       setResultsMetaDraft((prev) => ({ ...prev, [lab.id]: { performedBy: "", reviewedBy: "", reportedOn: "" } }));
+      if (downloadAfter && facility && patient) {
+        downloadLabResultsPdf(facility, patient, [updated], "LAB RESULT REPORT");
+      }
       alert(`Results saved for "${updated.testName}".`);
     } catch (e: any) {
       console.error(e);
@@ -313,16 +320,16 @@ export const LabRequestsPanel: React.FC<LabRequestsPanelProps> = ({
         </button>
       </div>
 
-      {requested.length > 0 && (
+      {visibleRequested.length > 0 && (
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-2">
             <h4 className="font-semibold text-slate-900 dark:text-white">Requested Tests</h4>
-            {facility && patient && requested.some((r) => !!r.results?.trim()) && (
+            {facility && patient && visibleRequested.some((r) => !!r.results?.trim()) && (
               <button
                 type="button"
                 onClick={() =>
                   handleDownloadLab(
-                    requested.filter((r) => !!r.results?.trim()),
+                    visibleRequested.filter((r) => !!r.results?.trim()),
                     "LAB RESULTS REPORT"
                   )
                 }
@@ -333,7 +340,7 @@ export const LabRequestsPanel: React.FC<LabRequestsPanelProps> = ({
               </button>
             )}
           </div>
-          {requested.map((lab) => (
+          {visibleRequested.map((lab) => (
             <div
               key={lab.id}
               className="p-4 bg-slate-50 dark:bg-[#2c2c2e] rounded-xl border border-slate-200 dark:border-slate-700"
@@ -481,6 +488,14 @@ export const LabRequestsPanel: React.FC<LabRequestsPanelProps> = ({
                           className="px-4 py-2 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold text-sm"
                         >
                           Save results
+                        </button>
+                        <button
+                          type="button"
+                          disabled={saving || !facility || !patient}
+                          onClick={() => handleSaveResults(lab, true)}
+                          className="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-semibold text-sm disabled:opacity-50"
+                        >
+                          Save & download
                         </button>
                         <button
                           type="button"
