@@ -51,6 +51,9 @@ export const LabRequestsPanel: React.FC<LabRequestsPanelProps> = ({
   const [editingResultsForId, setEditingResultsForId] = useState<string | null>(null);
   const [resultsDraft, setResultsDraft] = useState<Record<string, string>>({});
   const [resultsParamsDraft, setResultsParamsDraft] = useState<Record<string, Record<string, string>>>({});
+  const [resultsMetaDraft, setResultsMetaDraft] = useState<
+    Record<string, { performedBy: string; reviewedBy: string; reportedOn: string }>
+  >({});
 
   const canAdd =
     (draft.selectedIds.length > 0 || draft.testName.trim().length > 0) && !saving;
@@ -102,12 +105,20 @@ export const LabRequestsPanel: React.FC<LabRequestsPanelProps> = ({
   };
 
   const buildResultsText = (lab: LabRequest): string => {
+    const meta = resultsMetaDraft[lab.id] || { performedBy: "", reviewedBy: "", reportedOn: "" };
     const p = resultsParamsDraft[lab.id] || {};
     const lines = Object.entries(p)
       .filter(([, v]) => String(v).trim().length > 0)
       .map(([k, v]) => `${k}: ${String(v).trim()}`);
     const free = (resultsDraft[lab.id] || "").trim();
-    return [...lines, free].filter(Boolean).join("\n");
+    const metaLines = [
+      `Performed by: ${meta.performedBy.trim() || "—"}`,
+      `Reviewed by: ${meta.reviewedBy.trim() || "—"}`,
+      `Reported on: ${meta.reportedOn.trim() || new Date().toISOString().slice(0, 10)}`,
+    ];
+    return ["--- LAB SIGN-OFF ---", ...metaLines, "--- RESULTS ---", ...lines, free]
+      .filter(Boolean)
+      .join("\n");
   };
 
   const handleSaveResults = async (lab: LabRequest) => {
@@ -119,6 +130,7 @@ export const LabRequestsPanel: React.FC<LabRequestsPanelProps> = ({
       setEditingResultsForId(null);
       setResultsDraft((prev) => ({ ...prev, [lab.id]: "" }));
       setResultsParamsDraft((prev) => ({ ...prev, [lab.id]: {} }));
+      setResultsMetaDraft((prev) => ({ ...prev, [lab.id]: { performedBy: "", reviewedBy: "", reportedOn: "" } }));
       alert(`Results saved for "${updated.testName}".`);
     } catch (e: any) {
       console.error(e);
@@ -386,6 +398,68 @@ export const LabRequestsPanel: React.FC<LabRequestsPanelProps> = ({
                           ))}
                         </div>
                       )}
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                          Performed by
+                        </label>
+                        <input
+                          type="text"
+                          className="w-full p-2.5 rounded-xl bg-white dark:bg-[#1c1c1e] border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                          value={(resultsMetaDraft[lab.id] || { performedBy: "", reviewedBy: "", reportedOn: "" }).performedBy}
+                          onChange={(e) =>
+                            setResultsMetaDraft((prev) => ({
+                              ...prev,
+                              [lab.id]: {
+                                ...(prev[lab.id] || { performedBy: "", reviewedBy: "", reportedOn: "" }),
+                                performedBy: e.target.value,
+                              },
+                            }))
+                          }
+                          placeholder="Lab technologist"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                          Reviewed by
+                        </label>
+                        <input
+                          type="text"
+                          className="w-full p-2.5 rounded-xl bg-white dark:bg-[#1c1c1e] border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                          value={(resultsMetaDraft[lab.id] || { performedBy: "", reviewedBy: "", reportedOn: "" }).reviewedBy}
+                          onChange={(e) =>
+                            setResultsMetaDraft((prev) => ({
+                              ...prev,
+                              [lab.id]: {
+                                ...(prev[lab.id] || { performedBy: "", reviewedBy: "", reportedOn: "" }),
+                                reviewedBy: e.target.value,
+                              },
+                            }))
+                          }
+                          placeholder="Clinician / pathologist"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                          Reported on
+                        </label>
+                        <input
+                          type="date"
+                          className="w-full p-2.5 rounded-xl bg-white dark:bg-[#1c1c1e] border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                          value={(resultsMetaDraft[lab.id] || { performedBy: "", reviewedBy: "", reportedOn: "" }).reportedOn}
+                          onChange={(e) =>
+                            setResultsMetaDraft((prev) => ({
+                              ...prev,
+                              [lab.id]: {
+                                ...(prev[lab.id] || { performedBy: "", reviewedBy: "", reportedOn: "" }),
+                                reportedOn: e.target.value,
+                              },
+                            }))
+                          }
+                        />
+                      </div>
 
                       <div>
                         <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">

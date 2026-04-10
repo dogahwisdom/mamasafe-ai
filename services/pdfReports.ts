@@ -313,13 +313,17 @@ export function downloadLabResultsPdf(
   doc.text(`${patient.name} · ${patient.phone || '—'} · ${patient.location || '—'}`, PAGE_MARGIN, y);
   y += 8;
 
-  const body = labRequests.map((l) => [
-    l.orderedAt ? String(l.orderedAt).slice(0, 10) : '—',
-    `${l.testName}${l.testCategory ? ` (${l.testCategory})` : ''}`,
-    l.priority,
-    l.status,
-    (l.results || '—').slice(0, 600),
-  ]);
+  const body = labRequests.map((l) => {
+    const parsed = parseLabResultPayload(l.results);
+    const signer = `By: ${parsed.performedBy} · Reviewed: ${parsed.reviewedBy} · Date: ${parsed.reportedOn}`;
+    return [
+      l.orderedAt ? String(l.orderedAt).slice(0, 10) : '—',
+      `${l.testName}${l.testCategory ? ` (${l.testCategory})` : ''}`,
+      l.priority,
+      l.status,
+      `${signer}\n${parsed.body}`.slice(0, 1200),
+    ];
+  });
 
   autoTable(doc, {
     startY: y,
@@ -338,6 +342,38 @@ export function downloadLabResultsPdf(
   doc.text(`Generated ${new Date().toLocaleString()} · Confidential clinical record.`, PAGE_MARGIN, finalY + 8);
 
   triggerDownload(doc, `mamasafe-lab-results-${patient.name.replace(/\s+/g, '-')}-${Date.now()}.pdf`);
+}
+
+function parseLabResultPayload(raw: string | undefined): {
+  performedBy: string;
+  reviewedBy: string;
+  reportedOn: string;
+  body: string;
+} {
+  const txt = (raw || '').trim();
+  const lines = txt.split('\n').map((l) => l.trim());
+  let performedBy = '—';
+  let reviewedBy = '—';
+  let reportedOn = '—';
+  const bodyLines: string[] = [];
+  let inResults = false;
+  for (const line of lines) {
+    if (!line) continue;
+    if (line === '--- LAB SIGN-OFF ---') continue;
+    if (line === '--- RESULTS ---') {
+      inResults = true;
+      continue;
+    }
+    if (!inResults) {
+      if (line.toLowerCase().startsWith('performed by:')) performedBy = line.split(':').slice(1).join(':').trim() || '—';
+      else if (line.toLowerCase().startsWith('reviewed by:')) reviewedBy = line.split(':').slice(1).join(':').trim() || '—';
+      else if (line.toLowerCase().startsWith('reported on:')) reportedOn = line.split(':').slice(1).join(':').trim() || '—';
+      else bodyLines.push(line);
+      continue;
+    }
+    bodyLines.push(line);
+  }
+  return { performedBy, reviewedBy, reportedOn, body: bodyLines.join('\n').trim() || '—' };
 }
 
 function clipCell(s: string, max = 120): string {
