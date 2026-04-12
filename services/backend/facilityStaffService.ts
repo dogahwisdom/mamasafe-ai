@@ -201,4 +201,80 @@ export class FacilityStaffService {
       employerFacilityId: created.employer_facility_id || undefined,
     };
   }
+
+  /**
+   * Unlinks a staff member from this facility (clears `employer_facility_id`) and revokes
+   * module permissions. The user row and PIN remain so they can be re-invited or use PIN reset;
+   * they no longer appear on this team or pass `canManageStaffProfile` for this facility.
+   */
+  public async removeStaffFromFacility(
+    actor: UserProfile,
+    staffUserId: string
+  ): Promise<void> {
+    const facilityRootId = this.assertCanManageStaff(actor);
+    if (staffUserId === facilityRootId) {
+      throw new Error("You cannot remove the primary facility account.");
+    }
+
+    if (!isSupabaseConfigured()) {
+      const users = storage.get<UserProfile[]>(KEYS.USERS, []);
+      const idx = users.findIndex((u) => u.id === staffUserId);
+      if (idx === -1) throw new Error("User not found.");
+      const target = users[idx];
+      if (target.employerFacilityId !== facilityRootId) {
+        throw new Error("This person is not on your team.");
+      }
+      const fd = target.facilityData || { managerName: target.name };
+      users[idx] = {
+        ...target,
+        employerFacilityId: undefined,
+        facilityData: {
+          ...fd,
+          managerName: fd.managerName || target.name,
+          permissionRole: "attendant",
+          permissions: {
+            overview: false,
+            inventory: false,
+            expenses: false,
+          },
+        },
+      };
+      storage.set(KEYS.USERS, users);
+      return;
+    }
+
+    const { data: row, error: fetchErr } = await supabase
+      .from("users")
+      .select("id, employer_facility_id, facility_data")
+      .eq("id", staffUserId)
+      .maybeSingle();
+
+    if (fetchErr) throw new Error(fetchErr.message);
+    if (!row) throw new Error("User not found.");
+    if (row.employer_facility_id !== facilityRootId) {
+      throw new Error("This person is not on your team.");
+    }
+
+    const existingFd =
+      (row.facility_data as Record<string, unknown> | null) || {};
+    const nextFd = {
+      ...existingFd,
+      permissionRole: "attendant",
+      permissions: {
+        overview: false,
+        inventory: false,
+        expenses: false,
+      },
+    };
+
+    const { error } = await supabase
+      .from("users")
+      .update({
+        employer_facility_id: null,
+        facility_data: nextFd,
+      })
+      .eq("id", staffUserId);
+
+    if (error) throw new Error(error.message);
+  }
 }

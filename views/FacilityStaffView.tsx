@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import type { CreateFacilityStaffInput, FacilityStaffSummary, UserProfile } from "../types";
 import { backend } from "../services/backend";
 import { Permissions } from "../services/permissions";
-import { ArrowLeft, Loader2, UserPlus, Users } from "lucide-react";
+import { ArrowLeft, Loader2, UserMinus, UserPlus, Users } from "lucide-react";
 
 interface FacilityStaffViewProps {
   user: UserProfile;
@@ -13,6 +13,7 @@ export const FacilityStaffView: React.FC<FacilityStaffViewProps> = ({ user, onBa
   const [staff, setStaff] = useState<FacilityStaffSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [removingId, setRemovingId] = useState<string | null>(null);
   const [form, setForm] = useState<CreateFacilityStaffInput>({
     name: "",
     phone: "",
@@ -76,6 +77,24 @@ export const FacilityStaffView: React.FC<FacilityStaffViewProps> = ({ user, onBa
     }
   };
 
+  const removeStaff = async (staffUserId: string, displayName: string) => {
+    if (!canManage) return;
+    const ok = window.confirm(
+      `Remove ${displayName} from your team? They will keep their account but lose access to this facility’s data and permissions until re-added.`
+    );
+    if (!ok) return;
+    setRemovingId(staffUserId);
+    try {
+      await backend.facilityStaff.removeStaffFromFacility(user, staffUserId);
+      await load();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Could not remove staff.";
+      alert(msg);
+    } finally {
+      setRemovingId(null);
+    }
+  };
+
   if (!canManage) {
     return (
       <div className="p-8 bg-white dark:bg-[#1c1c1e] rounded-3xl border border-slate-200 dark:border-slate-800 max-w-2xl mx-auto">
@@ -113,7 +132,8 @@ export const FacilityStaffView: React.FC<FacilityStaffViewProps> = ({ user, onBa
           </h1>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
             Staff listed here have their own login (phone or email + PIN). Grant modules in Settings →
-            Permissions.
+            Permissions. Use Remove to unlink someone who has left; their account stays, but they lose
+            access to this facility until you add them again.
           </p>
         </div>
       </div>
@@ -215,22 +235,37 @@ export const FacilityStaffView: React.FC<FacilityStaffViewProps> = ({ user, onBa
               {staff.map((s) => (
                 <li
                   key={s.id}
-                  className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/80 dark:bg-[#2c2c2e]"
+                  className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/80 dark:bg-[#2c2c2e] flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3"
                 >
-                  <div className="font-semibold text-slate-900 dark:text-white">{s.name}</div>
-                  <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                    {s.phone}
-                    {s.email ? ` · ${s.email}` : ""}
+                  <div className="min-w-0 flex-1">
+                    <div className="font-semibold text-slate-900 dark:text-white">{s.name}</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                      {s.phone}
+                      {s.email ? ` · ${s.email}` : ""}
+                    </div>
+                    <div className="text-xs text-slate-600 dark:text-slate-300 mt-2">
+                      Role: <span className="font-mono">{s.permissionRole || "—"}</span>
+                      {s.permissions && (
+                        <span className="ml-2">
+                          · O:{s.permissions.overview ? "✓" : "—"} I:{s.permissions.inventory ? "✓" : "—"}{" "}
+                          E:{s.permissions.expenses ? "✓" : "—"}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-xs text-slate-600 dark:text-slate-300 mt-2">
-                    Role: <span className="font-mono">{s.permissionRole || "—"}</span>
-                    {s.permissions && (
-                      <span className="ml-2">
-                        · O:{s.permissions.overview ? "✓" : "—"} I:{s.permissions.inventory ? "✓" : "—"}{" "}
-                        E:{s.permissions.expenses ? "✓" : "—"}
-                      </span>
+                  <button
+                    type="button"
+                    onClick={() => removeStaff(s.id, s.name)}
+                    disabled={removingId === s.id}
+                    className="shrink-0 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border border-red-200 dark:border-red-900/50 text-red-700 dark:text-red-300 bg-red-50/80 dark:bg-red-950/30 hover:bg-red-100 dark:hover:bg-red-950/50 disabled:opacity-50"
+                  >
+                    {removingId === s.id ? (
+                      <Loader2 className="animate-spin" size={14} />
+                    ) : (
+                      <UserMinus size={14} />
                     )}
-                  </div>
+                    Remove
+                  </button>
                 </li>
               ))}
             </ul>
