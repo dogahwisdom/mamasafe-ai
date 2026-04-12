@@ -21,6 +21,8 @@ export interface UserProfile {
   // Role specific data
   patientData?: PatientExtension;
   facilityData?: FacilityExtension;
+  /** Staff: `users.id` of the facility account that manages this profile. Omitted/null = facility root or patient. */
+  employerFacilityId?: string | null;
   pin?: string; // Hashed in backend
 }
 
@@ -361,4 +363,25 @@ export type ViewState =
   | 'referrals'
   | 'superadmin'
   | 'visits'
-  | 'workflow';
+  | 'workflow'
+  | 'facility_staff'
+  | 'expenses';
+
+/** Roster row for users employed by a facility (`employer_facility_id`). */
+export interface FacilityStaffSummary {
+  id: string;
+  name: string;
+  phone: string;
+  email?: string;
+  permissionRole?: FacilityExtension['permissionRole'];
+  permissions?: FacilityExtension['permissions'];
+}
+
+export interface CreateFacilityStaffInput {
+  name: string;
+  phone: string;
+  email?: string;
+  pin: string;
+  location?: string;
+  staffPermissionRole: 'admin' | 'tech' | 'attendant';
+}

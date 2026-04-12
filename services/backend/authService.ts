@@ -22,6 +22,23 @@ export class AuthService {
     return e.length ? e : null;
   }
 
+  private dbRowToProfile(row: Record<string, unknown>): UserProfile {
+    return {
+      id: String(row.id),
+      role: row.role as UserRole,
+      name: String(row.name),
+      phone: String(row.phone),
+      email: (row.email as string) || undefined,
+      location: (row.location as string) ?? "",
+      avatar: (row.avatar as string) || undefined,
+      countryCode: (row.country_code as string) || "KE",
+      subscriptionPlan: (row.subscription_plan as string) || undefined,
+      patientData: row.patient_data as any,
+      facilityData: row.facility_data as any,
+      employerFacilityId: (row.employer_facility_id as string) || undefined,
+    };
+  }
+
   private getAllowInsecureDemoAuth(): boolean {
     // Never allow hard-coded credentials in production.
     // This is only for local/dev environments when Supabase isn't available.
@@ -234,7 +251,11 @@ export class AuthService {
         email: "admin@mamasafe.ai",
         location: "Nairobi",
         countryCode: "KE",
-        facilityData: { managerName: "System Admin" },
+        facilityData: {
+          managerName: "System Admin",
+          permissionRole: "owner",
+          permissions: { overview: true, inventory: true, expenses: true },
+        },
         avatar:
           "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80",
       };
@@ -277,7 +298,11 @@ export class AuthService {
       phone: "+254733000000",
       location: "Westlands, Nairobi",
       countryCode: "KE",
-      facilityData: { managerName: "Peter Drugman" },
+      facilityData: {
+        managerName: "Peter Drugman",
+        permissionRole: "owner",
+        permissions: { overview: true, inventory: true, expenses: true },
+      },
     };
     storage.set(KEYS.CURRENT_USER, demoPharmacy);
     storage.set(KEYS.SESSION, "true");
@@ -306,20 +331,10 @@ export class AuthService {
 
           if (existingUser) {
             // User exists, return their profile
-            const userProfile: UserProfile = {
-              id: existingUser.id,
-              role: existingUser.role as UserRole,
-              name: existingUser.name,
-              phone: existingUser.phone,
-              email: existingUser.email || undefined,
-              location: existingUser.location || '',
-              avatar: existingUser.avatar || googleUser.user_metadata?.avatar_url || undefined,
-              countryCode: existingUser.country_code || 'KE',
-              subscriptionPlan: existingUser.subscription_plan || undefined,
-              patientData: existingUser.patient_data as any,
-              facilityData: existingUser.facility_data as any,
-            };
-            
+            const userProfile = this.dbRowToProfile(existingUser as Record<string, unknown>);
+            if (googleUser.user_metadata?.avatar_url && !userProfile.avatar) {
+              userProfile.avatar = googleUser.user_metadata.avatar_url as string;
+            }
             storage.set(KEYS.CURRENT_USER, userProfile);
             storage.set(KEYS.SESSION, "true");
             return { user: userProfile };
@@ -349,6 +364,7 @@ export class AuthService {
               facility_data: role !== 'patient' ? JSON.parse(JSON.stringify({
                 managerName: googleUser.user_metadata?.full_name || 'Manager',
               })) : null,
+              employer_facility_id: null,
             };
 
             const { data: createdUser, error: createError } = await supabase
@@ -362,19 +378,7 @@ export class AuthService {
               throw new Error('Failed to create account. Please try again.');
             }
 
-            const userProfile: UserProfile = {
-              id: createdUser.id,
-              role: createdUser.role as UserRole,
-              name: createdUser.name,
-              phone: createdUser.phone,
-              email: createdUser.email || undefined,
-              location: createdUser.location || '',
-              avatar: createdUser.avatar || undefined,
-              countryCode: createdUser.country_code || 'KE',
-              subscriptionPlan: createdUser.subscription_plan || undefined,
-              patientData: createdUser.patient_data as any,
-              facilityData: createdUser.facility_data as any,
-            };
+            const userProfile = this.dbRowToProfile(createdUser as Record<string, unknown>);
 
             storage.set(KEYS.CURRENT_USER, userProfile);
             storage.set(KEYS.SESSION, "true");
@@ -568,20 +572,7 @@ export class AuthService {
         throw new Error('Invalid credentials.');
       }
 
-      // Convert DB user to UserProfile
-      const user: UserProfile = {
-        id: dbUser.id,
-        role: dbUser.role as UserRole,
-        name: dbUser.name,
-        phone: dbUser.phone,
-        email: dbUser.email || undefined,
-        location: dbUser.location,
-        avatar: dbUser.avatar || undefined,
-        countryCode: dbUser.country_code,
-        subscriptionPlan: dbUser.subscription_plan || undefined,
-        patientData: dbUser.patient_data as any,
-        facilityData: dbUser.facility_data as any,
-      };
+      const user = this.dbRowToProfile(dbUser as Record<string, unknown>);
 
       // Store session
       storage.set(KEYS.CURRENT_USER, user);
@@ -604,7 +595,11 @@ export class AuthService {
           email: "admin@mamasafe.ai",
           location: "Nairobi",
           countryCode: "KE",
-          facilityData: { managerName: "System Admin" },
+          facilityData: {
+            managerName: "System Admin",
+            permissionRole: "owner",
+            permissions: { overview: true, inventory: true, expenses: true },
+          },
           avatar:
             "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80",
         };
@@ -652,7 +647,11 @@ export class AuthService {
           phone: "+254733000000",
           location: "Westlands, Nairobi",
           countryCode: "KE",
-          facilityData: { managerName: "Peter Drugman" },
+          facilityData: {
+            managerName: "Peter Drugman",
+            permissionRole: "owner",
+            permissions: { overview: true, inventory: true, expenses: true },
+          },
         };
         storage.set(KEYS.CURRENT_USER, demoPharmacy);
         storage.set(KEYS.SESSION, "true");
@@ -739,7 +738,7 @@ export class AuthService {
         existingUser = data;
       }
 
-      const userData = {
+      const baseUserData: Record<string, unknown> = {
         role: user.role,
         name: user.name,
         phone: cleanPhone,
@@ -754,57 +753,36 @@ export class AuthService {
       };
 
       if (existingUser) {
-        // Update existing user
+        if (user.employerFacilityId !== undefined) {
+          baseUserData.employer_facility_id = user.employerFacilityId;
+        }
         const { data: updated, error } = await supabase
           .from('users')
-          .update(userData)
+          .update(baseUserData)
           .eq('id', existingUser.id)
           .select()
           .single();
 
         if (error) throw new Error(error.message);
 
-        const profile: UserProfile = {
-          id: updated.id,
-          role: updated.role as UserRole,
-          name: updated.name,
-          phone: updated.phone,
-          email: updated.email || undefined,
-          location: updated.location,
-          avatar: updated.avatar || undefined,
-          countryCode: updated.country_code,
-          subscriptionPlan: updated.subscription_plan || undefined,
-          patientData: updated.patient_data as any,
-          facilityData: updated.facility_data as any,
-        };
-
+        const profile = this.dbRowToProfile(updated as Record<string, unknown>);
         storage.set(KEYS.CURRENT_USER, profile);
         storage.set(KEYS.SESSION, "true");
         return { user: profile };
       } else {
-        // Create new user
+        const insertPayload = {
+          ...baseUserData,
+          employer_facility_id: user.employerFacilityId ?? null,
+        };
         const { data: newUser, error } = await supabase
           .from('users')
-          .insert(userData)
+          .insert(insertPayload)
           .select()
           .single();
 
         if (error) throw new Error(error.message);
 
-        const profile: UserProfile = {
-          id: newUser.id,
-          role: newUser.role as UserRole,
-          name: newUser.name,
-          phone: newUser.phone,
-          email: newUser.email || undefined,
-          location: newUser.location,
-          avatar: newUser.avatar || undefined,
-          countryCode: newUser.country_code,
-          subscriptionPlan: newUser.subscription_plan || undefined,
-          patientData: newUser.patient_data as any,
-          facilityData: newUser.facility_data as any,
-        };
-
+        const profile = this.dbRowToProfile(newUser as Record<string, unknown>);
         storage.set(KEYS.CURRENT_USER, profile);
         storage.set(KEYS.SESSION, "true");
         return { user: profile };
@@ -870,20 +848,10 @@ export class AuthService {
           .single();
 
         if (existingUser) {
-          const userProfile: UserProfile = {
-            id: existingUser.id,
-            role: existingUser.role as UserRole,
-            name: existingUser.name,
-            phone: existingUser.phone,
-            email: existingUser.email || undefined,
-            location: existingUser.location || '',
-            avatar: existingUser.avatar || googleUser.user_metadata?.avatar_url || undefined,
-            countryCode: existingUser.country_code || 'KE',
-            subscriptionPlan: existingUser.subscription_plan || undefined,
-            patientData: existingUser.patient_data as any,
-            facilityData: existingUser.facility_data as any,
-          };
-          
+          const userProfile = this.dbRowToProfile(existingUser as Record<string, unknown>);
+          if (googleUser.user_metadata?.avatar_url && !userProfile.avatar) {
+            userProfile.avatar = googleUser.user_metadata.avatar_url as string;
+          }
           storage.set(KEYS.CURRENT_USER, userProfile);
           storage.set(KEYS.SESSION, "true");
           return userProfile;
@@ -908,19 +876,7 @@ export class AuthService {
           .maybeSingle();
 
         if (!error && dbUser) {
-          const refreshed: UserProfile = {
-            id: dbUser.id,
-            role: dbUser.role as UserRole,
-            name: dbUser.name,
-            phone: dbUser.phone,
-            email: dbUser.email || undefined,
-            location: dbUser.location || "",
-            avatar: dbUser.avatar || undefined,
-            countryCode: dbUser.country_code || "KE",
-            subscriptionPlan: dbUser.subscription_plan || undefined,
-            patientData: dbUser.patient_data as any,
-            facilityData: dbUser.facility_data as any,
-          };
+          const refreshed = this.dbRowToProfile(dbUser as Record<string, unknown>);
           storage.set(KEYS.CURRENT_USER, refreshed);
           return refreshed;
         }
@@ -938,19 +894,23 @@ export class AuthService {
     // Use Supabase if configured
     if (isSupabaseConfigured()) {
       const emailNormalized = this.normalizeEmail(user.email);
+      const updatePayload: Record<string, unknown> = {
+        name: user.name,
+        phone: user.phone,
+        email: emailNormalized,
+        location: user.location,
+        avatar: user.avatar || null,
+        country_code: user.countryCode || 'KE',
+        subscription_plan: user.subscriptionPlan || null,
+        patient_data: user.patientData ? JSON.parse(JSON.stringify(user.patientData)) : null,
+        facility_data: user.facilityData ? JSON.parse(JSON.stringify(user.facilityData)) : null,
+      };
+      if (user.employerFacilityId !== undefined) {
+        updatePayload.employer_facility_id = user.employerFacilityId;
+      }
       const { error } = await supabase
         .from('users')
-        .update({
-          name: user.name,
-          phone: user.phone,
-          email: emailNormalized,
-          location: user.location,
-          avatar: user.avatar || null,
-          country_code: user.countryCode || 'KE',
-          subscription_plan: user.subscriptionPlan || null,
-          patient_data: user.patientData ? JSON.parse(JSON.stringify(user.patientData)) : null,
-          facility_data: user.facilityData ? JSON.parse(JSON.stringify(user.facilityData)) : null,
-        })
+        .update(updatePayload)
         .eq('id', user.id);
 
       if (error) throw new Error(error.message);
@@ -990,19 +950,7 @@ export class AuthService {
     }
     if (!dbUser) return null;
 
-    return {
-      id: dbUser.id,
-      role: dbUser.role as UserRole,
-      name: dbUser.name,
-      phone: dbUser.phone,
-      email: dbUser.email || undefined,
-      location: dbUser.location,
-      avatar: dbUser.avatar || undefined,
-      countryCode: dbUser.country_code,
-      subscriptionPlan: dbUser.subscription_plan || undefined,
-      patientData: dbUser.patient_data as any,
-      facilityData: dbUser.facility_data as any,
-    };
+    return this.dbRowToProfile(dbUser as Record<string, unknown>);
   }
 }
 

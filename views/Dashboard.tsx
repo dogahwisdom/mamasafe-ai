@@ -8,6 +8,7 @@ import { Patient, UserProfile, Task, ClinicVisit } from '../types';
 import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
 import { AgeGroupReport } from '../components/reports/AgeGroupReport';
 import { FinancialReportsPanel } from '../components/reports/FinancialReportsPanel';
+import { PermissionsManager } from '../components/admin/PermissionsManager';
 
 // Mock Data for Analytics
 const visitData = [
@@ -534,6 +535,8 @@ export const DashboardView: React.FC<DashboardProps> = ({ onNavigate, user }) =>
         <div className="mt-6">
           <FinancialReportsPanel data={financialReports} />
         </div>
+
+        {user && <div className="mt-6"><PermissionsManager currentUser={user} /></div>}
 
         {/* AI Usage & Resolved Tasks Section */}
         <div className="bg-white dark:bg-[#1c1c1e] p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm mt-6">

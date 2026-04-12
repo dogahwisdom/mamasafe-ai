@@ -18,6 +18,11 @@ export const PermissionsManager: React.FC<PermissionsManagerProps> = ({ currentU
   const [loading, setLoading] = useState(false);
   const [target, setTarget] = useState<UserProfile | null>(null);
 
+  const canEditTarget = useMemo(
+    () => !!target && Permissions.canManageStaffProfile(currentUser, target),
+    [currentUser, target]
+  );
+
   const targetPermissions = useMemo(() => {
     return target?.facilityData?.permissions ?? {};
   }, [target]);
@@ -43,6 +48,12 @@ export const PermissionsManager: React.FC<PermissionsManagerProps> = ({ currentU
     if (!target) return;
     if (!canManage) {
       alert("Access restricted. Only Owners/Admins can manage permissions.");
+      return;
+    }
+    if (!Permissions.canManageStaffProfile(currentUser, target)) {
+      alert(
+        "You can only change permissions for your own account or staff employed by your facility."
+      );
       return;
     }
     setLoading(true);
@@ -73,7 +84,8 @@ export const PermissionsManager: React.FC<PermissionsManagerProps> = ({ currentU
             Permissions
           </h3>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Owners/Admins can grant Overview and Inventory access to staff (Pharm Techs / Attendants).
+            Owners/Admins can grant Overview, Inventory, and Expenses to staff linked to their facility
+            (<span className="font-mono text-xs">employer_facility_id</span>).
           </p>
         </div>
       </div>
@@ -130,6 +142,14 @@ export const PermissionsManager: React.FC<PermissionsManagerProps> = ({ currentU
             </div>
           </div>
 
+          {canManage && !canEditTarget && (
+            <div className="mt-3 p-3 rounded-xl border border-amber-200 dark:border-amber-900/40 bg-amber-50/70 dark:bg-amber-900/15 text-sm text-slate-700 dark:text-slate-300">
+              View only: this user is not employed by your facility (or you are not their superadmin).
+              Ask a superadmin to set <span className="font-mono text-xs">employer_facility_id</span>{" "}
+              to your facility user id so you can manage them.
+            </div>
+          )}
+
           <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
             <div>
               <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
@@ -138,12 +158,13 @@ export const PermissionsManager: React.FC<PermissionsManagerProps> = ({ currentU
               <select
                 className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1c1c1e] text-slate-900 dark:text-white"
                 value={target.facilityData?.permissionRole || ""}
-                disabled={!canManage}
+                disabled={!canManage || !canEditTarget}
                 onChange={(e) =>
                   updateTarget({ permissionRole: e.target.value as any })
                 }
               >
                 <option value="">—</option>
+                <option value="owner">Owner</option>
                 <option value="admin">Admin</option>
                 <option value="tech">Pharm tech</option>
                 <option value="attendant">Attendant</option>
@@ -158,7 +179,7 @@ export const PermissionsManager: React.FC<PermissionsManagerProps> = ({ currentU
                 <input
                   type="checkbox"
                   checked={!!(targetPermissions as any)[k]}
-                  disabled={!canManage}
+                  disabled={!canManage || !canEditTarget}
                   onChange={(e) =>
                     updateTarget({
                       permissions: {

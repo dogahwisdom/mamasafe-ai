@@ -17,10 +17,11 @@ import { MedicationsView } from './views/Medications';
 import { SettingsView } from './views/Settings';
 import { SuperadminDashboard } from './views/SuperadminDashboard';
 import { ClinicWorkflow } from './views/ClinicWorkflow';
+import { FacilityStaffView } from './views/FacilityStaffView';
 import { backend } from './services/backend';
 import { ViewState, Alert, Patient, UserProfile } from './types';
 import { Permissions } from './services/permissions';
-import { LayoutDashboard, UserPlus, Stethoscope, Sun, Moon, Bell, LogOut, Users, X, HelpCircle, Book, ExternalLink, MessageSquare, Phone, Clock, FileText, Settings, Loader2, CheckCircle, Workflow, BarChart2, Package, Receipt } from 'lucide-react';
+import { LayoutDashboard, UserPlus, Stethoscope, Sun, Moon, Bell, LogOut, Users, X, HelpCircle, Book, ExternalLink, MessageSquare, Phone, Clock, FileText, Settings, Loader2, CheckCircle, Workflow, BarChart2, Package, Receipt, UserCog } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -172,6 +173,9 @@ export const App: React.FC = () => {
         ...(Permissions.canAccess(currentUser, 'overview')
           ? [{ id: 'dashboard', label: 'Pharmacy', icon: LayoutDashboard }]
           : []),
+        ...(Permissions.isOwnerOrAdmin(currentUser)
+          ? [{ id: 'facility_staff', label: 'Team', icon: UserCog }]
+          : []),
         { id: 'patients', label: 'Patients', icon: Users },
         ...(Permissions.canAccess(currentUser, 'inventory')
           ? [{ id: 'pharmacy_inventory', label: 'Inventory', icon: Package }]
@@ -187,6 +191,9 @@ export const App: React.FC = () => {
       return [
         ...(Permissions.canAccess(currentUser, 'overview')
           ? [{ id: 'dashboard', label: 'Overview', icon: LayoutDashboard }]
+          : []),
+        ...(Permissions.isOwnerOrAdmin(currentUser)
+          ? [{ id: 'facility_staff', label: 'Team', icon: UserCog }]
           : []),
         { id: 'workflow', label: 'Workflow', icon: Workflow },
         { id: 'patients', label: 'Patients', icon: Users },
@@ -298,11 +305,41 @@ export const App: React.FC = () => {
 
           <div className="cursor-pointer group flex items-center" onClick={() => setCurrentView('dashboard')}>
             <Logo size={32} className="transition-transform duration-300 group-hover:scale-105 md:scale-100 scale-90" />
-            <div className="hidden sm:flex">
-              {currentUser?.role === 'patient' && <span className="text-xs font-bold text-brand-600 ml-3 bg-brand-50 border border-brand-100 px-2.5 py-0.5 rounded-full self-center">Patient Portal</span>}
-              {currentUser?.role === 'pharmacy' && <span className="text-xs font-bold text-purple-600 ml-3 bg-purple-50 border border-purple-100 px-2.5 py-0.5 rounded-full self-center">Pharmacy</span>}
-              {currentUser?.role === 'clinic' && <span className="text-xs font-bold text-blue-600 ml-3 bg-blue-50 border border-blue-100 px-2.5 py-0.5 rounded-full self-center">Clinic Portal</span>}
-              {currentUser?.role === 'superadmin' && <span className="text-xs font-bold text-indigo-600 ml-3 bg-indigo-50 border border-indigo-100 px-2.5 py-0.5 rounded-full self-center">Superadmin</span>}
+            <div className="hidden sm:flex items-center gap-2 ml-3">
+              {currentUser?.role === 'patient' && <span className="text-xs font-bold text-brand-600 bg-brand-50 border border-brand-100 px-2.5 py-0.5 rounded-full self-center">Patient Portal</span>}
+              {currentUser?.role === 'pharmacy' &&
+                (Permissions.isOwnerOrAdmin(currentUser) ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setCurrentView('facility_staff');
+                    }}
+                    className="text-xs font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/30 border border-purple-100 dark:border-purple-800 px-2.5 py-0.5 rounded-full self-center hover:opacity-90 transition-opacity"
+                    title="View pharmacy team"
+                  >
+                    Pharmacy
+                  </button>
+                ) : (
+                  <span className="text-xs font-bold text-purple-600 bg-purple-50 border border-purple-100 px-2.5 py-0.5 rounded-full self-center">Pharmacy</span>
+                ))}
+              {currentUser?.role === 'clinic' &&
+                (Permissions.isOwnerOrAdmin(currentUser) ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setCurrentView('facility_staff');
+                    }}
+                    className="text-xs font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/30 border border-blue-100 dark:border-blue-800 px-2.5 py-0.5 rounded-full self-center hover:opacity-90 transition-opacity"
+                    title="View clinic team"
+                  >
+                    Clinic Portal
+                  </button>
+                ) : (
+                  <span className="text-xs font-bold text-blue-600 bg-blue-50 border border-blue-100 px-2.5 py-0.5 rounded-full self-center">Clinic Portal</span>
+                ))}
+              {currentUser?.role === 'superadmin' && <span className="text-xs font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-2.5 py-0.5 rounded-full self-center">Superadmin</span>}
             </div>
           </div>
 
@@ -508,6 +545,20 @@ export const App: React.FC = () => {
 
         {currentView === 'enrollment' && (
           <EnrollmentView onAddPatient={handleAddPatient} currentFacility={currentUser} />
+        )}
+
+        {currentView === 'facility_staff' && currentUser && (
+          (currentUser.role === 'clinic' || currentUser.role === 'pharmacy') &&
+          Permissions.isOwnerOrAdmin(currentUser) ? (
+            <FacilityStaffView user={currentUser} onBack={() => setCurrentView('dashboard')} />
+          ) : (
+            <div className="p-8 bg-white dark:bg-[#1c1c1e] rounded-3xl border border-slate-200 dark:border-slate-800">
+              <div className="text-lg font-bold text-slate-900 dark:text-white">Access restricted</div>
+              <div className="text-sm text-slate-500 dark:text-slate-400 mt-2">
+                Team management is only available to clinic or pharmacy owners and admins.
+              </div>
+            </div>
+          )
         )}
 
         {currentView === 'workflow' && currentUser && (
