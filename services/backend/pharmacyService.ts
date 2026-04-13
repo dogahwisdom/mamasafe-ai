@@ -3,10 +3,11 @@ import {
   KEYS,
   storage,
   DEFAULT_REFILLS,
-  DEFAULT_INVENTORY,
+  pharmacyInventoryStorageKey,
 } from "./shared";
 import { supabase, isSupabaseConfigured } from "../supabaseClient";
 import { InventoryMedicationMatcher } from "../inventoryMedicationMatcher";
+import { Permissions } from "../permissions";
 
 export type PrescriptionInventoryCheck =
   | { ok: true; variant: "no_match" }
@@ -32,6 +33,16 @@ export type PrescriptionInventoryDeductionResult =
   | { variant: "failed_concurrent"; itemName: string };
 
 export class PharmacyService {
+  /** Facility `users.id` that owns stock (clinic/pharmacy root or staff employer). */
+  private resolveInventoryFacilityId(): string | null {
+    const user = storage.get<UserProfile | null>(KEYS.CURRENT_USER, null);
+    if (!user) return null;
+    if (user.role !== "clinic" && user.role !== "pharmacy") {
+      return null;
+    }
+    return Permissions.facilityOwnerUserId(user);
+  }
+
   private canAdjustInventoryForPrescription(): boolean {
     const user = storage.get<UserProfile | null>(KEYS.CURRENT_USER, null);
     return (
@@ -90,6 +101,10 @@ export class PharmacyService {
     if (!this.canAdjustInventoryForPrescription()) {
       return { variant: "skipped_not_facility_staff" };
     }
+    const facilityId = this.resolveInventoryFacilityId();
+    if (!facilityId) {
+      return { variant: "skipped_not_facility_staff" };
+    }
     const qty = Math.max(1, Math.floor(quantity));
     const items = await this.getInventory();
     const match = InventoryMedicationMatcher.findMatch(
@@ -105,6 +120,7 @@ export class PharmacyService {
         .from("inventory")
         .select("stock")
         .eq("id", match.id)
+        .eq("facility_id", facilityId)
         .maybeSingle();
 
       if (readErr || !row) {
@@ -120,6 +136,7 @@ export class PharmacyService {
         .from("inventory")
         .update({ stock: next })
         .eq("id", match.id)
+        .eq("facility_id", facilityId)
         .eq("stock", current)
         .select("stock")
         .maybeSingle();
@@ -138,10 +155,8 @@ export class PharmacyService {
       };
     }
 
-    const inventory = storage.get<InventoryItem[]>(
-      KEYS.PHARMACY_INVENTORY,
-      DEFAULT_INVENTORY
-    );
+    const key = pharmacyInventoryStorageKey(facilityId);
+    const inventory = storage.get<InventoryItem[]>(key, []);
     const idx = inventory.findIndex((i) => i.id === match.id);
     if (idx < 0) {
       return { variant: "skipped_no_match" };
@@ -153,7 +168,7 @@ export class PharmacyService {
     const next = current - qty;
     const nextInv = [...inventory];
     nextInv[idx] = { ...nextInv[idx], stock: next };
-    storage.set(KEYS.PHARMACY_INVENTORY, nextInv);
+    storage.set(key, nextInv);
     return { variant: "deducted", itemName: match.name, newStock: next };
   }
 
@@ -187,35 +202,42 @@ export class PharmacyService {
   }
 
   public async getInventory(): Promise<InventoryItem[]> {
-    // Use Supabase if configured
+    const facilityId = this.resolveInventoryFacilityId();
+    if (!facilityId) {
+      return [];
+    }
+
     if (isSupabaseConfigured()) {
       const { data, error } = await supabase
-        .from('inventory')
-        .select('*')
-        .order('name', { ascending: true });
+        .from("inventory")
+        .select("*")
+        .eq("facility_id", facilityId)
+        .order("name", { ascending: true });
 
       if (error) {
-        console.error('Error fetching inventory:', error);
-        return storage.get<InventoryItem[]>(KEYS.PHARMACY_INVENTORY, DEFAULT_INVENTORY);
+        console.error("Error fetching inventory:", error);
+        return storage.get<InventoryItem[]>(
+          pharmacyInventoryStorageKey(facilityId),
+          []
+        );
       }
 
-      return (data || []).map((i: any) => ({
-        id: i.id,
-        name: i.name,
-        stock: i.stock,
-        minLevel: i.min_level,
-        unit: i.unit,
+      return (data || []).map((i: Record<string, unknown>) => ({
+        id: i.id as string,
+        name: i.name as string,
+        stock: i.stock as number,
+        minLevel: i.min_level as number,
+        unit: i.unit as string,
         unitPriceKes:
           i.unit_price_kes != null ? Number(i.unit_price_kes) : null,
-        supplier: i.supplier ?? null,
-        expiryDate: i.expiry_date ?? null,
+        supplier: (i.supplier as string) ?? null,
+        expiryDate: (i.expiry_date as string) ?? null,
       }));
     }
 
-    // Fallback to localStorage
     return storage.get<InventoryItem[]>(
-      KEYS.PHARMACY_INVENTORY,
-      DEFAULT_INVENTORY
+      pharmacyInventoryStorageKey(facilityId),
+      []
     );
   }
 
@@ -252,12 +274,18 @@ export class PharmacyService {
         ? String(item.expiryDate).trim()
         : null;
 
+    const facilityId = this.resolveInventoryFacilityId();
+    if (!facilityId) {
+      throw new Error("Sign in as a clinic or pharmacy user to manage inventory.");
+    }
+
     if (isSupabaseConfigured()) {
       const insertRow: Record<string, unknown> = {
         name,
         unit,
         stock,
         min_level: minLevel,
+        facility_id: facilityId,
       };
       if (unitPriceKes != null) insertRow.unit_price_kes = unitPriceKes;
       if (supplier != null) insertRow.supplier = supplier;
@@ -273,7 +301,7 @@ export class PharmacyService {
         console.error("Error adding inventory item:", error);
         if (error.code === "23505" || String(error.message).includes("unique")) {
           throw new Error(
-            "An item with this medication name already exists. Use a slightly different name or edit the existing row."
+            "An item with this name already exists in your facility inventory. Edit that row or use a different name."
           );
         }
         throw error;
@@ -293,8 +321,8 @@ export class PharmacyService {
     }
 
     const inventory = storage.get<InventoryItem[]>(
-      KEYS.PHARMACY_INVENTORY,
-      DEFAULT_INVENTORY
+      pharmacyInventoryStorageKey(facilityId),
+      []
     );
     const newItem: InventoryItem = {
       id: typeof crypto !== "undefined" && crypto.randomUUID
@@ -308,7 +336,7 @@ export class PharmacyService {
       supplier: supplier ?? undefined,
       expiryDate: expiryDate ?? undefined,
     };
-    storage.set(KEYS.PHARMACY_INVENTORY, [...inventory, newItem]);
+    storage.set(pharmacyInventoryStorageKey(facilityId), [...inventory, newItem]);
     return newItem;
   }
 
@@ -327,6 +355,11 @@ export class PharmacyService {
       >
     >
   ): Promise<void> {
+    const facilityId = this.resolveInventoryFacilityId();
+    if (!facilityId) {
+      throw new Error("Sign in as a clinic or pharmacy user to manage inventory.");
+    }
+
     if (isSupabaseConfigured()) {
       const payload: Record<string, unknown> = {};
       if (updates.stock !== undefined) payload.stock = updates.stock;
@@ -357,7 +390,8 @@ export class PharmacyService {
       const { error } = await supabase
         .from("inventory")
         .update(payload)
-        .eq("id", id);
+        .eq("id", id)
+        .eq("facility_id", facilityId);
 
       if (error) {
         console.error("Error updating inventory:", error);
@@ -367,18 +401,27 @@ export class PharmacyService {
     }
 
     const inventory = storage.get<InventoryItem[]>(
-      KEYS.PHARMACY_INVENTORY,
-      DEFAULT_INVENTORY
+      pharmacyInventoryStorageKey(facilityId),
+      []
     );
     const next = inventory.map((item) =>
       item.id === id ? { ...item, ...updates } : item
     );
-    storage.set(KEYS.PHARMACY_INVENTORY, next);
+    storage.set(pharmacyInventoryStorageKey(facilityId), next);
   }
 
   public async deleteInventoryItem(id: string): Promise<void> {
+    const facilityId = this.resolveInventoryFacilityId();
+    if (!facilityId) {
+      throw new Error("Sign in as a clinic or pharmacy user to manage inventory.");
+    }
+
     if (isSupabaseConfigured()) {
-      const { error } = await supabase.from("inventory").delete().eq("id", id);
+      const { error } = await supabase
+        .from("inventory")
+        .delete()
+        .eq("id", id)
+        .eq("facility_id", facilityId);
       if (error) {
         console.error("Error deleting inventory item:", error);
         throw error;
@@ -387,11 +430,11 @@ export class PharmacyService {
     }
 
     const inventory = storage.get<InventoryItem[]>(
-      KEYS.PHARMACY_INVENTORY,
-      DEFAULT_INVENTORY
+      pharmacyInventoryStorageKey(facilityId),
+      []
     );
     storage.set(
-      KEYS.PHARMACY_INVENTORY,
+      pharmacyInventoryStorageKey(facilityId),
       inventory.filter((i) => i.id !== id)
     );
   }
@@ -421,21 +464,25 @@ export class PharmacyService {
         throw updateError;
       }
 
-      // Update inventory
-      const { data: inventory } = await supabase
-        .from('inventory')
-        .select('*');
+      const facilityId = this.resolveInventoryFacilityId();
+      if (facilityId) {
+        const { data: inventory } = await supabase
+          .from("inventory")
+          .select("*")
+          .eq("facility_id", facilityId);
 
-      if (inventory) {
-        const itemToUpdate = inventory.find((item) =>
-          refill.medication.includes(item.name)
-        );
+        if (inventory) {
+          const itemToUpdate = inventory.find((item: { name: string }) =>
+            refill.medication.includes(item.name)
+          );
 
-        if (itemToUpdate) {
-          await supabase
-            .from('inventory')
-            .update({ stock: Math.max(0, itemToUpdate.stock - 1) })
-            .eq('id', itemToUpdate.id);
+          if (itemToUpdate) {
+            await supabase
+              .from("inventory")
+              .update({ stock: Math.max(0, (itemToUpdate as { stock: number }).stock - 1) })
+              .eq("id", (itemToUpdate as { id: string }).id)
+              .eq("facility_id", facilityId);
+          }
         }
       }
 
@@ -452,9 +499,12 @@ export class PharmacyService {
     ) as RefillRequest[];
     storage.set(KEYS.PHARMACY_REFILLS, updatedRefills);
 
+    const facilityId = this.resolveInventoryFacilityId();
+    if (!facilityId) return;
+
     const inventory = storage.get<InventoryItem[]>(
-      KEYS.PHARMACY_INVENTORY,
-      DEFAULT_INVENTORY
+      pharmacyInventoryStorageKey(facilityId),
+      []
     );
     const targetRefill = refills.find((r) => r.id === refillId);
 
@@ -465,7 +515,7 @@ export class PharmacyService {
         }
         return item;
       });
-      storage.set(KEYS.PHARMACY_INVENTORY, updatedInventory);
+      storage.set(pharmacyInventoryStorageKey(facilityId), updatedInventory);
     }
   }
 }

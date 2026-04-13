@@ -21,6 +21,11 @@ export const KEYS = {
   REFERRALS: "mamasafe_referrals",
 };
 
+/** localStorage key for inventory scoped to a facility `users.id` */
+export function pharmacyInventoryStorageKey(facilityUserId: string): string {
+  return `${KEYS.PHARMACY_INVENTORY}_${facilityUserId}`;
+}
+
 export const normalizePhone = (phone: string) => {
   if (!phone) return "";
   let clean = phone.replace(/[^0-9+]/g, "");

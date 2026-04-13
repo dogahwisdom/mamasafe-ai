@@ -72,8 +72,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user, onBack }) =>
   };
 
   useEffect(() => {
-    load();
-  }, []);
+    void load();
+  }, [user.id, user.employerFacilityId]);
 
   const handleDraft = (id: string, field: keyof InventoryDraft, value: string) => {
     setDrafts((prev) => ({
