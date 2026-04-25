@@ -174,7 +174,13 @@ export const AuthView: React.FC<AuthProps> = ({ onSuccess }) => {
         location: regData.location,
         countryCode: AFRICAN_COUNTRIES.find(c => c.name === regData.country)?.code || 'KE',
         pin: regData.password, // Backend expects 'pin' field but treats as password
-        facilityData: role !== 'patient' ? { managerName: regData.managerName } : undefined
+        facilityData: role !== 'patient'
+          ? {
+              managerName: regData.managerName || regData.name,
+              permissionRole: 'owner',
+              permissions: { overview: true, inventory: true, expenses: true },
+            }
+          : undefined
       };
       const { user } = await backend.auth.register(newUser as any);
       onSuccess(user);

@@ -39,6 +39,31 @@ export class AuthService {
     };
   }
 
+  private defaultFacilitySignupData(
+    role: UserRole,
+    managerName: string,
+    existing?: UserProfile["facilityData"],
+    employerFacilityId?: string | null
+  ): UserProfile["facilityData"] | null {
+    if (role === "patient") return null;
+
+    // Staff invited into an existing facility should not be auto-promoted.
+    if (employerFacilityId) {
+      return existing || { managerName };
+    }
+
+    return {
+      ...(existing || {}),
+      managerName: existing?.managerName || managerName,
+      permissionRole: "owner",
+      permissions: {
+        overview: true,
+        inventory: true,
+        expenses: true,
+      },
+    };
+  }
+
   private getAllowInsecureDemoAuth(): boolean {
     // Never allow hard-coded credentials in production.
     // This is only for local/dev environments when Supabase isn't available.
@@ -361,9 +386,12 @@ export class AuthService {
                 nextAppointment: new Date().toISOString(),
                 riskStatus: RiskLevel.LOW,
               })) : null,
-              facility_data: role !== 'patient' ? JSON.parse(JSON.stringify({
-                managerName: googleUser.user_metadata?.full_name || 'Manager',
-              })) : null,
+              facility_data: JSON.parse(JSON.stringify(
+                this.defaultFacilitySignupData(
+                  role,
+                  googleUser.user_metadata?.full_name || "Manager"
+                )
+              )),
               employer_facility_id: null,
             };
 
@@ -445,8 +473,7 @@ export class AuthService {
       location: "Nairobi, Kenya",
       countryCode: "KE",
       avatar: providerUser.avatar,
-      facilityData:
-        role !== "patient" ? { managerName: providerUser.name } : undefined,
+      facilityData: this.defaultFacilitySignupData(role, providerUser.name) || undefined,
       patientData:
         role === "patient"
           ? {
@@ -716,6 +743,13 @@ export class AuthService {
 
     // Use Supabase if configured
     if (isSupabaseConfigured()) {
+      const facilityDataForSignup = this.defaultFacilitySignupData(
+        user.role,
+        user.facilityData?.managerName || user.name,
+        user.facilityData,
+        user.employerFacilityId
+      );
+
       // Check if user exists
       let existingUser = null;
       if (cleanPhone) {
@@ -749,7 +783,7 @@ export class AuthService {
         subscription_plan: user.subscriptionPlan || null,
         pin_hash: Security.hash(user.pin),
         patient_data: user.patientData ? JSON.parse(JSON.stringify(user.patientData)) : null,
-        facility_data: user.facilityData ? JSON.parse(JSON.stringify(user.facilityData)) : null,
+        facility_data: facilityDataForSignup ? JSON.parse(JSON.stringify(facilityDataForSignup)) : null,
       };
 
       if (existingUser) {
@@ -802,6 +836,13 @@ export class AuthService {
     const newUser: UserProfile = {
       ...user,
       phone: cleanPhone,
+      facilityData:
+        this.defaultFacilitySignupData(
+          user.role,
+          user.facilityData?.managerName || user.name,
+          user.facilityData,
+          user.employerFacilityId
+        ) || undefined,
       pin: Security.hash(user.pin),
     };
 
