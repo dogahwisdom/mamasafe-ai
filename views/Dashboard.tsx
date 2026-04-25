@@ -6,7 +6,11 @@ import { Users, AlertTriangle, Calendar, Activity, ChevronRight, Building2, Tren
 import { AreaChart, Area, XAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { Patient, UserProfile, Task, ClinicVisit } from '../types';
 import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
-import { AgeGroupReport } from '../components/reports/AgeGroupReport';
+import {
+  AgeGroupReport,
+  type AgeGroupKey,
+  type AgeGroupPatientRow,
+} from '../components/reports/AgeGroupReport';
 import { FinancialReportsPanel } from '../components/reports/FinancialReportsPanel';
 import { PermissionsManager } from '../components/admin/PermissionsManager';
 
@@ -62,6 +66,9 @@ export const DashboardView: React.FC<DashboardProps> = ({ onNavigate, user }) =>
     above18: 0,
     above35: 0,
   });
+  const [visitAgePatientsByGroup, setVisitAgePatientsByGroup] = useState<
+    Partial<Record<AgeGroupKey, AgeGroupPatientRow[]>>
+  >({});
   const [financialReports, setFinancialReports] = useState({
     week: { totalKes: 0, byMethod: {} as Record<string, number> },
     month: { totalKes: 0, byMethod: {} as Record<string, number> },
@@ -248,35 +255,64 @@ export const DashboardView: React.FC<DashboardProps> = ({ onNavigate, user }) =>
           setEngagementRate(null);
         }
 
-        // Patient reports: age groups derived from workflow visits.
+        // Patient reports: age groups derived from workflow visits (visit counts + drill-down lists).
         try {
           const ageByPatientId = new Map<string, number>();
+          const patientById = new Map(patients.map((p) => [p.id, p]));
           for (const p of patients) {
             if (typeof p.age === 'number' && Number.isFinite(p.age)) {
               ageByPatientId.set(p.id, p.age);
             }
           }
-          let under5 = 0;
-          let fiveTo18 = 0;
-          let above18 = 0;
-          let above35 = 0;
+          const under5Map = new Map<string, number>();
+          const fiveTo18Map = new Map<string, number>();
+          const above18Map = new Map<string, number>();
+          const above35Map = new Map<string, number>();
+          const bump = (m: Map<string, number>, patientId: string) =>
+            m.set(patientId, (m.get(patientId) ?? 0) + 1);
+
           for (const v of visits) {
             const age = ageByPatientId.get(v.patientId);
             if (age == null) continue;
-            if (age < 5) under5 += 1;
-            if (age >= 5 && age <= 18) fiveTo18 += 1;
-            if (age > 18) above18 += 1;
-            if (age >= 35) above35 += 1;
+            if (age < 5) bump(under5Map, v.patientId);
+            if (age >= 5 && age <= 18) bump(fiveTo18Map, v.patientId);
+            if (age > 18) bump(above18Map, v.patientId);
+            if (age >= 35) bump(above35Map, v.patientId);
           }
+
+          const sumVisits = (m: Map<string, number>) =>
+            Array.from(m.values()).reduce((a, c) => a + c, 0);
+
+          const mapToRows = (m: Map<string, number>): AgeGroupPatientRow[] =>
+            Array.from(m.entries())
+              .map(([patientId, visitsInBucket]) => {
+                const p = patientById.get(patientId);
+                return {
+                  patientId,
+                  name: p?.name ?? 'Unknown patient',
+                  age: typeof p?.age === 'number' ? p.age : 0,
+                  phone: p?.phone,
+                  visitsInBucket,
+                };
+              })
+              .sort((a, b) => a.name.localeCompare(b.name));
+
           setVisitAgeCounts({
-            under5,
-            '5to18': fiveTo18,
-            above18,
-            above35,
+            under5: sumVisits(under5Map),
+            '5to18': sumVisits(fiveTo18Map),
+            above18: sumVisits(above18Map),
+            above35: sumVisits(above35Map),
+          });
+          setVisitAgePatientsByGroup({
+            under5: mapToRows(under5Map),
+            '5to18': mapToRows(fiveTo18Map),
+            above18: mapToRows(above18Map),
+            above35: mapToRows(above35Map),
           });
         } catch (e) {
           console.warn('Failed to compute age-group report:', e);
           setVisitAgeCounts({ under5: 0, '5to18': 0, above18: 0, above35: 0 });
+          setVisitAgePatientsByGroup({});
         }
 
         const missed = taskData.filter((t) => t.type === 'Missed Visit');
@@ -528,6 +564,8 @@ export const DashboardView: React.FC<DashboardProps> = ({ onNavigate, user }) =>
         <div className="mt-6">
           <AgeGroupReport
             counts={visitAgeCounts}
+            patientsByGroup={visitAgePatientsByGroup}
+            onOpenPatients={() => onNavigate('patients')}
             subtitle="Derived from workflow visits (counts by age at enrollment for patients visible to this facility)."
           />
         </div>

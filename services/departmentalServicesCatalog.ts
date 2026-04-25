@@ -85,6 +85,96 @@ export const DEPARTMENTAL_SERVICES: DepartmentService[] = [
     ],
   },
   {
+    id: "gynaecology_clinic",
+    label: "Gynaecological Clinic",
+    subCategories: [
+      { id: "gyne_routine", label: "Routine consultation" },
+      { id: "gyne_followup", label: "Follow-up visit" },
+      { id: "gyne_procedure", label: "Procedure / minor theatre" },
+      { id: "gyne_other", label: "Other" },
+    ],
+  },
+  {
+    id: "dental_services",
+    label: "Dental Services",
+    subCategories: [
+      { id: "dental_preventive", label: "Preventive / check-up" },
+      { id: "dental_restorative", label: "Restorative / fillings" },
+      { id: "dental_oral_surgery", label: "Oral surgery / extractions" },
+      { id: "dental_other", label: "Other" },
+    ],
+  },
+  {
+    id: "eye_clinic_ophthalmology",
+    label: "Eye Clinic (Ophthalmology)",
+    subCategories: [
+      { id: "eye_consult", label: "Ophthalmology consultation" },
+      { id: "eye_refraction", label: "Refraction / vision assessment" },
+      { id: "eye_surgical_review", label: "Surgical review / post-op" },
+      { id: "eye_other", label: "Other" },
+    ],
+  },
+  {
+    id: "orthopedic_clinic",
+    label: "Orthopedic Clinic",
+    subCategories: [
+      { id: "ortho_fracture", label: "Fracture / trauma care" },
+      { id: "ortho_joint", label: "Joint / musculoskeletal" },
+      { id: "ortho_followup", label: "Follow-up / cast review" },
+      { id: "ortho_other", label: "Other" },
+    ],
+  },
+  {
+    id: "dermatology_clinic",
+    label: "Dermatology Clinic",
+    subCategories: [
+      { id: "derm_consult", label: "Dermatology consultation" },
+      { id: "derm_chronic", label: "Chronic skin condition review" },
+      { id: "derm_procedure", label: "Minor procedure / biopsy" },
+      { id: "derm_other", label: "Other" },
+    ],
+  },
+  {
+    id: "physiotherapy_clinic",
+    label: "Physiotherapy Clinic",
+    subCategories: [
+      { id: "physio_assessment", label: "Initial assessment" },
+      { id: "physio_treatment", label: "Treatment session" },
+      { id: "physio_rehab", label: "Rehabilitation programme" },
+      { id: "physio_other", label: "Other" },
+    ],
+  },
+  {
+    id: "general_surgery_clinic",
+    label: "General Surgery Clinic",
+    subCategories: [
+      { id: "gsurg_consult", label: "Surgical consultation" },
+      { id: "gsurg_preop", label: "Pre-operative review" },
+      { id: "gsurg_postop", label: "Post-operative follow-up" },
+      { id: "gsurg_other", label: "Other" },
+    ],
+  },
+  {
+    id: "plastic_surgery_clinic",
+    label: "Plastic Surgery Clinic",
+    subCategories: [
+      { id: "plast_consult", label: "Plastic surgery consultation" },
+      { id: "plast_reconstructive", label: "Reconstructive care" },
+      { id: "plast_aesthetic", label: "Aesthetic / cosmetic review" },
+      { id: "plast_other", label: "Other" },
+    ],
+  },
+  {
+    id: "spine_clinic",
+    label: "Spine Clinic",
+    subCategories: [
+      { id: "spine_consult", label: "Spine consultation" },
+      { id: "spine_pain", label: "Back / neck pain management" },
+      { id: "spine_surgical_review", label: "Surgical review / post-op" },
+      { id: "spine_other", label: "Other" },
+    ],
+  },
+  {
     id: "other",
     label: "Other / specialist",
     subCategories: [{ id: "unspecified", label: "General specialist" }],
