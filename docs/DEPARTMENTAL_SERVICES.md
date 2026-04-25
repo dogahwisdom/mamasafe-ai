@@ -7,7 +7,7 @@ The enrollment **Department** and **Sub-category** fields are defined in code:
 
 ## PDF copy
 
-If your facility keeps a branded departmental services PDF in the repo (for example `docs/Deparmental Services.pdf`), keep it alongside this markdown; the **in-app** intake list is driven by `departmentalServicesCatalog.ts`, which should stay aligned with that document.
+If your facility keeps a branded departmental services PDF in the repo (for example `docs/Departmental Services.pdf`), keep it alongside this markdown; the **in-app** intake list is driven by `departmentalServicesCatalog.ts`, which should stay aligned with that document.
 
 To produce a printable list from this markdown (similar to other project PDFs), run:
 
