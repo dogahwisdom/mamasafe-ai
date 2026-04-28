@@ -34,8 +34,8 @@ export class WhatsAppRepository {
   }
 
   async logOutboundMessage({ patientId, phone, body, metaMessageId, rawPayload, relatedReminderId }) {
-    if (!this.client) return;
-    await this.client.from("whatsapp_messages").insert({
+    if (!this.client) return { ok: false, reason: "supabase_not_configured" };
+    const { error } = await this.client.from("whatsapp_messages").insert({
       patient_id: patientId || null,
       phone,
       direction: "outbound",
@@ -47,11 +47,16 @@ export class WhatsAppRepository {
       raw_payload: rawPayload || {},
       sent_at: nowIso(),
     });
+    if (error) {
+      console.error("Failed to log outbound whatsapp message:", error.message);
+      return { ok: false, reason: error.message };
+    }
+    return { ok: true };
   }
 
   async logInboundMessage({ patientId, phone, body, metaMessageId, rawPayload }) {
-    if (!this.client) return;
-    await this.client.from("whatsapp_messages").insert({
+    if (!this.client) return { ok: false, reason: "supabase_not_configured" };
+    const { error } = await this.client.from("whatsapp_messages").insert({
       patient_id: patientId || null,
       phone,
       direction: "inbound",
@@ -62,10 +67,15 @@ export class WhatsAppRepository {
       raw_payload: rawPayload || {},
       received_at: nowIso(),
     });
+    if (error) {
+      console.error("Failed to log inbound whatsapp message:", error.message);
+      return { ok: false, reason: error.message };
+    }
+    return { ok: true };
   }
 
   async updateMessageStatus({ metaMessageId, status, rawPayload }) {
-    if (!this.client || !metaMessageId) return;
+    if (!this.client || !metaMessageId) return { ok: false, reason: "missing_dependency_or_id" };
     const patch = {
       status,
       raw_payload: rawPayload || {},
@@ -74,9 +84,14 @@ export class WhatsAppRepository {
     if (status === "read") patch.read_at = nowIso();
     if (status === "failed") patch.failed_at = nowIso();
 
-    await this.client
+    const { error } = await this.client
       .from("whatsapp_messages")
       .update(patch)
       .eq("meta_message_id", metaMessageId);
+    if (error) {
+      console.error("Failed to update whatsapp message status:", error.message);
+      return { ok: false, reason: error.message };
+    }
+    return { ok: true };
   }
 }

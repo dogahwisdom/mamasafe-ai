@@ -29,7 +29,7 @@ export async function handler(event) {
     const patient =
       payload.patientId || !repo.isEnabled() ? null : await repo.findPatientByPhone(phone);
 
-    await repo.logOutboundMessage({
+    const logResult = await repo.logOutboundMessage({
       patientId: payload.patientId || patient?.id || null,
       phone,
       body,
@@ -42,6 +42,8 @@ export async function handler(event) {
       success: true,
       waId: sendResult.waId,
       metaMessageId: sendResult.metaMessageId,
+      dbLogged: !!logResult?.ok,
+      dbLogReason: logResult?.reason || null,
     });
   } catch (error) {
     console.error("whatsapp-send failed:", error);
