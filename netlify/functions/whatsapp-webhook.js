@@ -1,12 +1,8 @@
 /**
  * Meta WhatsApp Cloud API webhook for Netlify Functions.
- *
- * GET  -> verification handshake from Meta
- * POST -> inbound messages and status updates
- *
- * Callback URL example:
- *   https://<your-site>.netlify.app/.netlify/functions/whatsapp-webhook
  */
+import { parseIncomingWhatsAppEvents } from "./lib/whatsapp-cloud-service.js";
+import { WhatsAppRepository } from "./lib/whatsapp-repository.js";
 
 function json(statusCode, body) {
   return {
@@ -20,6 +16,7 @@ function json(statusCode, body) {
 
 export async function handler(event) {
   const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN;
+  const repo = new WhatsAppRepository();
 
   if (!verifyToken) {
     console.error("Missing WHATSAPP_VERIFY_TOKEN");
@@ -52,15 +49,37 @@ export async function handler(event) {
   if (event.httpMethod === "POST") {
     try {
       const payload = event.body ? JSON.parse(event.body) : {};
+      const changes = parseIncomingWhatsAppEvents(payload);
 
-      // For now we acknowledge immediately and log the event.
-      // Next step: persist inbound messages / statuses and trigger MamaSafe workflows.
+      for (const change of changes) {
+        for (const message of change.messages || []) {
+          const phone = message?.from ? `+${String(message.from).replace(/^\+/, "")}` : "";
+          const patient = await repo.findPatientByPhone(phone);
+          await repo.logInboundMessage({
+            patientId: patient?.id || null,
+            phone,
+            body: message?.text?.body || "",
+            metaMessageId: message?.id || null,
+            rawPayload: message,
+          });
+        }
+
+        for (const status of change.statuses || []) {
+          await repo.updateMessageStatus({
+            metaMessageId: status?.id || null,
+            status: status?.status || "sent",
+            rawPayload: status,
+          });
+        }
+      }
+
       console.log(
         "WhatsApp webhook event:",
         JSON.stringify(
           {
             object: payload?.object,
             entryCount: Array.isArray(payload?.entry) ? payload.entry.length : 0,
+            changes: changes.length,
           },
           null,
           2

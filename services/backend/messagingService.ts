@@ -12,8 +12,8 @@ interface MessageResult {
 }
 
 export class MessagingService {
-  private readonly WHATSAPP_API_URL = 'https://graph.facebook.com/v18.0';
   private readonly AT_SMS_URL = 'https://api.africastalking.com/version1/messaging';
+  private readonly WHATSAPP_FUNCTION_URL = '/.netlify/functions/whatsapp-send';
 
   /**
    * Send credentials to newly enrolled patient
@@ -71,43 +71,27 @@ Asante!`;
    * Send WhatsApp message
    */
   public async sendWhatsApp(phone: string, message: string): Promise<boolean> {
-    // Try to get from environment variables (for frontend)
-    const accessToken = (import.meta.env.VITE_WHATSAPP_ACCESS_TOKEN as string) || 
-                       (typeof process !== 'undefined' && process.env?.WHATSAPP_ACCESS_TOKEN) || '';
-    const phoneNumberId = (import.meta.env.VITE_WHATSAPP_PHONE_NUMBER_ID as string) || 
-                         (typeof process !== 'undefined' && process.env?.WHATSAPP_PHONE_NUMBER_ID) || '';
-
-    if (!accessToken || !phoneNumberId) {
-      console.warn('WhatsApp credentials not configured');
-      return false;
-    }
-
     try {
-      const cleanPhone = phone.replace(/[^0-9]/g, '');
-      
-      const response = await fetch(`${this.WHATSAPP_API_URL}/${phoneNumberId}/messages`, {
+      const response = await fetch(this.WHATSAPP_FUNCTION_URL, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          messaging_product: 'whatsapp',
-          to: cleanPhone,
-          type: 'text',
-          text: { body: message },
+          phone,
+          message,
         }),
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        console.error('WhatsApp API Error:', error);
+        const error = await response.json().catch(() => ({}));
+        console.error('WhatsApp send function error:', error);
         return false;
       }
 
-      const result = await response.json();
-      console.log(`WhatsApp message sent to ${phone}:`, result.messages?.[0]?.id);
-      return true;
+      const result = await response.json().catch(() => ({}));
+      console.log(`WhatsApp message sent to ${phone}:`, result.metaMessageId);
+      return !!result.success;
     } catch (error) {
       console.error(`Error sending WhatsApp to ${phone}:`, error);
       return false;
