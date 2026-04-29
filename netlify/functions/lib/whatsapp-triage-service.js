@@ -1,5 +1,3 @@
-import { GoogleGenAI, Type } from "@google/genai";
-
 const RiskLevel = {
   LOW: "Low",
   MEDIUM: "Medium",
@@ -7,28 +5,14 @@ const RiskLevel = {
   CRITICAL: "Critical",
 };
 
-const triageSchema = {
-  type: Type.OBJECT,
-  properties: {
-    riskLevel: {
-      type: Type.STRING,
-      enum: Object.values(RiskLevel),
-    },
-    reasoning: { type: Type.STRING },
-    recommendedAction: { type: Type.STRING },
-    draftResponse: { type: Type.STRING },
-  },
-  required: ["riskLevel", "reasoning", "recommendedAction", "draftResponse"],
-};
-
 export class WhatsAppTriageService {
   constructor() {
     const apiKey = process.env.TRIAGE_ENGINE_API_KEY || "";
-    this.client = apiKey ? new GoogleGenAI({ apiKey }) : null;
+    this.apiKey = apiKey;
   }
 
   async analyzeSymptoms({ symptoms, gestationalAge, previousConditions = "None" }) {
-    if (!this.client) {
+    if (!this.apiKey) {
       return {
         riskLevel: RiskLevel.MEDIUM,
         reasoning:
@@ -57,18 +41,38 @@ Return JSON only.
 `;
 
     try {
-      const response = await this.client.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: prompt,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: triageSchema,
-        },
-      });
-
-      const text = response.text;
+      const response = await fetch(
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": this.apiKey,
+          },
+          body: JSON.stringify({
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            generationConfig: {
+              responseMimeType: "application/json",
+            },
+          }),
+        }
+      );
+      if (!response.ok) {
+        const body = await response.text();
+        throw new Error(`Triage API failed (${response.status}): ${body}`);
+      }
+      const payload = await response.json();
+      const text = payload?.candidates?.[0]?.content?.parts?.[0]?.text || "";
       if (!text) throw new Error("No triage model response.");
-      return JSON.parse(text);
+      const parsed = JSON.parse(text);
+      return {
+        riskLevel: parsed?.riskLevel || RiskLevel.MEDIUM,
+        reasoning: parsed?.reasoning || "No reasoning provided.",
+        recommendedAction: parsed?.recommendedAction || "Clinician review recommended.",
+        draftResponse:
+          parsed?.draftResponse ||
+          "MamaSafe received your message. Please contact your clinic if your symptoms worsen.",
+      };
     } catch (error) {
       console.error("WhatsApp triage failed:", error);
       return {
