@@ -7,10 +7,16 @@ import { WhatsAppRepository } from "./lib/whatsapp-repository.js";
 import { RiskLevel, WhatsAppTriageService } from "./lib/whatsapp-triage-service.js";
 
 function json(statusCode, body) {
+  const debugCommit = process.env.COMMIT_REF || "unknown";
+  const triageKeyPresent = Boolean(
+    process.env.GROQ_API_KEY || process.env.TRIAGE_ENGINE_API_KEY
+  );
   return {
     statusCode,
     headers: {
       "Content-Type": "application/json",
+      "X-MamaSafe-Commit": debugCommit,
+      "X-Triage-Key-Present": String(triageKeyPresent),
     },
     body: JSON.stringify(body),
   };
@@ -37,7 +43,13 @@ export async function handler(event) {
       console.log("WhatsApp webhook verified successfully.");
       return {
         statusCode: 200,
-        headers: { "Content-Type": "text/plain" },
+        headers: {
+          "Content-Type": "text/plain",
+          "X-MamaSafe-Commit": process.env.COMMIT_REF || "unknown",
+          "X-Triage-Key-Present": String(
+            Boolean(process.env.GROQ_API_KEY || process.env.TRIAGE_ENGINE_API_KEY)
+          ),
+        },
         body: challenge || "",
       };
     }
@@ -141,7 +153,13 @@ export async function handler(event) {
 
       return {
         statusCode: 200,
-        headers: { "Content-Type": "text/plain" },
+        headers: {
+          "Content-Type": "text/plain",
+          "X-MamaSafe-Commit": process.env.COMMIT_REF || "unknown",
+          "X-Triage-Key-Present": String(
+            Boolean(process.env.GROQ_API_KEY || process.env.TRIAGE_ENGINE_API_KEY)
+          ),
+        },
         body: "EVENT_RECEIVED",
       };
     } catch (error) {
