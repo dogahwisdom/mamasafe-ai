@@ -25,12 +25,85 @@ export class WhatsAppRepository {
     for (const candidate of candidates) {
       const { data } = await this.client
         .from("patients")
-        .select("id, name, phone")
+        .select("id, name, phone, gestational_weeks, alerts")
         .eq("phone", candidate)
         .maybeSingle();
       if (data) return data;
     }
     return null;
+  }
+
+  async createOrFindPatientByPhone(phone, name = "WhatsApp Patient") {
+    const existing = await this.findPatientByPhone(phone);
+    if (existing) return existing;
+    if (!this.client) return null;
+
+    const normalized = String(phone).replace(/[^0-9+]/g, "");
+    const withPlus = normalized.startsWith("+") ? normalized : `+${normalized}`;
+    const { data, error } = await this.client
+      .from("patients")
+      .insert({
+        name,
+        phone: withPlus,
+        age: 25,
+        gestational_weeks: 12,
+        location: "Unknown",
+        risk_status: "Low",
+        alerts: [],
+      })
+      .select("id, name, phone, gestational_weeks, alerts")
+      .single();
+
+    if (error) {
+      console.error("Failed to auto-create WhatsApp patient:", error.message);
+      return null;
+    }
+    return data;
+  }
+
+  async createReferral({ patientId, patientName, reason, recommendedAction }) {
+    if (!this.client) return { ok: false, reason: "supabase_not_configured" };
+    const { error } = await this.client.from("referrals").insert({
+      patient_id: patientId,
+      patient_name: patientName,
+      from_facility: "MamaSafe AI",
+      to_facility: recommendedAction?.includes("Level 4") ? "Level 4/5 Hospital" : "Clinic review",
+      reason,
+      status: "pending",
+    });
+    if (error) {
+      console.error("Failed to create referral:", error.message);
+      return { ok: false, reason: error.message };
+    }
+    return { ok: true };
+  }
+
+  async createTask({ patientId, patientName, notes }) {
+    if (!this.client) return { ok: false, reason: "supabase_not_configured" };
+    const { data: existing } = await this.client
+      .from("tasks")
+      .select("id")
+      .eq("patient_id", patientId)
+      .eq("type", "Triage Alert")
+      .eq("resolved", false)
+      .limit(1);
+    if (existing && existing.length > 0) {
+      return { ok: true, skipped: "existing_open_triage_alert" };
+    }
+    const { error } = await this.client.from("tasks").insert({
+      patient_id: patientId,
+      patient_name: patientName,
+      type: "Triage Alert",
+      deadline: "Due immediately",
+      resolved: false,
+      notes,
+      timestamp: Date.now(),
+    });
+    if (error) {
+      console.error("Failed to create WhatsApp triage task:", error.message);
+      return { ok: false, reason: error.message };
+    }
+    return { ok: true };
   }
 
   async logOutboundMessage({ patientId, phone, body, metaMessageId, rawPayload, relatedReminderId }) {

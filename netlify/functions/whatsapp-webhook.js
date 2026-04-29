@@ -2,7 +2,9 @@
  * Meta WhatsApp Cloud API webhook for Netlify Functions.
  */
 import { parseIncomingWhatsAppEvents } from "./lib/whatsapp-cloud-service.js";
+import { WhatsAppCloudService } from "./lib/whatsapp-cloud-service.js";
 import { WhatsAppRepository } from "./lib/whatsapp-repository.js";
+import { RiskLevel, WhatsAppTriageService } from "./lib/whatsapp-triage-service.js";
 
 function json(statusCode, body) {
   return {
@@ -17,6 +19,8 @@ function json(statusCode, body) {
 export async function handler(event) {
   const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN;
   const repo = new WhatsAppRepository();
+  const cloud = new WhatsAppCloudService();
+  const triage = new WhatsAppTriageService();
 
   if (!verifyToken) {
     console.error("Missing WHATSAPP_VERIFY_TOKEN");
@@ -53,8 +57,13 @@ export async function handler(event) {
 
       for (const change of changes) {
         for (const message of change.messages || []) {
+          if (message?.type !== "text") {
+            continue;
+          }
           const phone = message?.from ? `+${String(message.from).replace(/^\+/, "")}` : "";
-          const patient = await repo.findPatientByPhone(phone);
+          const patient =
+            (await repo.findPatientByPhone(phone)) ||
+            (await repo.createOrFindPatientByPhone(phone, change?.contacts?.[0]?.profile?.name));
           await repo.logInboundMessage({
             patientId: patient?.id || null,
             phone,
@@ -62,6 +71,50 @@ export async function handler(event) {
             metaMessageId: message?.id || null,
             rawPayload: message,
           });
+
+          const triageResult = await triage.analyzeSymptoms({
+            symptoms: message?.text?.body || "",
+            gestationalAge: Number(patient?.gestational_weeks || 12),
+            previousConditions: JSON.stringify(patient?.alerts || []),
+          });
+
+          try {
+            const reply = await cloud.sendTextMessage({
+              phone,
+              body: triageResult.draftResponse,
+            });
+            await repo.logOutboundMessage({
+              patientId: patient?.id || null,
+              phone,
+              body: triageResult.draftResponse,
+              metaMessageId: reply.metaMessageId,
+              rawPayload: {
+                ...reply.raw,
+                triage: triageResult,
+                source: "whatsapp-webhook-auto-reply",
+              },
+            });
+          } catch (replyError) {
+            console.error("Failed to send WhatsApp auto-reply:", replyError);
+          }
+
+          if (
+            patient?.id &&
+            (triageResult.riskLevel === RiskLevel.HIGH ||
+              triageResult.riskLevel === RiskLevel.CRITICAL)
+          ) {
+            await repo.createReferral({
+              patientId: patient.id,
+              patientName: patient.name || "WhatsApp Patient",
+              reason: triageResult.reasoning,
+              recommendedAction: triageResult.recommendedAction,
+            });
+            await repo.createTask({
+              patientId: patient.id,
+              patientName: patient.name || "WhatsApp Patient",
+              notes: `WhatsApp triage (${triageResult.riskLevel}): ${triageResult.reasoning}`,
+            });
+          }
         }
 
         for (const status of change.statuses || []) {
