@@ -99,6 +99,8 @@ function renderQuestion(prompt, options) {
 export class WhatsAppQuestionnaireService {
   constructor() {
     this.startKeywords = new Set(["start", "hello", "hi", "hey", "menu", "checkup"]);
+    this.restartKeywords = new Set(["restart", "reset", "start over"]);
+    this.endKeywords = new Set(["end", "stop", "cancel", "quit"]);
   }
 
   shouldStartFlow(messageText, existingSession) {
@@ -139,6 +141,27 @@ export class WhatsAppQuestionnaireService {
   }
 
   handleMessage({ messageText, session, patientName }) {
+    const normalizedMessage = normalizeText(messageText);
+    if (this.restartKeywords.has(normalizedMessage)) {
+      return {
+        kind: "restart",
+        responseText: this.startMessage(patientName),
+        nextSession: this.buildStartSession(session?.patient_id || null),
+      };
+    }
+    if (this.endKeywords.has(normalizedMessage)) {
+      return {
+        kind: "end",
+        responseText:
+          "Your health check session has been ended. Send 'hello' anytime when you want to continue.",
+        nextSession: {
+          ...(session || this.buildStartSession(session?.patient_id || null)),
+          status: "cancelled",
+          completed_at: new Date().toISOString(),
+        },
+      };
+    }
+
     const option = this.resolveOption(messageText, session);
     if (!session || session.status !== "active") {
       return {

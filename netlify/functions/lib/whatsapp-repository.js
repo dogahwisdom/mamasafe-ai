@@ -156,12 +156,53 @@ export class WhatsAppRepository {
       answers: Array.isArray(answers) ? answers : [],
       status: status || "active",
       completed_at: completedAt || null,
+      last_user_message_at: nowIso(),
     };
     const { error } = await this.client.from("whatsapp_sessions").upsert(payload, {
       onConflict: "phone",
     });
     if (error) {
       console.error("Failed to upsert whatsapp session:", error.message);
+      return { ok: false, reason: error.message };
+    }
+    return { ok: true };
+  }
+
+  async listSessionsNeedingReminder(hours = 12) {
+    if (!this.client) return [];
+    const cutoff = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+    const { data, error } = await this.client
+      .from("whatsapp_sessions")
+      .select("phone, patient_id, flow_type, step_key, updated_at, reminder_count")
+      .eq("status", "active")
+      .lt("updated_at", cutoff)
+      .or("reminder_count.is.null,reminder_count.eq.0")
+      .limit(200);
+    if (error) {
+      console.error("Failed to list sessions needing reminder:", error.message);
+      return [];
+    }
+    return data || [];
+  }
+
+  async markSessionReminderSent(phone) {
+    if (!this.client || !phone) return { ok: false, reason: "supabase_not_configured_or_phone_missing" };
+    const { data: session } = await this.client
+      .from("whatsapp_sessions")
+      .select("reminder_count")
+      .eq("phone", phone)
+      .maybeSingle();
+    const nextCount = Number(session?.reminder_count || 0) + 1;
+    const { error } = await this.client
+      .from("whatsapp_sessions")
+      .update({
+        reminder_count: nextCount,
+        reminder_sent_at: nowIso(),
+        last_bot_message_at: nowIso(),
+      })
+      .eq("phone", phone);
+    if (error) {
+      console.error("Failed to mark session reminder sent:", error.message);
       return { ok: false, reason: error.message };
     }
     return { ok: true };
@@ -184,6 +225,13 @@ export class WhatsAppRepository {
     if (error) {
       console.error("Failed to log outbound whatsapp message:", error.message);
       return { ok: false, reason: error.message };
+    }
+    if (phone) {
+      await this.client
+        .from("whatsapp_sessions")
+        .update({ last_bot_message_at: nowIso() })
+        .eq("phone", phone)
+        .eq("status", "active");
     }
     return { ok: true };
   }

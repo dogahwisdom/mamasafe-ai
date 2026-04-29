@@ -7,16 +7,10 @@ import { WhatsAppQuestionnaireService } from "./lib/whatsapp-questionnaire-servi
 import { WhatsAppRepository } from "./lib/whatsapp-repository.js";
 
 function json(statusCode, body) {
-  const debugCommit = process.env.COMMIT_REF || "unknown";
-  const triageKeyPresent = Boolean(
-    process.env.GROQ_API_KEY || process.env.TRIAGE_ENGINE_API_KEY
-  );
   return {
     statusCode,
     headers: {
       "Content-Type": "application/json",
-      "X-MamaSafe-Commit": debugCommit,
-      "X-Triage-Key-Present": String(triageKeyPresent),
     },
     body: JSON.stringify(body),
   };
@@ -43,13 +37,7 @@ export async function handler(event) {
       console.log("WhatsApp webhook verified successfully.");
       return {
         statusCode: 200,
-        headers: {
-          "Content-Type": "text/plain",
-          "X-MamaSafe-Commit": process.env.COMMIT_REF || "unknown",
-          "X-Triage-Key-Present": String(
-            Boolean(process.env.GROQ_API_KEY || process.env.TRIAGE_ENGINE_API_KEY)
-          ),
-        },
+        headers: { "Content-Type": "text/plain" },
         body: challenge || "",
       };
     }
@@ -117,6 +105,7 @@ export async function handler(event) {
                 rawPayload: {
                   ...reply.raw,
                   source: "whatsapp-webhook-unregistered-welcome",
+                  flow_type: "intake",
                 },
               });
             } catch (replyError) {
@@ -129,6 +118,7 @@ export async function handler(event) {
           let triageResult = null;
           let responseText = "";
           let source = "whatsapp-webhook-auto-reply";
+          let flowType = activeSession?.flow_type || "intake";
 
           if (shouldUseQuestionnaire) {
             const flow = questionnaire.handleMessage({
@@ -138,6 +128,7 @@ export async function handler(event) {
             });
             responseText = flow.responseText;
             source = "whatsapp-webhook-questionnaire";
+            flowType = flow.nextSession?.flow_type || flow.nextSession?.flowType || flowType;
             await repo.upsertSession({
               phone,
               patientId: patient?.id || null,
@@ -153,6 +144,7 @@ export async function handler(event) {
             triageResult = questionnaire.buildRuleBasedSymptomResponse(inboundBody);
             responseText = triageResult.draftResponse;
             source = "whatsapp-webhook-rule-based";
+            flowType = activeSession?.flow_type || "free_text";
           }
 
           try {
@@ -169,6 +161,7 @@ export async function handler(event) {
                 ...reply.raw,
                 triage: triageResult,
                 source,
+                flow_type: flowType,
               },
             });
           } catch (replyError) {
@@ -219,13 +212,7 @@ export async function handler(event) {
 
       return {
         statusCode: 200,
-        headers: {
-          "Content-Type": "text/plain",
-          "X-MamaSafe-Commit": process.env.COMMIT_REF || "unknown",
-          "X-Triage-Key-Present": String(
-            Boolean(process.env.GROQ_API_KEY || process.env.TRIAGE_ENGINE_API_KEY)
-          ),
-        },
+        headers: { "Content-Type": "text/plain" },
         body: "EVENT_RECEIVED",
       };
     } catch (error) {
