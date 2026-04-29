@@ -215,12 +215,34 @@ export class WhatsAppRepository {
       .select("id, name, phone")
       .not("phone", "is", null)
       .neq("phone", "")
+      .eq("whatsapp_checkup_opt_out", false)
       .limit(limit);
     if (error) {
       console.error("Failed to list patients with phone:", error.message);
       return [];
     }
     return data || [];
+  }
+
+  async setPatientCheckupOptOut(phone, optOut = true) {
+    if (!this.client || !phone) return { ok: false, reason: "supabase_not_configured_or_phone_missing" };
+    const normalized = String(phone).replace(/[^0-9+]/g, "");
+    const withPlus = normalized.startsWith("+") ? normalized : `+${normalized}`;
+    const withoutPlus = withPlus.replace(/^\+/, "");
+    const timestamp = optOut ? nowIso() : null;
+    const patch = {
+      whatsapp_checkup_opt_out: Boolean(optOut),
+      whatsapp_checkup_opt_out_at: timestamp,
+    };
+    const { error } = await this.client
+      .from("patients")
+      .update(patch)
+      .in("phone", [withPlus, withoutPlus]);
+    if (error) {
+      console.error("Failed to update patient checkup opt-out:", error.message);
+      return { ok: false, reason: error.message };
+    }
+    return { ok: true };
   }
 
   async hasRecentOutboundBySource(phone, source, hours = 24 * 7) {

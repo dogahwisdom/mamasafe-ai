@@ -66,6 +66,7 @@ export async function handler(event) {
           }
           const phone = message?.from ? `+${String(message.from).replace(/^\+/, "")}` : "";
           const inboundBody = message?.text?.body || "";
+          const normalizedInbound = String(inboundBody || "").trim().toLowerCase();
           const patient = await repo.findPatientByPhone(phone);
           await repo.logInboundMessage({
             patientId: patient?.id || null,
@@ -74,6 +75,52 @@ export async function handler(event) {
             metaMessageId: message?.id || null,
             rawPayload: message,
           });
+
+          if (["stop", "unsubscribe", "opt out"].includes(normalizedInbound)) {
+            await repo.setPatientCheckupOptOut(phone, true);
+            const responseText =
+              "You have been unsubscribed from proactive MamaSafe check-up messages. You can still message us anytime. Send START to opt in again.";
+            try {
+              const reply = await cloud.sendTextMessage({ phone, body: responseText });
+              await repo.logOutboundMessage({
+                patientId: patient?.id || null,
+                phone,
+                body: responseText,
+                metaMessageId: reply.metaMessageId,
+                rawPayload: {
+                  ...reply.raw,
+                  source: "whatsapp-webhook-opt-out",
+                  flow_type: "system_checkup",
+                },
+              });
+            } catch (replyError) {
+              console.error("Failed to send opt-out confirmation:", replyError);
+            }
+            continue;
+          }
+
+          if (["start", "subscribe", "opt in"].includes(normalizedInbound)) {
+            await repo.setPatientCheckupOptOut(phone, false);
+            const responseText =
+              "You are now subscribed to proactive MamaSafe check-up messages again. Send hello to start a guided check-up now.";
+            try {
+              const reply = await cloud.sendTextMessage({ phone, body: responseText });
+              await repo.logOutboundMessage({
+                patientId: patient?.id || null,
+                phone,
+                body: responseText,
+                metaMessageId: reply.metaMessageId,
+                rawPayload: {
+                  ...reply.raw,
+                  source: "whatsapp-webhook-opt-in",
+                  flow_type: "system_checkup",
+                },
+              });
+            } catch (replyError) {
+              console.error("Failed to send opt-in confirmation:", replyError);
+            }
+            continue;
+          }
 
           const activeSession = await repo.getActiveSessionByPhone(phone);
           if (!patient && !activeSession) {
