@@ -11,6 +11,11 @@ interface MessageResult {
   error?: string;
 }
 
+interface WhatsAppSendContext {
+  patientId?: string;
+  relatedReminderId?: string;
+}
+
 export class MessagingService {
   private readonly AT_SMS_URL = 'https://api.africastalking.com/version1/messaging';
   private readonly WHATSAPP_FUNCTION_URL = '/.netlify/functions/whatsapp-send';
@@ -70,7 +75,11 @@ Asante!`;
   /**
    * Send WhatsApp message
    */
-  public async sendWhatsApp(phone: string, message: string): Promise<boolean> {
+  public async sendWhatsApp(
+    phone: string,
+    message: string,
+    context?: WhatsAppSendContext
+  ): Promise<boolean> {
     try {
       const response = await fetch(this.WHATSAPP_FUNCTION_URL, {
         method: 'POST',
@@ -80,6 +89,8 @@ Asante!`;
         body: JSON.stringify({
           phone,
           message,
+          patientId: context?.patientId,
+          relatedReminderId: context?.relatedReminderId,
         }),
       });
 
@@ -152,12 +163,13 @@ Asante!`;
   public async sendNotification(
     phone: string,
     message: string,
-    channels: ('sms' | 'whatsapp')[] = ['whatsapp', 'sms']
+    channels: ('sms' | 'whatsapp')[] = ['whatsapp', 'sms'],
+    context?: WhatsAppSendContext
   ): Promise<MessageResult[]> {
     const results: MessageResult[] = [];
 
     if (channels.includes('whatsapp')) {
-      const success = await this.sendWhatsApp(phone, message);
+      const success = await this.sendWhatsApp(phone, message, context);
       results.push({
         success,
         channel: 'whatsapp',

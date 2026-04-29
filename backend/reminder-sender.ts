@@ -47,13 +47,22 @@ interface Reminder {
   sent: boolean;
 }
 
+interface WhatsAppSendResult {
+  success: boolean;
+  metaMessageId?: string;
+  error?: string;
+}
+
 /**
  * Send WhatsApp message
  */
-async function sendWhatsAppMessage(phone: string, message: string): Promise<boolean> {
+async function sendWhatsAppMessage(
+  phone: string,
+  message: string
+): Promise<WhatsAppSendResult> {
   if (!WHATSAPP_ACCESS_TOKEN || !WHATSAPP_PHONE_NUMBER_ID) {
     console.warn('WhatsApp credentials not configured');
-    return false;
+    return { success: false, error: 'whatsapp_not_configured' };
   }
 
   try {
@@ -75,15 +84,47 @@ async function sendWhatsAppMessage(phone: string, message: string): Promise<bool
     if (!response.ok) {
       const error = await response.json();
       console.error('WhatsApp API Error:', error);
-      return false;
+      return {
+        success: false,
+        error: error?.error?.message || 'meta_send_failed',
+      };
     }
 
     const result = await response.json();
-    console.log(`WhatsApp message sent to ${phone}:`, result.messages?.[0]?.id);
-    return true;
+    const metaMessageId: string | undefined = result.messages?.[0]?.id;
+    console.log(`WhatsApp message sent to ${phone}:`, metaMessageId);
+    return { success: true, metaMessageId };
   } catch (error) {
     console.error(`Error sending WhatsApp to ${phone}:`, error);
-    return false;
+    return { success: false, error: 'whatsapp_exception' };
+  }
+}
+
+async function logWhatsAppReminderMessage(params: {
+  reminderId: string;
+  patientId: string;
+  phone: string;
+  body: string;
+  status: 'sent' | 'failed';
+  metaMessageId?: string;
+  rawPayload?: Record<string, unknown>;
+}) {
+  const { error } = await supabase.from('whatsapp_messages').insert({
+    patient_id: params.patientId,
+    related_reminder_id: params.reminderId,
+    phone: params.phone,
+    direction: 'outbound',
+    message_type: 'text',
+    body: params.body,
+    status: params.status,
+    meta_message_id: params.metaMessageId || null,
+    raw_payload: params.rawPayload || {},
+    sent_at: params.status === 'sent' ? new Date().toISOString() : null,
+    failed_at: params.status === 'failed' ? new Date().toISOString() : null,
+  });
+
+  if (error) {
+    console.error('Failed to log reminder whatsapp message:', error.message);
   }
 }
 
@@ -160,8 +201,17 @@ async function sendReminder(reminder: Reminder): Promise<boolean> {
 
   // Send via WhatsApp
   if (channel === 'whatsapp' || channel === 'both') {
-    const whatsappSent = await sendWhatsAppMessage(reminder.phone, reminder.message);
-    if (whatsappSent) sent = true;
+    const waResult = await sendWhatsAppMessage(reminder.phone, reminder.message);
+    await logWhatsAppReminderMessage({
+      reminderId: reminder.id,
+      patientId: reminder.patient_id,
+      phone: reminder.phone,
+      body: reminder.message,
+      status: waResult.success ? 'sent' : 'failed',
+      metaMessageId: waResult.metaMessageId,
+      rawPayload: waResult.error ? { error: waResult.error } : {},
+    });
+    if (waResult.success) sent = true;
   }
 
   // Send via SMS
