@@ -11,9 +11,10 @@ function json(statusCode, body) {
 
 const OUTREACH_SOURCE = "whatsapp-system-checkup";
 const DEFAULT_COOLDOWN_HOURS = 24 * 7;
-const DEFAULT_BATCH_SIZE = 500;
-const DEFAULT_START_HOUR = 8;
-const DEFAULT_END_HOUR = 18;
+const DEFAULT_BATCH_SIZE = 20;
+const DEFAULT_START_HOUR_LOCAL = 8;
+const DEFAULT_END_HOUR_LOCAL = 18;
+const DEFAULT_UNKNOWN_COUNTRY_UTC_OFFSET = 0;
 
 function buildCheckupMessage(patientName) {
   return [
@@ -26,6 +27,17 @@ function buildCheckupMessage(patientName) {
     "",
     "You can also type 'hello' to start a guided check-up.",
   ].join("\n");
+}
+
+function getCountryUtcOffsetByPhone(phone) {
+  const normalized = String(phone || "").trim();
+  if (normalized.startsWith("+233")) return 0; // Ghana
+  if (normalized.startsWith("+254")) return 3; // Kenya
+  return null;
+}
+
+function getLocalHour(utcHour, utcOffset) {
+  return (utcHour + utcOffset + 24) % 24;
 }
 
 export const config = {
@@ -44,28 +56,32 @@ export async function handler(event) {
     return json(200, { ok: true, skipped: true, reason: "system_checkup_disabled" });
   }
 
-  const startHour = Number(process.env.WHATSAPP_CHECKUP_START_HOUR || DEFAULT_START_HOUR);
-  const endHour = Number(process.env.WHATSAPP_CHECKUP_END_HOUR || DEFAULT_END_HOUR);
-  const nowHour = new Date().getUTCHours();
-  if (nowHour < startHour || nowHour >= endHour) {
-    return json(200, {
-      ok: true,
-      skipped: true,
-      reason: "outside_quiet_hours_window",
-      nowHourUtc: nowHour,
-      startHourUtc: startHour,
-      endHourUtc: endHour,
-    });
-  }
-
+  const startHourLocal = Number(
+    process.env.WHATSAPP_CHECKUP_LOCAL_START_HOUR || DEFAULT_START_HOUR_LOCAL
+  );
+  const endHourLocal = Number(process.env.WHATSAPP_CHECKUP_LOCAL_END_HOUR || DEFAULT_END_HOUR_LOCAL);
+  const defaultUtcOffset = Number(
+    process.env.WHATSAPP_CHECKUP_DEFAULT_UTC_OFFSET || DEFAULT_UNKNOWN_COUNTRY_UTC_OFFSET
+  );
+  const nowHourUtc = new Date().getUTCHours();
   const cooldownHours = Number(process.env.WHATSAPP_CHECKUP_COOLDOWN_HOURS || DEFAULT_COOLDOWN_HOURS);
   const batchSize = Number(process.env.WHATSAPP_CHECKUP_BATCH_SIZE || DEFAULT_BATCH_SIZE);
   const patients = await repo.listPatientsWithPhone(batchSize);
 
   let sent = 0;
   let skipped = 0;
+  let skippedQuietHours = 0;
 
   for (const patient of patients) {
+    const countryUtcOffset = getCountryUtcOffsetByPhone(patient.phone);
+    const utcOffset = countryUtcOffset === null ? defaultUtcOffset : countryUtcOffset;
+    const localHour = getLocalHour(nowHourUtc, utcOffset);
+    if (localHour < startHourLocal || localHour >= endHourLocal) {
+      skipped += 1;
+      skippedQuietHours += 1;
+      continue;
+    }
+
     const hasRecent = await repo.hasRecentOutboundBySource(
       patient.phone,
       OUTREACH_SOURCE,
@@ -104,7 +120,10 @@ export async function handler(event) {
     scanned: patients.length,
     sent,
     skipped,
+    skippedQuietHours,
     cooldownHours,
     source: OUTREACH_SOURCE,
+    nowHourUtc,
+    quietHoursLocal: `${startHourLocal}:00-${endHourLocal}:00`,
   });
 }
