@@ -208,6 +208,39 @@ export class WhatsAppRepository {
     return { ok: true };
   }
 
+  async listPatientsWithPhone(limit = 500) {
+    if (!this.client) return [];
+    const { data, error } = await this.client
+      .from("patients")
+      .select("id, name, phone")
+      .not("phone", "is", null)
+      .neq("phone", "")
+      .limit(limit);
+    if (error) {
+      console.error("Failed to list patients with phone:", error.message);
+      return [];
+    }
+    return data || [];
+  }
+
+  async hasRecentOutboundBySource(phone, source, hours = 24 * 7) {
+    if (!this.client || !phone || !source) return false;
+    const cutoff = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+    const { data, error } = await this.client
+      .from("whatsapp_messages")
+      .select("id")
+      .eq("direction", "outbound")
+      .eq("phone", phone)
+      .gte("created_at", cutoff)
+      .contains("raw_payload", { source })
+      .limit(1);
+    if (error) {
+      console.error("Failed to check recent outbound source:", error.message);
+      return false;
+    }
+    return Array.isArray(data) && data.length > 0;
+  }
+
   async logOutboundMessage({ patientId, phone, body, metaMessageId, rawPayload, relatedReminderId }) {
     if (!this.client) return { ok: false, reason: "supabase_not_configured" };
     const { error } = await this.client.from("whatsapp_messages").insert({
