@@ -3,6 +3,7 @@
  */
 import { parseIncomingWhatsAppEvents } from "./lib/whatsapp-cloud-service.js";
 import { WhatsAppCloudService } from "./lib/whatsapp-cloud-service.js";
+import { WhatsAppQuestionnaireService } from "./lib/whatsapp-questionnaire-service.js";
 import { WhatsAppRepository } from "./lib/whatsapp-repository.js";
 import { RiskLevel, WhatsAppTriageService } from "./lib/whatsapp-triage-service.js";
 
@@ -27,6 +28,7 @@ export async function handler(event) {
   const repo = new WhatsAppRepository();
   const cloud = new WhatsAppCloudService();
   const triage = new WhatsAppTriageService();
+  const questionnaire = new WhatsAppQuestionnaireService();
 
   if (!verifyToken) {
     console.error("Missing WHATSAPP_VERIFY_TOKEN");
@@ -73,37 +75,66 @@ export async function handler(event) {
             continue;
           }
           const phone = message?.from ? `+${String(message.from).replace(/^\+/, "")}` : "";
+          const inboundBody = message?.text?.body || "";
           const patient =
             (await repo.findPatientByPhone(phone)) ||
             (await repo.createOrFindPatientByPhone(phone, change?.contacts?.[0]?.profile?.name));
           await repo.logInboundMessage({
             patientId: patient?.id || null,
             phone,
-            body: message?.text?.body || "",
+            body: inboundBody,
             metaMessageId: message?.id || null,
             rawPayload: message,
           });
 
-          const triageResult = await triage.analyzeSymptoms({
-            symptoms: message?.text?.body || "",
-            gestationalAge: Number(patient?.gestational_weeks || 12),
-            previousConditions: JSON.stringify(patient?.alerts || []),
-          });
+          const activeSession = await repo.getActiveSessionByPhone(phone);
+          const shouldUseQuestionnaire = questionnaire.shouldStartFlow(inboundBody, activeSession);
+          let triageResult = null;
+          let responseText = "";
+          let source = "whatsapp-webhook-auto-reply";
+
+          if (shouldUseQuestionnaire) {
+            const flow = questionnaire.handleMessage({
+              messageText: inboundBody,
+              session: activeSession,
+              patientName: patient?.name || "Mum/Patient",
+            });
+            responseText = flow.responseText;
+            source = "whatsapp-webhook-questionnaire";
+            await repo.upsertSession({
+              phone,
+              patientId: patient?.id || null,
+              flowType: flow.nextSession?.flow_type || flow.nextSession?.flowType || "intake",
+              stepKey: flow.nextSession?.step_key || flow.nextSession?.stepKey || "choose_profile",
+              stepIndex: flow.nextSession?.step_index ?? flow.nextSession?.stepIndex ?? 0,
+              answers: flow.nextSession?.answers || [],
+              status: flow.nextSession?.status || "active",
+              completedAt: flow.nextSession?.completed_at || flow.nextSession?.completedAt || null,
+            });
+            triageResult = flow.triageResult || null;
+          } else {
+            triageResult = await triage.analyzeSymptoms({
+              symptoms: inboundBody,
+              gestationalAge: Number(patient?.gestational_weeks || 12),
+              previousConditions: JSON.stringify(patient?.alerts || []),
+            });
+            responseText = triageResult.draftResponse;
+          }
 
           try {
             const reply = await cloud.sendTextMessage({
               phone,
-              body: triageResult.draftResponse,
+              body: responseText,
             });
             await repo.logOutboundMessage({
               patientId: patient?.id || null,
               phone,
-              body: triageResult.draftResponse,
+              body: responseText,
               metaMessageId: reply.metaMessageId,
               rawPayload: {
                 ...reply.raw,
                 triage: triageResult,
-                source: "whatsapp-webhook-auto-reply",
+                source,
               },
             });
           } catch (replyError) {
@@ -112,8 +143,8 @@ export async function handler(event) {
 
           if (
             patient?.id &&
-            (triageResult.riskLevel === RiskLevel.HIGH ||
-              triageResult.riskLevel === RiskLevel.CRITICAL)
+            triageResult &&
+            (triageResult.riskLevel === RiskLevel.HIGH || triageResult.riskLevel === RiskLevel.CRITICAL)
           ) {
             await repo.createReferral({
               patientId: patient.id,

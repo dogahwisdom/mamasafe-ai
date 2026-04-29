@@ -106,6 +106,52 @@ export class WhatsAppRepository {
     return { ok: true };
   }
 
+  async getActiveSessionByPhone(phone) {
+    if (!this.client || !phone) return null;
+    const { data, error } = await this.client
+      .from("whatsapp_sessions")
+      .select("*")
+      .eq("phone", phone)
+      .eq("status", "active")
+      .maybeSingle();
+    if (error) {
+      console.error("Failed to read whatsapp session:", error.message);
+      return null;
+    }
+    return data;
+  }
+
+  async upsertSession({
+    phone,
+    patientId,
+    flowType,
+    stepKey,
+    stepIndex,
+    answers,
+    status,
+    completedAt,
+  }) {
+    if (!this.client || !phone) return { ok: false, reason: "supabase_not_configured" };
+    const payload = {
+      phone,
+      patient_id: patientId || null,
+      flow_type: flowType || "intake",
+      step_key: stepKey || "choose_profile",
+      step_index: Number(stepIndex || 0),
+      answers: Array.isArray(answers) ? answers : [],
+      status: status || "active",
+      completed_at: completedAt || null,
+    };
+    const { error } = await this.client.from("whatsapp_sessions").upsert(payload, {
+      onConflict: "phone",
+    });
+    if (error) {
+      console.error("Failed to upsert whatsapp session:", error.message);
+      return { ok: false, reason: error.message };
+    }
+    return { ok: true };
+  }
+
   async logOutboundMessage({ patientId, phone, body, metaMessageId, rawPayload, relatedReminderId }) {
     if (!this.client) return { ok: false, reason: "supabase_not_configured" };
     const { error } = await this.client.from("whatsapp_messages").insert({

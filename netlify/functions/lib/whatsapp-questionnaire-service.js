@@ -1,0 +1,238 @@
+const RISK = {
+  LOW: "Low",
+  HIGH: "High",
+  CRITICAL: "Critical",
+};
+
+const FLOW_QUESTION_BANK = {
+  pregnancy: [
+    {
+      key: "preg_danger_signs",
+      text: "Are you having severe headache, blurred vision, bleeding, or fever?",
+      options: ["Yes", "No"],
+      criticalOn: [1],
+    },
+    {
+      key: "preg_appointment",
+      text: "Have you missed your recent antenatal check-up?",
+      options: ["Yes", "No"],
+      riskOn: [1],
+    },
+    {
+      key: "preg_diabetes",
+      text: "Hello Mum, have you tested for diabetes in this pregnancy?",
+      options: ["Yes", "No"],
+      riskOn: [2],
+    },
+  ],
+  baby: [
+    {
+      key: "baby_feeding",
+      text: "Is your baby feeding every 2-3 hours?",
+      options: ["Yes", "No"],
+      criticalOn: [2],
+    },
+    {
+      key: "baby_fever",
+      text: "Does your baby have fever, difficulty breathing, or convulsions?",
+      options: ["Yes", "No"],
+      criticalOn: [1],
+    },
+    {
+      key: "baby_diarrhea",
+      text: "Has your baby had diarrhea or vomiting since morning?",
+      options: ["Yes", "No"],
+      riskOn: [1],
+    },
+  ],
+  general: [
+    {
+      key: "gen_danger",
+      text: "Do you have severe pain, bleeding, breathing difficulty, or very high fever?",
+      options: ["Yes", "No"],
+      criticalOn: [1],
+    },
+    {
+      key: "gen_chronic",
+      text: "Do you have diabetes, hypertension, or another chronic condition?",
+      options: ["Yes", "No"],
+      riskOn: [1],
+    },
+    {
+      key: "gen_duration",
+      text: "Have these symptoms lasted for more than 48 hours?",
+      options: ["Yes", "No"],
+      riskOn: [1],
+    },
+  ],
+};
+
+function isNumericOption(text) {
+  const trimmed = String(text || "").trim();
+  return /^[1-3]$/.test(trimmed) ? Number(trimmed) : null;
+}
+
+function renderQuestion(prompt, options) {
+  const lines = [`${prompt}`];
+  options.forEach((option, idx) => lines.push(`${idx + 1}. ${option}`));
+  return lines.join("\n");
+}
+
+export class WhatsAppQuestionnaireService {
+  constructor() {
+    this.startKeywords = new Set(["start", "hello", "hi", "hey", "menu", "checkup"]);
+  }
+
+  shouldStartFlow(messageText, existingSession) {
+    if (existingSession?.status === "active") return true;
+    const normalized = String(messageText || "").trim().toLowerCase();
+    if (!normalized) return true;
+    if (this.startKeywords.has(normalized)) return true;
+    if (/^[1-3]$/.test(normalized)) return true;
+    return false;
+  }
+
+  startMessage(patientName = "Mum/Patient") {
+    return [
+      `Hello ${patientName}, we have 3 quick questions to support your care.`,
+      "Your answers are private and will only be used by MamaSafe AI and your registered health facility.",
+      "",
+      renderQuestion("Who is this check for today?", [
+        "Pregnant mother",
+        "Baby (0-12 months)",
+        "General patient",
+      ]),
+    ].join("\n");
+  }
+
+  buildStartSession(flowOwnerPatientId) {
+    return {
+      phone: null,
+      patientId: flowOwnerPatientId || null,
+      flowType: "intake",
+      stepKey: "choose_profile",
+      stepIndex: 0,
+      answers: [],
+      status: "active",
+    };
+  }
+
+  handleMessage({ messageText, session, patientName }) {
+    const option = isNumericOption(messageText);
+    if (!session || session.status !== "active") {
+      return {
+        kind: "start",
+        responseText: this.startMessage(patientName),
+        nextSession: this.buildStartSession(session?.patient_id || null),
+      };
+    }
+
+    if (session.flow_type === "intake") {
+      if (!option) {
+        return {
+          kind: "invalid",
+          responseText: "Please choose one option by sending 1, 2, or 3.",
+          nextSession: session,
+        };
+      }
+
+      const flowType = option === 1 ? "pregnancy" : option === 2 ? "baby" : "general";
+      const first = FLOW_QUESTION_BANK[flowType][0];
+      return {
+        kind: "question",
+        responseText: renderQuestion(first.text, first.options),
+        nextSession: {
+          ...session,
+          flow_type: flowType,
+          step_key: first.key,
+          step_index: 0,
+        },
+      };
+    }
+
+    const questions = FLOW_QUESTION_BANK[session.flow_type] || [];
+    const current = questions[session.step_index];
+    if (!current) {
+      return {
+        kind: "complete",
+        responseText:
+          "Thank you for your responses. MamaSafe AI will use your answers to support the best care.",
+        nextSession: { ...session, status: "completed", completed_at: new Date().toISOString() },
+        triageResult: {
+          riskLevel: RISK.LOW,
+          reasoning: "Questionnaire completed.",
+          recommendedAction: "Continue routine care.",
+        },
+      };
+    }
+
+    if (!option || option > current.options.length) {
+      return {
+        kind: "invalid",
+        responseText: `Please answer this question by sending 1 or 2.\n\n${renderQuestion(
+          current.text,
+          current.options
+        )}`,
+        nextSession: session,
+      };
+    }
+
+    const answers = [...(session.answers || []), { key: current.key, value: option }];
+    const nextIndex = session.step_index + 1;
+    if (nextIndex < questions.length) {
+      const next = questions[nextIndex];
+      return {
+        kind: "question",
+        responseText: renderQuestion(next.text, next.options),
+        nextSession: {
+          ...session,
+          answers,
+          step_index: nextIndex,
+          step_key: next.key,
+        },
+      };
+    }
+
+    const triageResult = this.scoreRisk(session.flow_type, answers);
+    return {
+      kind: "complete",
+      responseText: this.completionText(triageResult.riskLevel),
+      nextSession: {
+        ...session,
+        answers,
+        status: "completed",
+        completed_at: new Date().toISOString(),
+      },
+      triageResult,
+    };
+  }
+
+  completionText(riskLevel) {
+    if (riskLevel === RISK.CRITICAL || riskLevel === RISK.HIGH) {
+      return "Thank you for your responses. We identified urgent risk signs and have flagged your case for the doctor. Please go to the nearest hospital immediately while our team follows up.";
+    }
+    return "Thank you for your responses. MamaSafe AI and your health facility will use your answers to provide the best care. We will not share your personal information without your permission.";
+  }
+
+  scoreRisk(flowType, answers) {
+    const questions = FLOW_QUESTION_BANK[flowType] || [];
+    let riskHits = 0;
+    let criticalHit = false;
+
+    for (const answer of answers) {
+      const question = questions.find((q) => q.key === answer.key);
+      if (!question) continue;
+      if ((question.criticalOn || []).includes(answer.value)) criticalHit = true;
+      if ((question.riskOn || []).includes(answer.value)) riskHits += 1;
+    }
+
+    const riskLevel = criticalHit ? RISK.CRITICAL : riskHits >= 2 ? RISK.HIGH : riskHits === 1 ? RISK.HIGH : RISK.LOW;
+    const reasoning = `Questionnaire flow "${flowType}" completed with ${answers.length} answers; critical=${criticalHit}, riskHits=${riskHits}.`;
+    const recommendedAction =
+      riskLevel === RISK.LOW
+        ? "Continue routine follow-up and monitor symptoms."
+        : "Escalate to clinician review immediately.";
+
+    return { riskLevel, reasoning, recommendedAction };
+  }
+}
