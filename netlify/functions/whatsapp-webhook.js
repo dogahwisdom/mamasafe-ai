@@ -5,7 +5,6 @@ import { parseIncomingWhatsAppEvents } from "./lib/whatsapp-cloud-service.js";
 import { WhatsAppCloudService } from "./lib/whatsapp-cloud-service.js";
 import { WhatsAppQuestionnaireService } from "./lib/whatsapp-questionnaire-service.js";
 import { WhatsAppRepository } from "./lib/whatsapp-repository.js";
-import { RiskLevel, WhatsAppTriageService } from "./lib/whatsapp-triage-service.js";
 
 function json(statusCode, body) {
   const debugCommit = process.env.COMMIT_REF || "unknown";
@@ -27,7 +26,6 @@ export async function handler(event) {
   const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN;
   const repo = new WhatsAppRepository();
   const cloud = new WhatsAppCloudService();
-  const triage = new WhatsAppTriageService();
   const questionnaire = new WhatsAppQuestionnaireService();
 
   if (!verifyToken) {
@@ -113,12 +111,9 @@ export async function handler(event) {
             });
             triageResult = flow.triageResult || null;
           } else {
-            triageResult = await triage.analyzeSymptoms({
-              symptoms: inboundBody,
-              gestationalAge: Number(patient?.gestational_weeks || 12),
-              previousConditions: JSON.stringify(patient?.alerts || []),
-            });
+            triageResult = questionnaire.buildRuleBasedSymptomResponse(inboundBody);
             responseText = triageResult.draftResponse;
+            source = "whatsapp-webhook-rule-based";
           }
 
           try {
@@ -144,7 +139,8 @@ export async function handler(event) {
           if (
             patient?.id &&
             triageResult &&
-            (triageResult.riskLevel === RiskLevel.HIGH || triageResult.riskLevel === RiskLevel.CRITICAL)
+            (String(triageResult.riskLevel).toLowerCase() === "high" ||
+              String(triageResult.riskLevel).toLowerCase() === "critical")
           ) {
             await repo.createReferral({
               patientId: patient.id,

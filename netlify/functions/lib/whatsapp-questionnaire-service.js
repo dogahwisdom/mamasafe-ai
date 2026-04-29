@@ -4,6 +4,20 @@ const RISK = {
   CRITICAL: "Critical",
 };
 
+const DANGER_KEYWORDS = [
+  "bleeding",
+  "convulsion",
+  "faint",
+  "blurred vision",
+  "severe headache",
+  "not breathing",
+  "difficulty breathing",
+  "fever",
+  "vomit",
+  "vomiting",
+  "reduced movement",
+];
+
 const FLOW_QUESTION_BANK = {
   pregnancy: [
     {
@@ -72,6 +86,10 @@ function isNumericOption(text) {
   return /^[1-3]$/.test(trimmed) ? Number(trimmed) : null;
 }
 
+function normalizeText(text) {
+  return String(text || "").trim().toLowerCase();
+}
+
 function renderQuestion(prompt, options) {
   const lines = [`${prompt}`];
   options.forEach((option, idx) => lines.push(`${idx + 1}. ${option}`));
@@ -89,6 +107,9 @@ export class WhatsAppQuestionnaireService {
     if (!normalized) return true;
     if (this.startKeywords.has(normalized)) return true;
     if (/^[1-3]$/.test(normalized)) return true;
+    if (normalized.includes("pregnant") || normalized.includes("baby") || normalized.includes("patient")) {
+      return true;
+    }
     return false;
   }
 
@@ -118,7 +139,7 @@ export class WhatsAppQuestionnaireService {
   }
 
   handleMessage({ messageText, session, patientName }) {
-    const option = isNumericOption(messageText);
+    const option = this.resolveOption(messageText, session);
     if (!session || session.status !== "active") {
       return {
         kind: "start",
@@ -131,7 +152,8 @@ export class WhatsAppQuestionnaireService {
       if (!option) {
         return {
           kind: "invalid",
-          responseText: "Please choose one option by sending 1, 2, or 3.",
+          responseText:
+            "Please choose one option by sending 1, 2, or 3.\n\nYou can also type words like 'pregnant mother', 'baby', or 'general patient'.",
           nextSession: session,
         };
       }
@@ -207,6 +229,36 @@ export class WhatsAppQuestionnaireService {
     };
   }
 
+  buildRuleBasedSymptomResponse(messageText) {
+    const normalized = normalizeText(messageText);
+    const hits = DANGER_KEYWORDS.filter((term) => normalized.includes(term));
+    if (hits.length >= 2) {
+      return {
+        riskLevel: RISK.CRITICAL,
+        reasoning: `Danger-sign keywords detected: ${hits.join(", ")}.`,
+        recommendedAction: "Immediate hospital review and clinician follow-up.",
+        draftResponse:
+          "I am concerned about your symptoms. Please go to the nearest hospital immediately. Our care team has been alerted to follow up.",
+      };
+    }
+    if (hits.length === 1) {
+      return {
+        riskLevel: RISK.HIGH,
+        reasoning: `Potential risk symptom detected: ${hits[0]}.`,
+        recommendedAction: "Urgent clinician review recommended.",
+        draftResponse:
+          "Thank you for sharing. Your symptom needs urgent review. Please visit the nearest health facility today, and our team will follow up.",
+      };
+    }
+    return {
+      riskLevel: RISK.LOW,
+      reasoning: "No immediate danger keywords found in free-text input.",
+      recommendedAction: "Continue monitoring and complete guided questionnaire.",
+      draftResponse:
+        "Thank you. To support safe care, please type 'hello' to begin our 3-question health check.",
+    };
+  }
+
   completionText(riskLevel) {
     if (riskLevel === RISK.CRITICAL || riskLevel === RISK.HIGH) {
       return "Thank you for your responses. We identified urgent risk signs and have flagged your case for the doctor. Please go to the nearest hospital immediately while our team follows up.";
@@ -234,5 +286,28 @@ export class WhatsAppQuestionnaireService {
         : "Escalate to clinician review immediately.";
 
     return { riskLevel, reasoning, recommendedAction };
+  }
+
+  resolveOption(messageText, session) {
+    const numeric = isNumericOption(messageText);
+    if (numeric) return numeric;
+    const normalized = normalizeText(messageText);
+
+    if (!session || session.flow_type === "intake") {
+      if (normalized.includes("pregnant") || normalized.includes("mother") || normalized.includes("mum")) {
+        return 1;
+      }
+      if (normalized.includes("baby") || normalized.includes("newborn") || normalized.includes("infant")) {
+        return 2;
+      }
+      if (normalized.includes("general") || normalized.includes("patient") || normalized.includes("adult")) {
+        return 3;
+      }
+      return null;
+    }
+
+    if (["yes", "y", "true"].includes(normalized)) return 1;
+    if (["no", "n", "false"].includes(normalized)) return 2;
+    return null;
   }
 }
