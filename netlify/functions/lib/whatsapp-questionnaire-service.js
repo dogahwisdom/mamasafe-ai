@@ -96,6 +96,10 @@ function renderQuestion(prompt, options) {
   return lines.join("\n");
 }
 
+function guidanceSuffix() {
+  return "\n\nReply with 1 or 2, or send 'restart' to start over, or 'end' to stop.";
+}
+
 export class WhatsAppQuestionnaireService {
   constructor() {
     this.startKeywords = new Set(["start", "hello", "hi", "hey", "menu", "checkup"]);
@@ -142,6 +146,15 @@ export class WhatsAppQuestionnaireService {
 
   handleMessage({ messageText, session, patientName }) {
     const normalizedMessage = normalizeText(messageText);
+    if (session?.status === "active" && this.startKeywords.has(normalizedMessage)) {
+      const resume = this.resumePromptForActiveSession(session, patientName);
+      return {
+        kind: "resume",
+        responseText: resume,
+        nextSession: session,
+      };
+    }
+
     if (this.restartKeywords.has(normalizedMessage)) {
       return {
         kind: "restart",
@@ -250,6 +263,21 @@ export class WhatsAppQuestionnaireService {
       },
       triageResult,
     };
+  }
+
+  resumePromptForActiveSession(session, patientName) {
+    if (!session || session.status !== "active") {
+      return this.startMessage(patientName);
+    }
+    if (session.flow_type === "intake") {
+      return `${this.startMessage(patientName)}\n\nReply with 1, 2, or 3, or send 'end' to stop.`;
+    }
+    const questions = FLOW_QUESTION_BANK[session.flow_type] || [];
+    const current = questions[session.step_index];
+    if (!current) {
+      return "Your session is almost complete. Send 'restart' to begin again or 'end' to close this session.";
+    }
+    return `${renderQuestion(current.text, current.options)}${guidanceSuffix()}`;
   }
 
   buildRuleBasedSymptomResponse(messageText) {
