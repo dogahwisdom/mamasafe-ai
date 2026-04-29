@@ -18,10 +18,11 @@ import { SettingsView } from './views/Settings';
 import { SuperadminDashboard } from './views/SuperadminDashboard';
 import { ClinicWorkflow } from './views/ClinicWorkflow';
 import { FacilityStaffView } from './views/FacilityStaffView';
+import { OutreachMonitorView } from './views/OutreachMonitorView';
 import { backend } from './services/backend';
 import { ViewState, Alert, Patient, UserProfile } from './types';
 import { Permissions } from './services/permissions';
-import { LayoutDashboard, UserPlus, Stethoscope, Sun, Moon, Bell, LogOut, Users, X, HelpCircle, Book, ExternalLink, MessageSquare, Phone, Clock, FileText, Settings, Loader2, CheckCircle, Workflow, BarChart2, Package, Receipt, UserCog } from 'lucide-react';
+import { LayoutDashboard, UserPlus, Stethoscope, Sun, Moon, Bell, LogOut, Users, X, HelpCircle, Book, ExternalLink, MessageSquare, Phone, Clock, FileText, Settings, Loader2, CheckCircle, Workflow, BarChart2, Package, Receipt, UserCog, Radar } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -176,6 +177,7 @@ export const App: React.FC = () => {
         ...(Permissions.isOwnerOrAdmin(currentUser)
           ? [{ id: 'facility_staff', label: 'Team', icon: UserCog }]
           : []),
+        { id: 'outreach_monitor', label: 'Outreach', icon: Radar },
         { id: 'patients', label: 'Patients', icon: Users },
         ...(Permissions.canAccess(currentUser, 'inventory')
           ? [{ id: 'pharmacy_inventory', label: 'Inventory', icon: Package }]
@@ -195,6 +197,7 @@ export const App: React.FC = () => {
         ...(Permissions.isOwnerOrAdmin(currentUser)
           ? [{ id: 'facility_staff', label: 'Team', icon: UserCog }]
           : []),
+        { id: 'outreach_monitor', label: 'Outreach', icon: Radar },
         { id: 'workflow', label: 'Workflow', icon: Workflow },
         { id: 'patients', label: 'Patients', icon: Users },
         ...(Permissions.canAccess(currentUser, 'inventory')
@@ -556,6 +559,19 @@ export const App: React.FC = () => {
               <div className="text-lg font-bold text-slate-900 dark:text-white">Access restricted</div>
               <div className="text-sm text-slate-500 dark:text-slate-400 mt-2">
                 Team management is only available to clinic or pharmacy owners and admins.
+              </div>
+            </div>
+          )
+        )}
+
+        {currentView === 'outreach_monitor' && currentUser && (
+          (currentUser.role === 'clinic' || currentUser.role === 'pharmacy') ? (
+            <OutreachMonitorView user={currentUser} onBack={() => setCurrentView('dashboard')} />
+          ) : (
+            <div className="p-8 bg-white dark:bg-[#1c1c1e] rounded-3xl border border-slate-200 dark:border-slate-800">
+              <div className="text-lg font-bold text-slate-900 dark:text-white">Access restricted</div>
+              <div className="text-sm text-slate-500 dark:text-slate-400 mt-2">
+                Outreach monitoring is available in clinic and pharmacy portals.
               </div>
             </div>
           )

@@ -365,6 +365,7 @@ export type ViewState =
   | 'visits'
   | 'workflow'
   | 'facility_staff'
+  | 'outreach_monitor'
   | 'expenses';
 
 /** Roster row for users employed by a facility (`employer_facility_id`). */
@@ -384,4 +385,23 @@ export interface CreateFacilityStaffInput {
   pin: string;
   location?: string;
   staffPermissionRole: 'admin' | 'tech' | 'attendant';
+}
+
+export interface OutreachPatientRow {
+  patientId: string;
+  patientName: string;
+  phone: string;
+  checkupSentCount: number;
+  lastCheckupSentAt?: string;
+  optedOut: boolean;
+  optedOutAt?: string;
+  repliedAfterOutreach: boolean;
+  lastReplyAt?: string;
+}
+
+export interface OutreachMonitorSummary {
+  totalPatients: number;
+  sentCheckups: number;
+  optedOut: number;
+  repliedAfterOutreach: number;
 }
