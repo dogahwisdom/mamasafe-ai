@@ -72,11 +72,13 @@ export async function handler(event) {
           if (message?.type !== "text") {
             continue;
           }
+          if (message?.id && (await repo.hasInboundMessage(message.id))) {
+            console.log("Skipping duplicate inbound whatsapp message:", message.id);
+            continue;
+          }
           const phone = message?.from ? `+${String(message.from).replace(/^\+/, "")}` : "";
           const inboundBody = message?.text?.body || "";
-          const patient =
-            (await repo.findPatientByPhone(phone)) ||
-            (await repo.createOrFindPatientByPhone(phone, change?.contacts?.[0]?.profile?.name));
+          const patient = await repo.findPatientByPhone(phone);
           await repo.logInboundMessage({
             patientId: patient?.id || null,
             phone,
@@ -86,6 +88,43 @@ export async function handler(event) {
           });
 
           const activeSession = await repo.getActiveSessionByPhone(phone);
+          if (!patient && !activeSession) {
+            const responseText = [
+              "Hello, welcome to MamaSafe AI. How can I assist you today?",
+              "",
+              "Please reply with one option:",
+              "1. Pregnant mother",
+              "2. Baby (0-12 months)",
+              "3. General patient",
+            ].join("\n");
+            await repo.upsertSession({
+              phone,
+              patientId: null,
+              flowType: "intake",
+              stepKey: "choose_profile",
+              stepIndex: 0,
+              answers: [],
+              status: "active",
+              completedAt: null,
+            });
+            try {
+              const reply = await cloud.sendTextMessage({ phone, body: responseText });
+              await repo.logOutboundMessage({
+                patientId: null,
+                phone,
+                body: responseText,
+                metaMessageId: reply.metaMessageId,
+                rawPayload: {
+                  ...reply.raw,
+                  source: "whatsapp-webhook-unregistered-welcome",
+                },
+              });
+            } catch (replyError) {
+              console.error("Failed to send WhatsApp welcome reply:", replyError);
+            }
+            continue;
+          }
+
           const shouldUseQuestionnaire = questionnaire.shouldStartFlow(inboundBody, activeSession);
           let triageResult = null;
           let responseText = "";

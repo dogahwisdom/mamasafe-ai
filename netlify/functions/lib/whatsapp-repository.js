@@ -121,6 +121,21 @@ export class WhatsAppRepository {
     return data;
   }
 
+  async hasInboundMessage(metaMessageId) {
+    if (!this.client || !metaMessageId) return false;
+    const { data, error } = await this.client
+      .from("whatsapp_messages")
+      .select("id")
+      .eq("direction", "inbound")
+      .eq("meta_message_id", metaMessageId)
+      .limit(1);
+    if (error) {
+      console.error("Failed to check duplicate inbound whatsapp message:", error.message);
+      return false;
+    }
+    return Array.isArray(data) && data.length > 0;
+  }
+
   async upsertSession({
     phone,
     patientId,
