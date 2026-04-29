@@ -57,32 +57,41 @@ Return strict JSON only with keys:
 `;
 
     try {
-      const response = await fetch(
-        "https://api.groq.com/openai/v1/chat/completions",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${this.apiKey}`,
-          },
-          body: JSON.stringify({
-            model: "llama-3.1-8b-instant",
-            temperature: 0.2,
-            response_format: { type: "json_object" },
-            messages: [
-              {
-                role: "system",
-                content:
-                  "You are a careful maternal health triage assistant. Always return valid JSON.",
-              },
-              {
-                role: "user",
-                content: prompt,
-              },
-            ],
-          }),
-        }
-      );
+      const controller = new AbortController();
+      const timeoutMs = 6000;
+      const timeout = setTimeout(() => controller.abort(), timeoutMs);
+      let response;
+      try {
+        response = await fetch(
+          "https://api.groq.com/openai/v1/chat/completions",
+          {
+            method: "POST",
+            signal: controller.signal,
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${this.apiKey}`,
+            },
+            body: JSON.stringify({
+              model: "llama-3.1-8b-instant",
+              temperature: 0.2,
+              response_format: { type: "json_object" },
+              messages: [
+                {
+                  role: "system",
+                  content:
+                    "You are a careful maternal health triage assistant. Always return valid JSON.",
+                },
+                {
+                  role: "user",
+                  content: prompt,
+                },
+              ],
+            }),
+          }
+        );
+      } finally {
+        clearTimeout(timeout);
+      }
       if (!response.ok) {
         const body = await response.text();
         throw new Error(`Triage API failed (${response.status}): ${body}`);
