@@ -210,7 +210,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ user, portal, onBack
                 {rows.map((r) => (
                   <tr key={r.id} className="border-b border-slate-100 dark:border-slate-800">
                     <td className="px-4 py-3 text-slate-600 dark:text-slate-300 whitespace-nowrap">
-                      {r.expenseDate ? String(r.expenseDate).slice(0, 10) : "—"}
+                      {r.expenseDate ? String(r.expenseDate).slice(0, 10) : "N/A"}
                     </td>
                     <td className="px-4 py-3 font-semibold text-slate-900 dark:text-white">
                       {r.category}
@@ -219,7 +219,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ user, portal, onBack
                       {formatKes(r.amountKes)}
                     </td>
                     <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-                      {r.notes || "—"}
+                      {r.notes || "N/A"}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <button

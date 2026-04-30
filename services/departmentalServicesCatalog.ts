@@ -194,7 +194,7 @@ export class DepartmentalServicesCatalog {
     const dept = DepartmentalServicesCatalog.getDepartment(departmentId);
     if (!dept) return null;
     const sub = dept.subCategories.find((s) => s.id === subcategoryId);
-    return sub ? `${dept.label} — ${sub.label}` : dept.label;
+    return sub ? `${dept.label} N/A ${sub.label}` : dept.label;
   }
 
   /** ANC intake uses pregnancy-specific enrollment fields (LMP, gravida, etc.). */

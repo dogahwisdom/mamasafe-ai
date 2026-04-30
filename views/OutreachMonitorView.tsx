@@ -17,7 +17,7 @@ interface OutreachMonitorViewProps {
   onBack: () => void;
 }
 
-const formatDate = (value?: string) => (value ? new Date(value).toLocaleString() : "—");
+const formatDate = (value?: string) => (value ? new Date(value).toLocaleString() : "N/A");
 
 const toCsvCell = (value: string | number | boolean | undefined) =>
   `"${String(value ?? "").replace(/"/g, '""')}"`;

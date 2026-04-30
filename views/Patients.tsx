@@ -10,7 +10,7 @@ interface PatientsViewProps {
   onNavigate: (view: string) => void;
   patients: Patient[];
   onDeletePatient?: (id: string) => Promise<void>;
-  /** Logged-in facility (clinic/pharmacy) — used for PDF letterhead */
+  /** Logged-in facility (clinic/pharmacy) N/A used for PDF letterhead */
   currentUser?: UserProfile | null;
 }
 

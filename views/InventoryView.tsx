@@ -262,7 +262,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ user, onBack }) =>
           <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-3">Add medication</h3>
           <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
             Register a new line in stock (name must be unique). Optional: unit trade price, supplier, and expiry for
-            procurement and FEFO monitoring—then fine-tune in the table.
+            procurement and FEFO monitoringN/Athen fine-tune in the table.
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-end">
             <div className="lg:col-span-4">

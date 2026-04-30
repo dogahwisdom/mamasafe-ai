@@ -128,7 +128,7 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
     const visitId = currentVisit?.id;
     if (!visitId) return;
     loadVisitData(visitId);
-    // Only reload when the active visit id changes — not when setCurrentVisit replaces the
+    // Only reload when the active visit id changes N/A not when setCurrentVisit replaces the
     // same visit with a new object reference (that was resetting "Total treatment" while typing).
   }, [currentVisit?.id]);
 
@@ -544,7 +544,7 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
               onChange={(e) => setPatientSearch(e.target.value)}
             />
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
-              Returning patients do not need re-registration—search here, select, then start the visit.
+              Returning patients do not need re-registrationN/Asearch here, select, then start the visit.
             </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1356,7 +1356,7 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
                             <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
                               <span className="font-bold text-slate-900 dark:text-white">Total treatment</span>
                               <span className="font-mono">
-                                {totalDue != null ? `KES ${totalDue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '— (set above)'}
+                                {totalDue != null ? `KES ${totalDue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A (set above)'}
                               </span>
                             </div>
                             <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
@@ -1370,7 +1370,7 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
                               <span className="font-mono font-bold text-amber-700 dark:text-amber-400">
                                 {balance != null
                                   ? `KES ${balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                                  : '—'}
+                                  : 'N/A'}
                               </span>
                             </div>
                           </>

@@ -99,7 +99,7 @@ export const PermissionsManager: React.FC<PermissionsManagerProps> = ({ currentU
             This account cannot manage permissions yet.
           </div>
           <div className="text-xs text-slate-600 dark:text-slate-400 mt-2">
-            Detected: role=<span className="font-mono">{String(currentUser.role)}</span>, permissionRole=<span className="font-mono">{String(currentUser.facilityData?.permissionRole || "—")}</span>
+            Detected: role=<span className="font-mono">{String(currentUser.role)}</span>, permissionRole=<span className="font-mono">{String(currentUser.facilityData?.permissionRole || "N/A")}</span>
           </div>
         </div>
       )}
@@ -134,11 +134,11 @@ export const PermissionsManager: React.FC<PermissionsManagerProps> = ({ currentU
             <div>
               <div className="font-bold text-slate-900 dark:text-white">{target.name}</div>
               <div className="text-xs text-slate-500 dark:text-slate-400">
-                {target.role} · {target.phone || "—"} · {target.email || "—"}
+                {target.role} · {target.phone || "N/A"} · {target.email || "N/A"}
               </div>
             </div>
             <div className="text-xs text-slate-500 dark:text-slate-400">
-              Staff role: {target.facilityData?.permissionRole || "—"}
+              Staff role: {target.facilityData?.permissionRole || "N/A"}
             </div>
           </div>
 
@@ -163,7 +163,7 @@ export const PermissionsManager: React.FC<PermissionsManagerProps> = ({ currentU
                   updateTarget({ permissionRole: e.target.value as any })
                 }
               >
-                <option value="">—</option>
+                <option value="">N/A</option>
                 <option value="owner">Owner</option>
                 <option value="admin">Admin</option>
                 <option value="tech">Pharm tech</option>
