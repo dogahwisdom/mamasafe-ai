@@ -199,7 +199,7 @@ export const SubscriptionManagement: React.FC<SubscriptionManagementProps> = ({ 
                       <div>
                         <p className="text-slate-500 dark:text-slate-400 text-xs mb-1">Next Billing</p>
                         <p className="font-semibold text-slate-900 dark:text-white">
-                          {sub.nextBillingDate ? new Date(sub.nextBillingDate).toLocaleDateString() : 'N/A'}
+                          {sub.nextBillingDate ? new Date(sub.nextBillingDate).toLocaleDateString() : '-'}
                         </p>
                       </div>
                       <div>

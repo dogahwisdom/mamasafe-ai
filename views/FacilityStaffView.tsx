@@ -67,7 +67,7 @@ export const FacilityStaffView: React.FC<FacilityStaffViewProps> = ({ user, onBa
       });
       await load();
       alert(
-        "Staff account created. They sign in with their own phone (or email) and PIN N/A not the owner’s login."
+        "Staff account created. They sign in with their own phone (or email) and PIN - not the owner’s login."
       );
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Could not create staff.";
@@ -228,7 +228,7 @@ export const FacilityStaffView: React.FC<FacilityStaffViewProps> = ({ user, onBa
             </div>
           ) : staff.length === 0 ? (
             <p className="text-sm text-slate-500 dark:text-slate-400 py-8 text-center">
-              No linked staff yet. Add someone above N/A they’ll use their own credentials to sign in.
+              No linked staff yet. Add someone above - they’ll use their own credentials to sign in.
             </p>
           ) : (
             <ul className="space-y-3">
@@ -244,11 +244,11 @@ export const FacilityStaffView: React.FC<FacilityStaffViewProps> = ({ user, onBa
                       {s.email ? ` · ${s.email}` : ""}
                     </div>
                     <div className="text-xs text-slate-600 dark:text-slate-300 mt-2">
-                      Role: <span className="font-mono">{s.permissionRole || "N/A"}</span>
+                      Role: <span className="font-mono">{s.permissionRole || "-"}</span>
                       {s.permissions && (
                         <span className="ml-2">
-                          · O:{s.permissions.overview ? "✓" : "N/A"} I:{s.permissions.inventory ? "✓" : "N/A"}{" "}
-                          E:{s.permissions.expenses ? "✓" : "N/A"}
+                          · O:{s.permissions.overview ? "✓" : "-"} I:{s.permissions.inventory ? "✓" : "-"}{" "}
+                          E:{s.permissions.expenses ? "✓" : "-"}
                         </span>
                       )}
                     </div>

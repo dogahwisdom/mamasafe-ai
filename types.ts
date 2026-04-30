@@ -131,7 +131,7 @@ export interface InventoryItem {
   unitPriceKes?: number | null;
   /** Supplier or vendor name */
   supplier?: string | null;
-  /** ISO date YYYY-MM-DD N/A expiry for this line (FEFO) */
+  /** ISO date YYYY-MM-DD - expiry for this line (FEFO) */
   expiryDate?: string | null;
 }
 

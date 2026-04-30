@@ -408,21 +408,21 @@ export const DashboardView: React.FC<DashboardProps> = ({ onNavigate, user }) =>
         />
         <ActionCard 
           title="24h Follow-up" 
-          value={followup24hRate !== null ? `${followup24hRate}%` : 'N/A'} 
+          value={followup24hRate !== null ? `${followup24hRate}%` : '-'} 
           subtitle="Response within 24h"
           icon={Clock} 
           variant="brand"
         />
          <ActionCard 
           title="Early Enrollment" 
-          value={earlyEnrollmentRate !== null ? `${earlyEnrollmentRate}%` : 'N/A'} 
+          value={earlyEnrollmentRate !== null ? `${earlyEnrollmentRate}%` : '-'} 
           subtitle="Timely registration rate"
           icon={Calendar} 
           variant="default"
         />
          <ActionCard 
           title="Engagement" 
-          value={engagementRate !== null ? `${engagementRate}%` : 'N/A'} 
+          value={engagementRate !== null ? `${engagementRate}%` : '-'} 
           subtitle="Patient response rate"
           icon={Activity} 
           variant="default"

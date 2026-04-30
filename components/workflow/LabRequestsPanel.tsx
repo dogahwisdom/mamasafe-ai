@@ -117,8 +117,8 @@ export const LabRequestsPanel: React.FC<LabRequestsPanelProps> = ({
       .map(([k, v]) => `${k}: ${String(v).trim()}`);
     const free = (resultsDraft[lab.id] || "").trim();
     const metaLines = [
-      `Performed by: ${meta.performedBy.trim() || "N/A"}`,
-      `Reviewed by: ${meta.reviewedBy.trim() || "N/A"}`,
+      `Performed by: ${meta.performedBy.trim() || "-"}`,
+      `Reviewed by: ${meta.reviewedBy.trim() || "-"}`,
       `Reported on: ${meta.reportedOn.trim() || new Date().toISOString().slice(0, 10)}`,
     ];
     return ["--- LAB SIGN-OFF ---", ...metaLines, "--- RESULTS ---", ...lines, free]
@@ -295,7 +295,7 @@ export const LabRequestsPanel: React.FC<LabRequestsPanelProps> = ({
                         <li key={p.name}>
                           {p.name}
                           {p.unit ? ` (${p.unit})` : ""}
-                          {p.reference ? ` N/A ${p.reference}` : ""}
+                          {p.reference ? ` - ${p.reference}` : ""}
                         </li>
                       ))}
                       {(t!.parameters || []).length > 8 && (

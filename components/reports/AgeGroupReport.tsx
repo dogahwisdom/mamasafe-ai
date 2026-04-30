@@ -117,7 +117,7 @@ export const AgeGroupReport: React.FC<AgeGroupReportProps> = ({
         <div className="mt-5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-[#252525] overflow-hidden">
           <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-slate-200 dark:border-slate-700 bg-white/60 dark:bg-black/20">
             <div className="text-sm font-bold text-slate-900 dark:text-white">
-              {expandedLabel} N/A patients ({expandedRows.length} unique)
+              {expandedLabel} - patients ({expandedRows.length} unique)
             </div>
             <div className="flex items-center gap-2">
               {onOpenPatients && (
@@ -165,7 +165,7 @@ export const AgeGroupReport: React.FC<AgeGroupReportProps> = ({
                       </td>
                       <td className="px-4 py-2.5 text-slate-600 dark:text-slate-300">{row.age}</td>
                       <td className="px-4 py-2.5 text-slate-600 dark:text-slate-300 font-mono text-xs">
-                        {row.phone || "N/A"}
+                        {row.phone || "-"}
                       </td>
                       <td className="px-4 py-2.5 text-right text-slate-700 dark:text-slate-200">
                         {row.visitsInBucket}

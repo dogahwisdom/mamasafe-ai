@@ -17,6 +17,8 @@ interface ClinicWorkflowProps {
 
 export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate }) => {
   const [patients, setPatients] = useState<Patient[]>([]);
+  const [recentVisits, setRecentVisits] = useState<ClinicVisit[]>([]);
+  const [loadingRecentVisits, setLoadingRecentVisits] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [currentVisit, setCurrentVisit] = useState<ClinicVisit | null>(null);
   const [activeStage, setActiveStage] = useState<'registration' | 'history' | 'lab' | 'diagnosis' | 'pharmacy' | 'payment'>('registration');
@@ -128,7 +130,7 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
     const visitId = currentVisit?.id;
     if (!visitId) return;
     loadVisitData(visitId);
-    // Only reload when the active visit id changes N/A not when setCurrentVisit replaces the
+    // Only reload when the active visit id changes - not when setCurrentVisit replaces the
     // same visit with a new object reference (that was resetting "Total treatment" while typing).
   }, [currentVisit?.id]);
 
@@ -140,6 +142,48 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
       console.error('Error loading patients:', error);
     }
   };
+
+  const loadRecentVisits = async () => {
+    setLoadingRecentVisits(true);
+    try {
+      const visits = await backend.workflow.getVisits();
+      setRecentVisits(visits);
+    } catch (error) {
+      console.error('Error loading recent visits:', error);
+      setRecentVisits([]);
+    } finally {
+      setLoadingRecentVisits(false);
+    }
+  };
+
+  const handleOpenVisitRecord = async (visit: ClinicVisit) => {
+    setLoading(true);
+    try {
+      const visitData = await backend.workflow.getVisitById(visit.id);
+      const patient = patients.find((p) => p.id === visit.patientId) || null;
+      setSelectedPatient(patient);
+      setCurrentVisit(visitData.visit);
+      setClinicalHistory(visitData.clinicalHistory || null);
+      setLabRequests(visitData.labRequests);
+      setDiagnoses(visitData.diagnoses);
+      setPayments(visitData.payments);
+      setActiveStage('history');
+      if (visitData.visit.totalTreatmentAmount != null && visitData.visit.totalTreatmentAmount > 0) {
+        setTotalTreatmentInput(String(visitData.visit.totalTreatmentAmount));
+      } else {
+        setTotalTreatmentInput('');
+      }
+    } catch (error) {
+      console.error('Error opening visit record:', error);
+      alert('Could not open this visit record.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadRecentVisits();
+  }, []);
 
   const loadVisitData = async (visitId: string) => {
     try {
@@ -544,7 +588,7 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
               onChange={(e) => setPatientSearch(e.target.value)}
             />
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
-              Returning patients do not need re-registrationN/Asearch here, select, then start the visit.
+              Returning patients do not need re-registration. Search here, select a patient, then start the visit.
             </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -581,6 +625,66 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
               </button>
             ))}
           </div>
+        </div>
+      )}
+
+      {!currentVisit && (
+        <div className="bg-white dark:bg-[#1c1c1e] p-6 rounded-2xl border border-slate-100 dark:border-slate-800">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white">Recent visit records</h2>
+            <button
+              type="button"
+              onClick={() => void loadRecentVisits()}
+              className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300"
+            >
+              Refresh records
+            </button>
+          </div>
+          {loadingRecentVisits ? (
+            <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-sm">
+              <Loader2 className="animate-spin" size={16} />
+              Loading recent records...
+            </div>
+          ) : recentVisits.length === 0 ? (
+            <p className="text-sm text-slate-500 dark:text-slate-400">No visit records found yet.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800">
+                    <th className="py-2 pr-3">Patient</th>
+                    <th className="py-2 pr-3">Visit type</th>
+                    <th className="py-2 pr-3">Date</th>
+                    <th className="py-2 pr-3">Status</th>
+                    <th className="py-2 pr-3">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentVisits.slice(0, 12).map((visit) => (
+                    <tr key={visit.id} className="border-b border-slate-100 dark:border-slate-800">
+                      <td className="py-2 pr-3 text-slate-900 dark:text-white">{visit.patientName}</td>
+                      <td className="py-2 pr-3 capitalize">{visit.visitType.replace('_', ' ')}</td>
+                      <td className="py-2 pr-3 text-slate-600 dark:text-slate-300">
+                        {new Date(visit.visitDate).toLocaleString()}
+                      </td>
+                      <td className="py-2 pr-3 capitalize text-slate-600 dark:text-slate-300">
+                        {visit.status.replace('_', ' ')}
+                      </td>
+                      <td className="py-2 pr-3">
+                        <button
+                          type="button"
+                          onClick={() => void handleOpenVisitRecord(visit)}
+                          className="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-slate-900 dark:bg-white text-white dark:text-black"
+                        >
+                          Open record
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 
@@ -1356,7 +1460,7 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
                             <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
                               <span className="font-bold text-slate-900 dark:text-white">Total treatment</span>
                               <span className="font-mono">
-                                {totalDue != null ? `KES ${totalDue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A (set above)'}
+                                {totalDue != null ? `KES ${totalDue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '- (set above)'}
                               </span>
                             </div>
                             <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
@@ -1370,7 +1474,7 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
                               <span className="font-mono font-bold text-amber-700 dark:text-amber-400">
                                 {balance != null
                                   ? `KES ${balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                                  : 'N/A'}
+                                  : '-'}
                               </span>
                             </div>
                           </>

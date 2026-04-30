@@ -146,7 +146,7 @@ export const EnrollmentStepContact: React.FC<EnrollmentStepContactProps> = ({
       </div>
       {existingPatient?.exists && existingPatient.location && (
         <p className="text-xs text-slate-500 dark:text-slate-400 -mt-2">
-          Location pre-filled from the existing patient record when available N/A you can edit if
+          Location pre-filled from the existing patient record when available - you can edit if
           needed.
         </p>
       )}

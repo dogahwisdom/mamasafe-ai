@@ -96,7 +96,7 @@ export class PharmacyReportsService {
     /**
      * Build revenue lines from dispensing records.
      * Unit price is stored on the record if available (unit_price column).
-     * Falls back to 0 if not tracked N/A pharmacy can add prices later.
+     * Falls back to 0 if not tracked - pharmacy can add prices later.
      */
     public async getRevenueLines(
         startDate?: string,

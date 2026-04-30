@@ -490,7 +490,7 @@ export const PharmacyReports: React.FC<PharmacyReportsProps> = ({ user, onBack }
                                                         <tr key={exp.id} className="hover:bg-slate-50 dark:hover:bg-[#2c2c2e] transition-colors">
                                                             <td className="px-4 py-3 text-slate-500">{fmt(exp.purchasedAt)}</td>
                                                             <td className="px-4 py-3 font-semibold text-slate-800 dark:text-slate-200">{exp.medicationName}</td>
-                                                            <td className="px-4 py-3 text-slate-500">{exp.supplier || 'N/A'}</td>
+                                                            <td className="px-4 py-3 text-slate-500">{exp.supplier || '-'}</td>
                                                             <td className="px-4 py-3 text-right text-slate-600 dark:text-slate-400">{exp.quantity}</td>
                                                             <td className="px-4 py-3 text-right text-slate-600 dark:text-slate-400">{fmtCurrency(exp.unitCost)}</td>
                                                             <td className="px-4 py-3 text-right font-bold text-red-600 dark:text-red-400">{fmtCurrency(exp.totalCost)}</td>
@@ -582,7 +582,7 @@ export const PharmacyReports: React.FC<PharmacyReportsProps> = ({ user, onBack }
                                                             <td className="px-4 py-3 text-right font-bold text-slate-700 dark:text-slate-200">
                                                                 {record.quantity} <span className="text-xs font-normal text-slate-400">{record.unit}</span>
                                                             </td>
-                                                            <td className="px-4 py-3 text-slate-400 text-xs max-w-[150px] truncate">{record.notes || 'N/A'}</td>
+                                                            <td className="px-4 py-3 text-slate-400 text-xs max-w-[150px] truncate">{record.notes || '-'}</td>
                                                         </tr>
                                                     ))}
                                                 </tbody>

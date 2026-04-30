@@ -13,7 +13,7 @@ export class TransferService {
     patientName?: string;
     facilityId?: string;
     facilityName?: string;
-    /** e.g. "Nairobi, Westlands" N/A used to pre-fill enrollment location */
+    /** e.g. "Nairobi, Westlands" - used to pre-fill enrollment location */
     location?: string | null;
   }> {
     if (isSupabaseConfigured()) {

@@ -112,7 +112,7 @@ export class FacilityStaffService {
       },
     };
 
-    const location = (input.location || actor.location || "N/A").trim() || "N/A";
+    const location = (input.location || actor.location || "-").trim() || "-";
 
     if (!isSupabaseConfigured()) {
       const users = storage.get<UserProfile[]>(KEYS.USERS, []);

@@ -30,7 +30,7 @@ function formatKesAmount(n: number): string {
 }
 
 function formatExpiryPdf(iso: string | null | undefined): string {
-  if (!iso) return 'N/A';
+  if (!iso) return '-';
   try {
     return new Date(`${iso}T12:00:00`).toLocaleDateString('en-KE', {
       year: 'numeric',
@@ -72,17 +72,17 @@ function drawFacilityHeader(
   doc.setFontSize(7.5);
   const tag =
     facility.role === 'pharmacy'
-      ? 'PHARMACY N/A PATIENT CARE & INVENTORY'
-      : 'CLINIC N/A MATERNAL & CLINICAL CARE';
+      ? 'PHARMACY - PATIENT CARE & INVENTORY'
+      : 'CLINIC - MATERNAL & CLINICAL CARE';
   doc.text(tag, boxX + 3, boxY + 13);
 
   const addr = facility.location || '';
-  doc.text(addr ? `ADDRESS: ${addr}` : 'ADDRESS: N/A', boxX + 3, boxY + 19);
+  doc.text(addr ? `ADDRESS: ${addr}` : 'ADDRESS: -', boxX + 3, boxY + 19);
 
   const phone = facility.phone || '';
   const email = facility.email || '';
-  doc.text(`TEL: ${phone || 'N/A'}`, boxX + 3, boxY + 25);
-  doc.text(email ? `EMAIL: ${email}` : 'EMAIL: N/A', boxX + 3, boxY + 31);
+  doc.text(`TEL: ${phone || '-'}`, boxX + 3, boxY + 25);
+  doc.text(email ? `EMAIL: ${email}` : 'EMAIL: -', boxX + 3, boxY + 31);
 
   y = boxY + 44;
   doc.setFont('helvetica', 'bold');
@@ -121,8 +121,8 @@ export function downloadInventoryStockPdf(
     `${row.name} (${row.unit})`,
     row.unitPriceKes != null && !Number.isNaN(Number(row.unitPriceKes))
       ? formatKesAmount(Number(row.unitPriceKes))
-      : 'N/A',
-    (row.supplier && String(row.supplier).trim()) || 'N/A',
+      : '-',
+    (row.supplier && String(row.supplier).trim()) || '-',
     formatExpiryPdf(row.expiryDate),
     String(row.stock),
     String(row.minLevel),
@@ -183,7 +183,7 @@ export function downloadPatientDiagnosisPdf(
   y += 5;
   doc.text(`Name: ${patient.name}`, PAGE_MARGIN, y);
   y += 5;
-  doc.text(`Age: ${patient.age} · Phone: ${patient.phone || 'N/A'} · Location: ${patient.location || 'N/A'}`, PAGE_MARGIN, y);
+  doc.text(`Age: ${patient.age} · Phone: ${patient.phone || '-'} · Location: ${patient.location || '-'}`, PAGE_MARGIN, y);
   y += 5;
   if (options?.visitDate) {
     doc.text(`Visit date: ${options.visitDate}`, PAGE_MARGIN, y);
@@ -196,11 +196,11 @@ export function downloadPatientDiagnosisPdf(
     const info = [
       d.diagnosisName,
       d.diagnosisCode ? `ICD-10: ${d.diagnosisCode}` : '',
-      `${d.diagnosisType} · ${d.severity || 'N/A'}`,
+      `${d.diagnosisType} · ${d.severity || '-'}`,
     ]
       .filter(Boolean)
       .join(' · ');
-    const treatment = d.description?.trim() || 'N/A';
+    const treatment = d.description?.trim() || '-';
     return [dateStr, info, treatment];
   });
 
@@ -240,7 +240,7 @@ export function downloadVisitPaymentSummaryPdf(
   doc.text('Patient', PAGE_MARGIN, y);
   doc.setFont('helvetica', 'normal');
   y += 5;
-  doc.text(`${patient.name} · ${patient.phone || 'N/A'}`, PAGE_MARGIN, y);
+  doc.text(`${patient.name} · ${patient.phone || '-'}`, PAGE_MARGIN, y);
   y += 8;
 
   const sumPaid = payments.reduce((s, p) => s + (Number.isFinite(p.amount) ? p.amount : 0), 0);
@@ -269,9 +269,9 @@ export function downloadVisitPaymentSummaryPdf(
       p.paymentType,
       p.amount.toFixed(2),
       formatPaymentMethodLabel(p.paymentMethod),
-      isInsurance && provider ? provider : 'N/A',
+      isInsurance && provider ? provider : '-',
       p.paymentStatus,
-      p.paymentDate ? String(p.paymentDate).slice(0, 16).replace('T', ' ') : 'N/A',
+      p.paymentDate ? String(p.paymentDate).slice(0, 16).replace('T', ' ') : '-',
     ];
   });
 
@@ -310,14 +310,14 @@ export function downloadLabResultsPdf(
   doc.text('Patient', PAGE_MARGIN, y);
   doc.setFont('helvetica', 'normal');
   y += 5;
-  doc.text(`${patient.name} · ${patient.phone || 'N/A'} · ${patient.location || 'N/A'}`, PAGE_MARGIN, y);
+  doc.text(`${patient.name} · ${patient.phone || '-'} · ${patient.location || '-'}`, PAGE_MARGIN, y);
   y += 8;
 
   const body = labRequests.map((l) => {
     const parsed = parseLabResultPayload(l.results);
     const signer = `By: ${parsed.performedBy} · Reviewed: ${parsed.reviewedBy} · Date: ${parsed.reportedOn}`;
     return [
-      l.orderedAt ? String(l.orderedAt).slice(0, 10) : 'N/A',
+      l.orderedAt ? String(l.orderedAt).slice(0, 10) : '-',
       `${l.testName}${l.testCategory ? ` (${l.testCategory})` : ''}`,
       l.priority,
       l.status,
@@ -361,7 +361,7 @@ export function downloadLabResultsPdf(
 
   const row2Y = rowY + 7;
   doc.text('Date: ____________________________', leftX, row2Y);
-  doc.text(`Facility: ${facility.name || 'N/A'}`, midX, row2Y);
+  doc.text(`Facility: ${facility.name || '-'}`, midX, row2Y);
   doc.text('Stamp: ___________________________', rightX, row2Y);
 
   doc.setFontSize(8);
@@ -383,9 +383,9 @@ function parseLabResultPayload(raw: string | undefined): {
 } {
   const txt = (raw || '').trim();
   const lines = txt.split('\n').map((l) => l.trim());
-  let performedBy = 'N/A';
-  let reviewedBy = 'N/A';
-  let reportedOn = 'N/A';
+  let performedBy = '-';
+  let reviewedBy = '-';
+  let reportedOn = '-';
   const bodyLines: string[] = [];
   let inResults = false;
   for (const line of lines) {
@@ -396,15 +396,15 @@ function parseLabResultPayload(raw: string | undefined): {
       continue;
     }
     if (!inResults) {
-      if (line.toLowerCase().startsWith('performed by:')) performedBy = line.split(':').slice(1).join(':').trim() || 'N/A';
-      else if (line.toLowerCase().startsWith('reviewed by:')) reviewedBy = line.split(':').slice(1).join(':').trim() || 'N/A';
-      else if (line.toLowerCase().startsWith('reported on:')) reportedOn = line.split(':').slice(1).join(':').trim() || 'N/A';
+      if (line.toLowerCase().startsWith('performed by:')) performedBy = line.split(':').slice(1).join(':').trim() || '-';
+      else if (line.toLowerCase().startsWith('reviewed by:')) reviewedBy = line.split(':').slice(1).join(':').trim() || '-';
+      else if (line.toLowerCase().startsWith('reported on:')) reportedOn = line.split(':').slice(1).join(':').trim() || '-';
       else bodyLines.push(line);
       continue;
     }
     bodyLines.push(line);
   }
-  return { performedBy, reviewedBy, reportedOn, body: bodyLines.join('\n').trim() || 'N/A' };
+  return { performedBy, reviewedBy, reportedOn, body: bodyLines.join('\n').trim() || '-' };
 }
 
 function clipCell(s: string, max = 120): string {
@@ -436,12 +436,12 @@ export function downloadPatientInformationPdf(
   doc.text(`Name: ${patient.name}`, PAGE_MARGIN, y);
   y += 4;
   doc.text(
-    `Patient ID: ${shortCode(patient.id)} · Age: ${patient.age} · Phone: ${patient.phone || 'N/A'}`,
+    `Patient ID: ${shortCode(patient.id)} · Age: ${patient.age} · Phone: ${patient.phone || '-'}`,
     PAGE_MARGIN,
     y
   );
   y += 4;
-  doc.text(`Location: ${patient.location || 'N/A'}`, PAGE_MARGIN, y);
+  doc.text(`Location: ${patient.location || '-'}`, PAGE_MARGIN, y);
   y += 4;
   doc.text(
     `Patient type: ${patient.patientType === 'inpatient' ? 'Inpatient' : 'Outpatient'} · Risk: ${patient.riskStatus}`,
@@ -465,7 +465,7 @@ export function downloadPatientInformationPdf(
     y += 4;
   }
   doc.text(
-    `Next appointment: ${patient.nextAppointment ? new Date(patient.nextAppointment).toLocaleDateString() : 'N/A'}`,
+    `Next appointment: ${patient.nextAppointment ? new Date(patient.nextAppointment).toLocaleDateString() : '-'}`,
     PAGE_MARGIN,
     y
   );
@@ -479,7 +479,7 @@ export function downloadPatientInformationPdf(
     y += 4;
   }
   doc.text(
-    `Last check-in: ${patient.lastCheckIn ? new Date(patient.lastCheckIn).toLocaleDateString() : 'N/A'}`,
+    `Last check-in: ${patient.lastCheckIn ? new Date(patient.lastCheckIn).toLocaleDateString() : '-'}`,
     PAGE_MARGIN,
     y
   );
@@ -507,7 +507,7 @@ export function downloadPatientInformationPdf(
       clipCell(m.name, 40),
       clipCell(m.dosage, 24),
       clipCell(m.frequency, 24),
-      clipCell(m.instructions || 'N/A', 50),
+      clipCell(m.instructions || '-', 50),
     ]);
     autoTable(doc, {
       startY: y,
@@ -557,7 +557,7 @@ export function downloadPatientInformationPdf(
       t.type,
       t.resolved ? 'Done' : 'Open',
       clipCell(t.deadline, 40),
-      clipCell(t.notes || 'N/A', 55),
+      clipCell(t.notes || '-', 55),
     ]);
     autoTable(doc, {
       startY: y,
@@ -601,7 +601,7 @@ export function downloadPatientInformationPdf(
   doc.setFontSize(8);
   doc.setTextColor(100, 100, 100);
   doc.text(
-    `Generated ${new Date().toLocaleString()} · Confidential N/A for authorized clinical use only.`,
+    `Generated ${new Date().toLocaleString()} · Confidential - for authorized clinical use only.`,
     PAGE_MARGIN,
     Math.min(finalY + 10, 285)
   );

@@ -71,7 +71,7 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = ({
           type="text"
           inputMode="decimal"
           className="w-28 min-w-[7rem] px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-[#2c2c2e] text-right text-sm"
-          placeholder="N/A"
+          placeholder="-"
           value={draft.unitPriceKes}
           onChange={(e) => onDraft("unitPriceKes", e.target.value)}
           aria-label="Unit price KES"
@@ -82,7 +82,7 @@ export const InventoryTableRow: React.FC<InventoryTableRowProps> = ({
         <input
           type="text"
           className="w-full min-w-[140px] max-w-[220px] px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-[#2c2c2e] text-sm"
-          placeholder="N/A"
+          placeholder="-"
           value={draft.supplier}
           onChange={(e) => onDraft("supplier", e.target.value)}
           aria-label="Supplier"
