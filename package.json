@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "test:whatsapp": "node scripts/whatsapp-routing-selftest.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
