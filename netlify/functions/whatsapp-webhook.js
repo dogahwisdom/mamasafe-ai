@@ -1,10 +1,16 @@
 /**
  * Meta WhatsApp Cloud API webhook for Netlify Functions.
+ *
+ * Operational note (Meta platform, not MamaSafe-specific): WhatsApp Cloud API outbound messages reach
+ * a given customer only once your Meta app/WABA is configured for production and the customer has opted
+ * in appropriately. Sandbox / test apps often allow only administrators or invited testers; symptom:
+ * admins receive replies while strangers see nothing. Inspect Netlify function logs for sends that fail
+ * with Meta error codes (e.g. recipient / permission related).
  */
-import { parseIncomingWhatsAppEvents } from "./lib/whatsapp-cloud-service.js";
-import { WhatsAppCloudService } from "./lib/whatsapp-cloud-service.js";
+import { parseIncomingWhatsAppEvents, WhatsAppCloudService } from "./lib/whatsapp-cloud-service.js";
 import { WhatsAppQuestionnaireService } from "./lib/whatsapp-questionnaire-service.js";
 import { WhatsAppRepository } from "./lib/whatsapp-repository.js";
+import { WhatsAppInboundOrchestrator } from "./lib/whatsapp-inbound-orchestrator.js";
 
 function json(statusCode, body) {
   return {
@@ -21,6 +27,7 @@ export async function handler(event) {
   const repo = new WhatsAppRepository();
   const cloud = new WhatsAppCloudService();
   const questionnaire = new WhatsAppQuestionnaireService();
+  const inbound = new WhatsAppInboundOrchestrator({ repo, cloud, questionnaire });
 
   if (!verifyToken) {
     console.error("Missing WHATSAPP_VERIFY_TOKEN");
@@ -57,181 +64,10 @@ export async function handler(event) {
 
       for (const change of changes) {
         for (const message of change.messages || []) {
-          if (message?.type !== "text") {
-            continue;
-          }
-          if (message?.id && (await repo.hasInboundMessage(message.id))) {
-            console.log("Skipping duplicate inbound whatsapp message:", message.id);
-            continue;
-          }
-          const phone = message?.from ? `+${String(message.from).replace(/^\+/, "")}` : "";
-          const inboundBody = message?.text?.body || "";
-          const normalizedInbound = String(inboundBody || "").trim().toLowerCase();
-          const patient = await repo.findPatientByPhone(phone);
-          await repo.logInboundMessage({
-            patientId: patient?.id || null,
-            phone,
-            body: inboundBody,
-            metaMessageId: message?.id || null,
-            rawPayload: message,
-          });
-
-          if (["stop", "unsubscribe", "opt out"].includes(normalizedInbound)) {
-            await repo.setPatientCheckupOptOut(phone, true);
-            const responseText =
-              "You have been unsubscribed from proactive MamaSafe check-up messages. You can still message us anytime. Send START to opt in again.";
-            try {
-              const reply = await cloud.sendTextMessage({ phone, body: responseText });
-              await repo.logOutboundMessage({
-                patientId: patient?.id || null,
-                phone,
-                body: responseText,
-                metaMessageId: reply.metaMessageId,
-                rawPayload: {
-                  ...reply.raw,
-                  source: "whatsapp-webhook-opt-out",
-                  flow_type: "system_checkup",
-                },
-              });
-            } catch (replyError) {
-              console.error("Failed to send opt-out confirmation:", replyError);
-            }
-            continue;
-          }
-
-          if (["start", "subscribe", "opt in"].includes(normalizedInbound)) {
-            await repo.setPatientCheckupOptOut(phone, false);
-            const responseText =
-              "You are now subscribed to proactive MamaSafe check-up messages again. Send hello to start a guided check-up now.";
-            try {
-              const reply = await cloud.sendTextMessage({ phone, body: responseText });
-              await repo.logOutboundMessage({
-                patientId: patient?.id || null,
-                phone,
-                body: responseText,
-                metaMessageId: reply.metaMessageId,
-                rawPayload: {
-                  ...reply.raw,
-                  source: "whatsapp-webhook-opt-in",
-                  flow_type: "system_checkup",
-                },
-              });
-            } catch (replyError) {
-              console.error("Failed to send opt-in confirmation:", replyError);
-            }
-            continue;
-          }
-
-          const activeSession = await repo.getActiveSessionByPhone(phone);
-          if (!patient && !activeSession) {
-            const responseText = [
-              "Hello, welcome to MamaSafe AI. How can I assist you today?",
-              "",
-              "Please reply with one option:",
-              "1. Pregnant mother",
-              "2. Baby (0-12 months)",
-              "3. General patient",
-            ].join("\n");
-            await repo.upsertSession({
-              phone,
-              patientId: null,
-              flowType: "intake",
-              stepKey: "choose_profile",
-              stepIndex: 0,
-              answers: [],
-              status: "active",
-              completedAt: null,
-            });
-            try {
-              const reply = await cloud.sendTextMessage({ phone, body: responseText });
-              await repo.logOutboundMessage({
-                patientId: null,
-                phone,
-                body: responseText,
-                metaMessageId: reply.metaMessageId,
-                rawPayload: {
-                  ...reply.raw,
-                  source: "whatsapp-webhook-unregistered-welcome",
-                  flow_type: "intake",
-                },
-              });
-            } catch (replyError) {
-              console.error("Failed to send WhatsApp welcome reply:", replyError);
-            }
-            continue;
-          }
-
-          const shouldUseQuestionnaire = questionnaire.shouldStartFlow(inboundBody, activeSession);
-          let triageResult = null;
-          let responseText = "";
-          let source = "whatsapp-webhook-auto-reply";
-          let flowType = activeSession?.flow_type || "intake";
-
-          if (shouldUseQuestionnaire) {
-            const flow = questionnaire.handleMessage({
-              messageText: inboundBody,
-              session: activeSession,
-              patientName: patient?.name || "Mum/Patient",
-            });
-            responseText = flow.responseText;
-            source = "whatsapp-webhook-questionnaire";
-            flowType = flow.nextSession?.flow_type || flow.nextSession?.flowType || flowType;
-            await repo.upsertSession({
-              phone,
-              patientId: patient?.id || null,
-              flowType: flow.nextSession?.flow_type || flow.nextSession?.flowType || "intake",
-              stepKey: flow.nextSession?.step_key || flow.nextSession?.stepKey || "choose_profile",
-              stepIndex: flow.nextSession?.step_index ?? flow.nextSession?.stepIndex ?? 0,
-              answers: flow.nextSession?.answers || [],
-              status: flow.nextSession?.status || "active",
-              completedAt: flow.nextSession?.completed_at || flow.nextSession?.completedAt || null,
-            });
-            triageResult = flow.triageResult || null;
-          } else {
-            triageResult = questionnaire.buildRuleBasedSymptomResponse(inboundBody);
-            responseText = triageResult.draftResponse;
-            source = "whatsapp-webhook-rule-based";
-            flowType = activeSession?.flow_type || "free_text";
-          }
-
           try {
-            const reply = await cloud.sendTextMessage({
-              phone,
-              body: responseText,
-            });
-            await repo.logOutboundMessage({
-              patientId: patient?.id || null,
-              phone,
-              body: responseText,
-              metaMessageId: reply.metaMessageId,
-              rawPayload: {
-                ...reply.raw,
-                triage: triageResult,
-                source,
-                flow_type: flowType,
-              },
-            });
-          } catch (replyError) {
-            console.error("Failed to send WhatsApp auto-reply:", replyError);
-          }
-
-          if (
-            patient?.id &&
-            triageResult &&
-            (String(triageResult.riskLevel).toLowerCase() === "high" ||
-              String(triageResult.riskLevel).toLowerCase() === "critical")
-          ) {
-            await repo.createReferral({
-              patientId: patient.id,
-              patientName: patient.name || "WhatsApp Patient",
-              reason: triageResult.reasoning,
-              recommendedAction: triageResult.recommendedAction,
-            });
-            await repo.createTask({
-              patientId: patient.id,
-              patientName: patient.name || "WhatsApp Patient",
-              notes: `WhatsApp triage (${triageResult.riskLevel}): ${triageResult.reasoning}`,
-            });
+            await inbound.handleInboundMessage(message);
+          } catch (messageError) {
+            console.error("WhatsApp webhook: inbound message handling error:", messageError);
           }
         }
 

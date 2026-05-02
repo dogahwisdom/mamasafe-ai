@@ -47,9 +47,23 @@ export class WhatsAppCloudService {
     const payload = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-      const detail =
-        payload?.error?.message || `Meta API request failed (${response.status}).`;
-      throw new Error(detail);
+      const errObj = payload?.error || {};
+      const detailParts = [
+        errObj.message,
+        errObj.code != null ? `code=${errObj.code}` : null,
+        errObj.error_subcode != null ? `subcode=${errObj.error_subcode}` : null,
+        errObj.fbtrace_id ? `fbtrace_id=${errObj.fbtrace_id}` : null,
+      ].filter(Boolean);
+      const suffix = detailParts.length ? ` (${detailParts.join("; ")})` : ` (HTTP ${response.status})`;
+      const userTitle =
+        typeof errObj.error_user_title === "string" && errObj.error_user_title
+          ? ` user_title="${errObj.error_user_title}"`
+          : "";
+      const err = new Error(
+        `${errObj.message || "Meta WhatsApp Cloud API rejected the send"}${suffix}${userTitle}`.trim()
+      );
+      err.meta = errObj;
+      throw err;
     }
 
     return {
