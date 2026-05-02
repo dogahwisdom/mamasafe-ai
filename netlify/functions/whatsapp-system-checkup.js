@@ -93,20 +93,32 @@ export async function handler(event) {
     }
 
     const body = buildCheckupMessage(patient.name);
+    const templateName = String(process.env.WHATSAPP_CHECKUP_TEMPLATE_NAME || "").trim();
+    const templateLang = String(process.env.WHATSAPP_CHECKUP_TEMPLATE_LANGUAGE || "en").trim() || "en";
+    const templateBodyVars =
+      String(process.env.WHATSAPP_CHECKUP_TEMPLATE_HAS_BODY_VARS ?? "true").toLowerCase() !== "false";
     try {
-      const reply = await cloud.sendTextMessage({
-        phone: patient.phone,
-        body,
-      });
+      const reply = templateName
+        ? await cloud.sendTemplateMessage({
+            phone: patient.phone,
+            templateName,
+            languageCode: templateLang,
+            bodyParameters: templateBodyVars ? [patient.name || "Patient"] : [],
+          })
+        : await cloud.sendTextMessage({
+            phone: patient.phone,
+            body,
+          });
       await repo.logOutboundMessage({
         patientId: patient.id,
         phone: patient.phone,
-        body,
+        body: templateName ? `[template:${templateName}|${templateLang}] ${body}` : body,
         metaMessageId: reply.metaMessageId,
         rawPayload: {
           ...reply.raw,
           source: OUTREACH_SOURCE,
           flow_type: "system_checkup",
+          ...(templateName ? { template_name: templateName, template_language: templateLang } : {}),
         },
       });
       sent += 1;
