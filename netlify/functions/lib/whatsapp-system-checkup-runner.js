@@ -21,6 +21,8 @@ const DEFAULT_START_HOUR_LOCAL = 7;
 const DEFAULT_END_HOUR_LOCAL = 22;
 const DEFAULT_UNKNOWN_COUNTRY_UTC_OFFSET = 0;
 
+const DEFAULT_PAGE_ALL_MAX_PAGES = 500;
+
 function resolveFacilityName(patient) {
   const name = String(patient?.primary_facility_name || "").trim();
   return name || "your health facility";
@@ -51,8 +53,25 @@ function getLocalHour(utcHour, utcOffset) {
   return (utcHour + utcOffset + 24) % 24;
 }
 
+/** @param {string | undefined} rawBody */
+function parseSweepFromEventBody(rawBody) {
+  if (typeof rawBody !== "string" || !rawBody.trim()) {
+    return { startOffset: 0, pageAllFromBody: false };
+  }
+  try {
+    const j = JSON.parse(rawBody);
+    const offset = Number.isFinite(j.offset) ? Math.max(0, Number(j.offset)) : 0;
+    return {
+      startOffset: offset,
+      pageAllFromBody: j.page_all === true,
+    };
+  } catch (_) {
+    return { startOffset: 0, pageAllFromBody: false };
+  }
+}
+
 /**
- * Executes one outbound batch scan. Used by cron (no body) or manual POST.
+ * Executes one outbound batch scan or a multi-page sweep. Used by cron (no body) or manual POST.
  * @returns {Promise<{ statusCode: number; headers: Record<string,string>; body: string }>}
  */
 export async function runWhatsAppSystemCheckup(event = {}) {
@@ -80,82 +99,124 @@ export async function runWhatsAppSystemCheckup(event = {}) {
   const nowHourUtc = new Date().getUTCHours();
   const cooldownHours = Number(process.env.WHATSAPP_CHECKUP_COOLDOWN_HOURS || DEFAULT_COOLDOWN_HOURS);
   const batchSize = Number(process.env.WHATSAPP_CHECKUP_BATCH_SIZE || DEFAULT_BATCH_SIZE);
-  const patients = await repo.listPatientsWithPhone(batchSize);
+  const { startOffset, pageAllFromBody } = parseSweepFromEventBody(event.body);
+  const envPageAll = String(process.env.WHATSAPP_CHECKUP_PAGE_ALL || "false").toLowerCase() === "true";
+  const pageAll = pageAllFromBody || envPageAll;
+  const maxPages = Number(
+    process.env.WHATSAPP_CHECKUP_PAGE_ALL_MAX_PAGES || DEFAULT_PAGE_ALL_MAX_PAGES
+  );
+
+  const templateName = String(process.env.WHATSAPP_CHECKUP_TEMPLATE_NAME || "").trim();
+  const templateLang = String(process.env.WHATSAPP_CHECKUP_TEMPLATE_LANGUAGE || "en").trim() || "en";
+  const templateBodyVars =
+    String(process.env.WHATSAPP_CHECKUP_TEMPLATE_HAS_BODY_VARS ?? "true").toLowerCase() !== "false";
+  const includeFacilityVariable =
+    String(process.env.WHATSAPP_CHECKUP_TEMPLATE_INCLUDE_FACILITY ?? "false").toLowerCase() === "true";
 
   let sent = 0;
   let skipped = 0;
   let skippedQuietHours = 0;
+  let scanned = 0;
+  let offset = startOffset;
+  let pagesRun = 0;
+  /** @type {'none'|'max_pages_reached'} */
+  let stoppedReason = "none";
 
-  for (const patient of patients) {
-    const facilityName = resolveFacilityName(patient);
-    const countryUtcOffset = getCountryUtcOffsetByPhone(patient.phone);
-    const utcOffset = countryUtcOffset === null ? defaultUtcOffset : countryUtcOffset;
-    const localHour = getLocalHour(nowHourUtc, utcOffset);
-    if (localHour < startHourLocal || localHour >= endHourLocal) {
-      skipped += 1;
-      skippedQuietHours += 1;
-      continue;
+  while (pagesRun === 0 || pageAll) {
+    if (pageAll && pagesRun >= maxPages) {
+      stoppedReason = "max_pages_reached";
+      break;
+    }
+    const patients = await repo.listPatientsWithPhone(batchSize, offset);
+    if (!patients.length) {
+      break;
+    }
+    pagesRun += 1;
+    scanned += patients.length;
+
+    for (const patient of patients) {
+      const facilityName = resolveFacilityName(patient);
+      const countryUtcOffset = getCountryUtcOffsetByPhone(patient.phone);
+      const utcOffset = countryUtcOffset === null ? defaultUtcOffset : countryUtcOffset;
+      const localHour = getLocalHour(nowHourUtc, utcOffset);
+      if (localHour < startHourLocal || localHour >= endHourLocal) {
+        skipped += 1;
+        skippedQuietHours += 1;
+        continue;
+      }
+
+      const hasRecent = await repo.hasRecentOutboundBySource(patient.phone, OUTREACH_SOURCE, cooldownHours);
+      if (hasRecent) {
+        skipped += 1;
+        continue;
+      }
+
+      const body = buildCheckupMessage(patient.name, facilityName);
+      const templateParams = templateBodyVars
+        ? includeFacilityVariable
+          ? [patient.name || "Patient", facilityName]
+          : [patient.name || "Patient"]
+        : [];
+
+      try {
+        const reply = templateName
+          ? await cloud.sendTemplateMessage({
+              phone: patient.phone,
+              templateName,
+              languageCode: templateLang,
+              bodyParameters: templateParams,
+            })
+          : await cloud.sendTextMessage({
+              phone: patient.phone,
+              body,
+            });
+
+        await repo.logOutboundMessage({
+          patientId: patient.id,
+          phone: patient.phone,
+          body: templateName ? `[template:${templateName}|${templateLang}] ${body}` : body,
+          metaMessageId: reply.metaMessageId,
+          rawPayload: {
+            ...reply.raw,
+            source: OUTREACH_SOURCE,
+            flow_type: "system_checkup",
+            ...(templateName ? { template_name: templateName, template_language: templateLang } : {}),
+          },
+        });
+        sent += 1;
+      } catch (error) {
+        console.error("Failed to send system checkup:", patient.phone, error);
+      }
     }
 
-    const hasRecent = await repo.hasRecentOutboundBySource(patient.phone, OUTREACH_SOURCE, cooldownHours);
-    if (hasRecent) {
-      skipped += 1;
-      continue;
-    }
+    offset += patients.length;
+    if (!pageAll) break;
+    if (patients.length < batchSize) break;
+  }
 
-    const body = buildCheckupMessage(patient.name, facilityName);
-    const templateName = String(process.env.WHATSAPP_CHECKUP_TEMPLATE_NAME || "").trim();
-    const templateLang = String(process.env.WHATSAPP_CHECKUP_TEMPLATE_LANGUAGE || "en").trim() || "en";
-    const templateBodyVars =
-      String(process.env.WHATSAPP_CHECKUP_TEMPLATE_HAS_BODY_VARS ?? "true").toLowerCase() !== "false";
-    const includeFacilityVariable =
-      String(process.env.WHATSAPP_CHECKUP_TEMPLATE_INCLUDE_FACILITY ?? "false").toLowerCase() === "true";
-    const templateParams = templateBodyVars
-      ? includeFacilityVariable
-        ? [patient.name || "Patient", facilityName]
-        : [patient.name || "Patient"]
-      : [];
-
-    try {
-      const reply = templateName
-        ? await cloud.sendTemplateMessage({
-            phone: patient.phone,
-            templateName,
-            languageCode: templateLang,
-            bodyParameters: templateParams,
-          })
-        : await cloud.sendTextMessage({
-            phone: patient.phone,
-            body,
-          });
-
-      await repo.logOutboundMessage({
-        patientId: patient.id,
-        phone: patient.phone,
-        body: templateName ? `[template:${templateName}|${templateLang}] ${body}` : body,
-        metaMessageId: reply.metaMessageId,
-        rawPayload: {
-          ...reply.raw,
-          source: OUTREACH_SOURCE,
-          flow_type: "system_checkup",
-          ...(templateName ? { template_name: templateName, template_language: templateLang } : {}),
-        },
-      });
-      sent += 1;
-    } catch (error) {
-      console.error("Failed to send system checkup:", patient.phone, error);
-    }
+  /** Absolute row offset for POST `{\"offset\":n}` continuation (manual paging). */
+  let nextOffset = null;
+  if (stoppedReason === "max_pages_reached") {
+    nextOffset = offset;
+  } else if (!pageAll && scanned > 0) {
+    nextOffset = offset;
   }
 
   const lastAllowedHour = Math.max(startHourLocal, endHourLocal - 1);
 
   return json(200, {
     ok: true,
-    scanned: patients.length,
+    pageAll,
+    pagesRun,
+    scanned,
     sent,
     skipped,
     skippedQuietHours,
     cooldownHours,
+    batchSize,
+    startOffset,
+    nextOffset,
+    stoppedReason,
     source: OUTREACH_SOURCE,
     nowHourUtc,
     quietHoursPolicy: `patients only when local hour H satisfies ${startHourLocal} <= H < ${endHourLocal}`,

@@ -244,15 +244,23 @@ export class WhatsAppRepository {
     return { ok: true };
   }
 
-  async listPatientsWithPhone(limit = 500) {
+  /**
+   * @param {number} limit
+   * @param {number} [offset] zero-based stable page (ordered by patient id).
+   */
+  async listPatientsWithPhone(limit = 500, offset = 0) {
     if (!this.client) return [];
+    const safeLimit = Math.max(1, Math.min(Number(limit) || 500, 1000));
+    const safeOffset = Math.max(0, Math.floor(Number(offset)) || 0);
+    const to = safeOffset + safeLimit - 1;
     const { data, error } = await this.client
       .from("patients")
       .select("id, name, phone, primary_facility_name")
       .not("phone", "is", null)
       .neq("phone", "")
       .eq("whatsapp_checkup_opt_out", false)
-      .limit(limit);
+      .order("id", { ascending: true })
+      .range(safeOffset, to);
     if (error) {
       console.error("Failed to list patients with phone:", error.message);
       return [];
