@@ -1,10 +1,7 @@
-/**
- * Scheduled (morning) + manual POST anchor: keep this path for dashboards and curl triggers.
- */
 import { runWhatsAppSystemCheckup } from "./lib/whatsapp-system-checkup-runner.js";
 
 export const config = {
-  schedule: "0 6 * * *",
+  schedule: "0 12 * * *",
 };
 
 export async function handler(event) {
