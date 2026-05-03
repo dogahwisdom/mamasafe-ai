@@ -851,7 +851,13 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
       {/* Workflow Stages */}
       {selectedPatient && (
         <div className="bg-white dark:bg-[#1c1c1e] p-6 rounded-2xl border border-slate-100 dark:border-slate-800">
-          {/* Stage Progress */}
+          {/* Stage Progress — each card is a navigation control, not just a status bar */}
+          <div className="mb-2">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Tap a step to open it. Earlier steps stay available to review what was saved (e.g.
+              Registration, Clinical History).
+            </p>
+          </div>
           <div className="flex items-center justify-between mb-6 overflow-x-auto pb-4">
             {stages.map((stage, index) => {
               const StageIcon = stage.icon;
@@ -862,16 +868,24 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
               return (
                 <React.Fragment key={stage.id}>
                   <button
+                    type="button"
+                    title={
+                      !isAccessible
+                        ? `${stage.label} (start a visit first)`
+                        : isActive
+                          ? `${stage.label} (current)`
+                          : `${stage.label} — open`
+                    }
                     onClick={() => isAccessible && setActiveStage(stage.id as any)}
                     disabled={!isAccessible}
                     className={`flex flex-col items-center gap-2 px-4 py-2 rounded-xl transition-all min-w-[120px] ${
-                      isActive
-                        ? 'bg-brand-600 text-white'
+                      !isAccessible
+                        ? 'bg-slate-50 dark:bg-slate-800/50 text-slate-400 dark:text-slate-600 cursor-not-allowed'
+                        : isActive
+                        ? 'bg-brand-600 text-white ring-2 ring-brand-400/40 ring-offset-2 ring-offset-white dark:ring-offset-[#1c1c1e]'
                         : isCompleted
-                        ? 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400'
-                        : isAccessible
-                        ? 'bg-slate-100 dark:bg-[#2c2c2e] text-slate-600 dark:text-slate-400 hover:bg-slate-200'
-                        : 'bg-slate-50 dark:bg-slate-800/50 text-slate-400 dark:text-slate-600 cursor-not-allowed'
+                        ? 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400 hover:bg-green-200/90 dark:hover:bg-green-900/35 cursor-pointer'
+                        : 'bg-slate-100 dark:bg-[#2c2c2e] text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer'
                     }`}
                   >
                     <StageIcon size={20} />
@@ -879,7 +893,7 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
                     {isCompleted && <CheckCircle size={16} className="mt-1" />}
                   </button>
                   {index < stages.length - 1 && (
-                    <ChevronRight className="text-slate-400 mx-2" size={20} />
+                    <ChevronRight className="text-slate-400 mx-2 shrink-0 hidden sm:block" size={20} />
                   )}
                 </React.Fragment>
               );
