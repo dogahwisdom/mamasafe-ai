@@ -248,7 +248,7 @@ export class WhatsAppRepository {
     if (!this.client) return [];
     const { data, error } = await this.client
       .from("patients")
-      .select("id, name, phone")
+      .select("id, name, phone, primary_facility_name")
       .not("phone", "is", null)
       .neq("phone", "")
       .eq("whatsapp_checkup_opt_out", false)

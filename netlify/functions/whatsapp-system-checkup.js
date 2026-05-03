@@ -16,9 +16,15 @@ const DEFAULT_START_HOUR_LOCAL = 8;
 const DEFAULT_END_HOUR_LOCAL = 18;
 const DEFAULT_UNKNOWN_COUNTRY_UTC_OFFSET = 0;
 
-function buildCheckupMessage(patientName) {
+function resolveFacilityName(patient) {
+  const name = String(patient?.primary_facility_name || "").trim();
+  return name || "your health facility";
+}
+
+function buildCheckupMessage(patientName, facilityName) {
   return [
-    `Hello ${patientName || "Patient"}, MamaSafe AI is checking on you today.`,
+    `Hello ${patientName || "Patient"}, this is MamaSafe AI supporting ${facilityName}.`,
+    "We are checking in on your health today.",
     "How are you feeling?",
     "",
     "Please reply with one option:",
@@ -73,6 +79,7 @@ export async function handler(event) {
   let skippedQuietHours = 0;
 
   for (const patient of patients) {
+    const facilityName = resolveFacilityName(patient);
     const countryUtcOffset = getCountryUtcOffsetByPhone(patient.phone);
     const utcOffset = countryUtcOffset === null ? defaultUtcOffset : countryUtcOffset;
     const localHour = getLocalHour(nowHourUtc, utcOffset);
@@ -92,18 +99,25 @@ export async function handler(event) {
       continue;
     }
 
-    const body = buildCheckupMessage(patient.name);
+    const body = buildCheckupMessage(patient.name, facilityName);
     const templateName = String(process.env.WHATSAPP_CHECKUP_TEMPLATE_NAME || "").trim();
     const templateLang = String(process.env.WHATSAPP_CHECKUP_TEMPLATE_LANGUAGE || "en").trim() || "en";
     const templateBodyVars =
       String(process.env.WHATSAPP_CHECKUP_TEMPLATE_HAS_BODY_VARS ?? "true").toLowerCase() !== "false";
+    const includeFacilityVariable =
+      String(process.env.WHATSAPP_CHECKUP_TEMPLATE_INCLUDE_FACILITY ?? "false").toLowerCase() === "true";
+    const templateParams = templateBodyVars
+      ? includeFacilityVariable
+        ? [patient.name || "Patient", facilityName]
+        : [patient.name || "Patient"]
+      : [];
     try {
       const reply = templateName
         ? await cloud.sendTemplateMessage({
             phone: patient.phone,
             templateName,
             languageCode: templateLang,
-            bodyParameters: templateBodyVars ? [patient.name || "Patient"] : [],
+            bodyParameters: templateParams,
           })
         : await cloud.sendTextMessage({
             phone: patient.phone,
