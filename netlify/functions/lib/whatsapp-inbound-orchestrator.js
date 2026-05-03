@@ -18,6 +18,24 @@ export class WhatsAppInboundOrchestrator {
     this.questionnaire = deps.questionnaire;
   }
 
+  getDisplayName(patient) {
+    const rawName = String(patient?.name || "").trim();
+    if (!rawName) return "there";
+    const lowered = rawName.toLowerCase();
+    const blockedNameFragments = ["test", "terminal", "demo", "sample", "whatsapp patient"];
+    if (blockedNameFragments.some((item) => lowered.includes(item))) {
+      return "there";
+    }
+    return rawName.split(/\s+/)[0].slice(0, 40);
+  }
+
+  appendUnregisteredPrompt(messageText) {
+    const text = String(messageText || "").trim();
+    if (!text) return text;
+    if (text.toLowerCase().includes("register")) return text;
+    return `${text}\n\nFor personalized follow-up and records, please register at your nearest MamaSafe-supported facility.`;
+  }
+
   /**
    * Processes one inbound `messages[]` item (idempotent by meta message id).
    * @param {Record<string, unknown>} message
@@ -123,6 +141,7 @@ export class WhatsAppInboundOrchestrator {
    */
   async dispatchTextInbound({ phone, inboundBody, patient, message }) {
     const normalizedInbound = String(inboundBody || "").trim().toLowerCase();
+    const isRegisteredPatient = Boolean(patient?.id);
 
     if (["stop", "unsubscribe", "opt out"].includes(normalizedInbound)) {
       await this.repo.setPatientCheckupOptOut(phone, true);
@@ -185,12 +204,13 @@ export class WhatsAppInboundOrchestrator {
     let responseText = "";
     let source = "whatsapp-webhook-auto-reply";
     let flowType = activeSession?.flow_type || "intake";
+    let shouldAppendRegistrationPrompt = false;
 
     if (shouldUseQuestionnaire) {
       const flow = this.questionnaire.handleMessage({
         messageText: inboundBody,
         session: activeSession,
-        patientName: patient?.name || "Mum/Patient",
+        patientName: this.getDisplayName(patient),
       });
       responseText = flow.responseText;
       source = "whatsapp-webhook-questionnaire";
@@ -206,11 +226,21 @@ export class WhatsAppInboundOrchestrator {
         completedAt: flow.nextSession?.completed_at || flow.nextSession?.completedAt || null,
       });
       triageResult = flow.triageResult || null;
+      if (!isRegisteredPatient) {
+        const flowStatus = flow.nextSession?.status || "active";
+        shouldAppendRegistrationPrompt =
+          flow.kind === "complete" || flow.kind === "end" || flowStatus === "completed" || flowStatus === "cancelled";
+      }
     } else {
       triageResult = this.questionnaire.buildRuleBasedSymptomResponse(inboundBody);
       responseText = triageResult.draftResponse;
       source = "whatsapp-webhook-rule-based";
       flowType = activeSession?.flow_type || "free_text";
+      shouldAppendRegistrationPrompt = !isRegisteredPatient;
+    }
+
+    if (shouldAppendRegistrationPrompt) {
+      responseText = this.appendUnregisteredPrompt(responseText);
     }
 
     await this.maybeSendOutbound({
