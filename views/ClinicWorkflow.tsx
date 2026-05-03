@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { UserProfile, Patient, ClinicVisit, ClinicalHistory, LabRequest, Diagnosis, Payment } from '../types';
 import { backend } from '../services/backend';
 import { 
@@ -15,6 +15,67 @@ interface ClinicWorkflowProps {
   onNavigate: (view: string) => void;
 }
 
+type HistoryFormState = {
+  chiefComplaint: string;
+  historyOfPresentIllness: string;
+  pastMedicalHistory: string;
+  familyHistory: string;
+  socialHistory: string;
+  allergies: string;
+  currentMedications: string;
+  temperature: string;
+  bp: string;
+  pulse: string;
+  respiratoryRate: string;
+  oxygenSaturation: string;
+  weight: string;
+  height: string;
+  physicalExamination: string;
+};
+
+const EMPTY_HISTORY_FORM: HistoryFormState = {
+  chiefComplaint: '',
+  historyOfPresentIllness: '',
+  pastMedicalHistory: '',
+  familyHistory: '',
+  socialHistory: '',
+  allergies: '',
+  currentMedications: '',
+  temperature: '',
+  bp: '',
+  pulse: '',
+  respiratoryRate: '',
+  oxygenSaturation: '',
+  weight: '',
+  height: '',
+  physicalExamination: '',
+};
+
+/** Map saved clinical history into controlled form fields (JSONB vitals may use camelCase or snake_case). */
+function clinicalHistoryToHistoryForm(history: ClinicalHistory): HistoryFormState {
+  const v = history.vitalSigns as Record<string, unknown> | undefined;
+  const numStr = (n: unknown) => (n != null && n !== '' && Number.isFinite(Number(n)) ? String(n) : '');
+  const rr = v?.respiratoryRate ?? v?.respiratory_rate;
+  const o2 = v?.oxygenSaturation ?? v?.oxygen_saturation;
+  return {
+    chiefComplaint: history.chiefComplaint ?? '',
+    historyOfPresentIllness: history.historyOfPresentIllness ?? '',
+    pastMedicalHistory: history.pastMedicalHistory ?? '',
+    familyHistory: history.familyHistory ?? '',
+    socialHistory: history.socialHistory ?? '',
+    allergies: history.allergies ?? '',
+    currentMedications: history.currentMedications ?? '',
+    temperature: numStr(v?.temperature),
+    bp: String(v?.bp ?? ''),
+    pulse: numStr(v?.pulse),
+    respiratoryRate: rr != null && rr !== '' ? String(rr) : '',
+    oxygenSaturation: o2 != null && o2 !== '' ? String(o2) : '',
+    weight: numStr(v?.weight),
+    height: numStr(v?.height),
+    physicalExamination: history.physicalExamination ?? '',
+  };
+}
+
 export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate }) => {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [recentVisits, setRecentVisits] = useState<ClinicVisit[]>([]);
@@ -25,6 +86,10 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [patientSearch, setPatientSearch] = useState('');
+  const [visitRecordSearch, setVisitRecordSearch] = useState('');
+  const [visitStatusFilter, setVisitStatusFilter] = useState<'all' | 'registered' | 'in_progress' | 'completed' | 'cancelled'>('all');
+  const [visitStartDate, setVisitStartDate] = useState('');
+  const [visitEndDate, setVisitEndDate] = useState('');
 
   // Form states
   const [visitForm, setVisitForm] = useState({
@@ -32,23 +97,7 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
     receptionNotes: '',
   });
 
-  const [historyForm, setHistoryForm] = useState({
-    chiefComplaint: '',
-    historyOfPresentIllness: '',
-    pastMedicalHistory: '',
-    familyHistory: '',
-    socialHistory: '',
-    allergies: '',
-    currentMedications: '',
-    temperature: '',
-    bp: '',
-    pulse: '',
-    respiratoryRate: '',
-    oxygenSaturation: '',
-    weight: '',
-    height: '',
-    physicalExamination: '',
-  });
+  const [historyForm, setHistoryForm] = useState<HistoryFormState>(EMPTY_HISTORY_FORM);
 
   const [labForm, setLabForm] = useState<LabRequestDraft>({
     search: '',
@@ -100,6 +149,32 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
   const [diagnoses, setDiagnoses] = useState<Diagnosis[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [clinicalHistory, setClinicalHistory] = useState<ClinicalHistory | null>(null);
+
+  /** Registration controls must reflect the loaded visit row (opening a record showed blank despite saved data). */
+  useEffect(() => {
+    if (!currentVisit) {
+      setVisitForm({ visitType: 'outpatient', receptionNotes: '' });
+      return;
+    }
+    setVisitForm({
+      visitType: currentVisit.visitType,
+      receptionNotes: currentVisit.receptionNotes ?? '',
+    });
+  }, [currentVisit?.id, currentVisit?.visitType, currentVisit?.receptionNotes]);
+
+  /** History inputs bind to `historyForm` but persistence loads into `clinicalHistory` only — keep them aligned. */
+  useEffect(() => {
+    const vid = currentVisit?.id;
+    if (!vid) {
+      setHistoryForm({ ...EMPTY_HISTORY_FORM });
+      return;
+    }
+    if (!clinicalHistory || clinicalHistory.visitId !== vid) {
+      setHistoryForm({ ...EMPTY_HISTORY_FORM });
+      return;
+    }
+    setHistoryForm(clinicalHistoryToHistoryForm(clinicalHistory));
+  }, [currentVisit?.id, clinicalHistory]);
 
   useEffect(() => {
     loadPatients();
@@ -184,6 +259,29 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
   useEffect(() => {
     void loadRecentVisits();
   }, []);
+
+  const filteredRecentVisits = useMemo(() => {
+    const q = visitRecordSearch.trim().toLowerCase();
+    return recentVisits
+      .filter((visit) => {
+        if (visitStatusFilter !== 'all' && visit.status !== visitStatusFilter) return false;
+        if (visitStartDate && visit.visitDate < `${visitStartDate}T00:00:00`) return false;
+        if (visitEndDate && visit.visitDate > `${visitEndDate}T23:59:59`) return false;
+        if (!q) return true;
+        return (
+          visit.patientName.toLowerCase().includes(q) ||
+          visit.id.toLowerCase().includes(q) ||
+          visit.visitType.toLowerCase().includes(q)
+        );
+      })
+      .slice(0, 50);
+  }, [recentVisits, visitRecordSearch, visitStatusFilter, visitStartDate, visitEndDate]);
+
+  const hasActiveVisitFilters =
+    visitRecordSearch.trim().length > 0 ||
+    visitStatusFilter !== 'all' ||
+    visitStartDate.length > 0 ||
+    visitEndDate.length > 0;
 
   const loadVisitData = async (visitId: string) => {
     try {
@@ -640,12 +738,74 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
               Refresh records
             </button>
           </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
+            <input
+              type="text"
+              value={visitRecordSearch}
+              onChange={(e) => setVisitRecordSearch(e.target.value)}
+              placeholder="Search patient, visit ID, or visit type"
+              className="md:col-span-2 p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#2c2c2e] text-sm text-slate-900 dark:text-white"
+            />
+            <select
+              value={visitStatusFilter}
+              onChange={(e) => setVisitStatusFilter(e.target.value as any)}
+              className="p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#2c2c2e] text-sm text-slate-900 dark:text-white"
+            >
+              <option value="all">All statuses</option>
+              <option value="registered">Registered</option>
+              <option value="in_progress">In progress</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="text-xs text-slate-600 dark:text-slate-300">
+                Start date
+                <input
+                  type="date"
+                  value={visitStartDate}
+                  onChange={(e) => setVisitStartDate(e.target.value)}
+                  className="mt-1 w-full p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#2c2c2e] text-xs text-slate-900 dark:text-white"
+                />
+              </label>
+              <label className="text-xs text-slate-600 dark:text-slate-300">
+                End date
+                <input
+                  type="date"
+                  value={visitEndDate}
+                  onChange={(e) => setVisitEndDate(e.target.value)}
+                  className="mt-1 w-full p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#2c2c2e] text-xs text-slate-900 dark:text-white"
+                />
+              </label>
+            </div>
+          </div>
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Showing {filteredRecentVisits.length} record{filteredRecentVisits.length === 1 ? '' : 's'}
+            </p>
+            <button
+              type="button"
+              disabled={!hasActiveVisitFilters}
+              onClick={() => {
+                setVisitRecordSearch('');
+                setVisitStatusFilter('all');
+                setVisitStartDate('');
+                setVisitEndDate('');
+              }}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg border ${
+                hasActiveVisitFilters
+                  ? 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#2c2c2e]'
+                  : 'border-slate-100 dark:border-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed'
+              }`}
+            >
+              Clear filters
+            </button>
+          </div>
           {loadingRecentVisits ? (
             <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-sm">
               <Loader2 className="animate-spin" size={16} />
               Loading recent records...
             </div>
-          ) : recentVisits.length === 0 ? (
+          ) : filteredRecentVisits.length === 0 ? (
             <p className="text-sm text-slate-500 dark:text-slate-400">No visit records found yet.</p>
           ) : (
             <div className="overflow-x-auto">
@@ -660,7 +820,7 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
                   </tr>
                 </thead>
                 <tbody>
-                  {recentVisits.slice(0, 12).map((visit) => (
+                  {filteredRecentVisits.map((visit) => (
                     <tr key={visit.id} className="border-b border-slate-100 dark:border-slate-800">
                       <td className="py-2 pr-3 text-slate-900 dark:text-white">{visit.patientName}</td>
                       <td className="py-2 pr-3 capitalize">{visit.visitType.replace('_', ' ')}</td>
