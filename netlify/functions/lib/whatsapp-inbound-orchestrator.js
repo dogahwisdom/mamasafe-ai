@@ -172,12 +172,14 @@ export class WhatsAppInboundOrchestrator {
     const activeSession = await this.repo.getActiveSessionByPhone(phone);
     if (!patient && !activeSession) {
       const responseText = [
-        "Hello, welcome to MamaSafe AI. How can I assist you today?",
+        "Hello, welcome to MamaSafe AI. I can guide a quick health check to support safe next steps.",
         "",
         "Please reply with one option:",
         "1. Pregnant mother",
         "2. Baby (0-12 months)",
         "3. General patient",
+        "",
+        "Reply with 1, 2, or 3, or send 'end' to stop.",
       ].join("\n");
       await this.repo.upsertSession({
         phone,
