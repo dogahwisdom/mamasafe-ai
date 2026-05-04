@@ -146,6 +146,22 @@ function guidanceSuffix() {
   return "\n\nReply with 1 or 2, or send 'restart' to start over, or 'end' to stop.";
 }
 
+function privacyLine(facilityName) {
+  const f = String(facilityName || "").trim();
+  if (f) {
+    return `Your answers are private and will only be used by MamaSafe AI and ${f}.`;
+  }
+  return "Your answers are private and will only be used by MamaSafe AI and your registered health facility.";
+}
+
+function completionLowRiskLine(facilityName) {
+  const f = String(facilityName || "").trim();
+  if (f) {
+    return `Thank you for your responses. MamaSafe AI and ${f} will use your answers to support your care. We will not share your personal information without your permission.`;
+  }
+  return "Thank you for your responses. MamaSafe AI and your health facility will use your answers to provide the best care. We will not share your personal information without your permission.";
+}
+
 export class WhatsAppQuestionnaireService {
   constructor() {
     this.startKeywords = new Set(["start", "hello", "hi", "hey", "menu", "checkup"]);
@@ -172,10 +188,10 @@ export class WhatsAppQuestionnaireService {
     return false;
   }
 
-  startMessage(patientName = "Mum/Patient") {
+  startMessage(patientName = "Mum/Patient", facilityName) {
     return [
       `Hello ${patientName}, we have 3 quick questions to support your care.`,
-      "Your answers are private and will only be used by MamaSafe AI and your registered health facility.",
+      privacyLine(facilityName),
       "",
       renderQuestion("Who is this check for today?", [
         "Pregnant mother",
@@ -232,12 +248,12 @@ export class WhatsAppQuestionnaireService {
     };
   }
 
-  handleMessage({ messageText, session, patientName }) {
+  handleMessage({ messageText, session, patientName, facilityName }) {
     const sanitized = sanitizeQuestionnaireInput(messageText);
     const normalizedMessage = normalizeText(sanitized);
 
     if (session?.status === "active" && this.startKeywords.has(normalizedMessage)) {
-      const resume = this.resumePromptForActiveSession(session, patientName);
+      const resume = this.resumePromptForActiveSession(session, patientName, facilityName);
       return {
         kind: "resume",
         responseText: resume,
@@ -248,7 +264,7 @@ export class WhatsAppQuestionnaireService {
     if (this.restartKeywords.has(normalizedMessage)) {
       return {
         kind: "restart",
-        responseText: this.startMessage(patientName),
+        responseText: this.startMessage(patientName, facilityName),
         nextSession: this.buildStartSession(this.ownerPatientId(session)),
       };
     }
@@ -275,7 +291,7 @@ export class WhatsAppQuestionnaireService {
       }
       return {
         kind: "start",
-        responseText: this.startMessage(patientName),
+        responseText: this.startMessage(patientName, facilityName),
         nextSession: this.buildStartSession(this.ownerPatientId(session)),
       };
     }
@@ -298,8 +314,7 @@ export class WhatsAppQuestionnaireService {
     if (!current) {
       return {
         kind: "complete",
-        responseText:
-          "Thank you for your responses. MamaSafe AI will use your answers to support the best care.",
+        responseText: completionLowRiskLine(facilityName),
         nextSession: { ...session, status: "completed", completed_at: new Date().toISOString() },
         triageResult: {
           riskLevel: RISK.LOW,
@@ -339,7 +354,7 @@ export class WhatsAppQuestionnaireService {
     const triageResult = this.scoreRisk(session.flow_type, answers);
     return {
       kind: "complete",
-      responseText: this.completionText(triageResult.riskLevel),
+      responseText: this.completionText(triageResult.riskLevel, facilityName),
       nextSession: {
         ...session,
         answers,
@@ -350,12 +365,12 @@ export class WhatsAppQuestionnaireService {
     };
   }
 
-  resumePromptForActiveSession(session, patientName) {
+  resumePromptForActiveSession(session, patientName, facilityName) {
     if (!session || session.status !== "active") {
-      return this.startMessage(patientName);
+      return this.startMessage(patientName, facilityName);
     }
     if (session.flow_type === "intake") {
-      return `${this.startMessage(patientName)}\n\nReply with 1, 2, or 3, or send 'end' to stop.`;
+      return `${this.startMessage(patientName, facilityName)}\n\nReply with 1, 2, or 3, or send 'end' to stop.`;
     }
     const questions = FLOW_QUESTION_BANK[session.flow_type] || [];
     const current = questions[session.step_index];
@@ -365,41 +380,57 @@ export class WhatsAppQuestionnaireService {
     return `${renderQuestion(current.text, current.options)}${guidanceSuffix()}`;
   }
 
-  buildRuleBasedSymptomResponse(messageText) {
+  buildRuleBasedSymptomResponse(messageText, facilityName, patientShortName) {
     const normalized = normalizeText(sanitizeQuestionnaireInput(messageText));
     const hits = DANGER_KEYWORDS.filter((term) => normalized.includes(term));
+    const facility = String(facilityName || "").trim();
+    const who =
+      patientShortName && String(patientShortName).trim() && patientShortName !== "there"
+        ? String(patientShortName).trim()
+        : null;
+
     if (hits.length >= 2) {
+      const team =
+        facility.length > 0
+          ? `${facility} has been notified—please seek emergency care if your symptoms worsen.`
+          : "Our care team has been alerted to follow up.";
       return {
         riskLevel: RISK.CRITICAL,
         reasoning: `Danger-sign keywords detected: ${hits.join(", ")}.`,
         recommendedAction: "Immediate hospital review and clinician follow-up.",
-        draftResponse:
-          "I am concerned about your symptoms. Please go to the nearest hospital immediately. Our care team has been alerted to follow up.",
+        draftResponse: `I am concerned about your symptoms. Please go to the nearest hospital immediately. ${team}`,
       };
     }
     if (hits.length === 1) {
+      const team =
+        facility.length > 0
+          ? `${facility} can help arrange follow-up—please visit a health facility today if you feel worse.`
+          : "Please visit the nearest health facility today, and our team will follow up.";
       return {
         riskLevel: RISK.HIGH,
         reasoning: `Potential risk symptom detected: ${hits[0]}.`,
         recommendedAction: "Urgent clinician review recommended.",
-        draftResponse:
-          "Thank you for sharing. Your symptom needs urgent review. Please visit the nearest health facility today, and our team will follow up.",
+        draftResponse: `Thank you for sharing. Your symptom needs urgent review. ${team}`,
       };
     }
+    const helloLead = who ? `Thank you, ${who}. ` : "Thank you. ";
     return {
       riskLevel: RISK.LOW,
       reasoning: "No immediate danger keywords found in free-text input.",
       recommendedAction: "Continue monitoring and complete guided questionnaire.",
-      draftResponse:
-        "Thank you. To support safe care, please type 'hello' to begin our 3-question health check.",
+      draftResponse: `${helloLead}To support safe care, please type 'hello' to begin our 3-question health check.`,
     };
   }
 
-  completionText(riskLevel) {
+  completionText(riskLevel, facilityName) {
+    const facility = String(facilityName || "").trim();
     if (riskLevel === RISK.CRITICAL || riskLevel === RISK.HIGH) {
+      if (facility.length > 0) {
+        return `Thank you for your responses. We identified urgent risk signs and have notified ${facility}. Please go to the nearest hospital immediately if symptoms worsen, and stay in touch with ${facility} for follow-up.`;
+      }
       return "Thank you for your responses. We identified urgent risk signs and have flagged your case for the doctor. Please go to the nearest hospital immediately while our team follows up.";
     }
-    return "Thank you for your responses. MamaSafe AI and your health facility will use your answers to provide the best care. We will not share your personal information without your permission.";
+    return completionLowRiskLine(facilityName);
   }
 
   scoreRisk(flowType, answers) {

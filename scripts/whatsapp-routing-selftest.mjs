@@ -73,6 +73,13 @@ class StatefulRecordingRepo {
     return this.patientLookup;
   }
 
+  async resolveFacilityDisplayName(patient) {
+    if (!patient) return null;
+    const snap = String(patient.primary_facility_name ?? "").trim();
+    if (snap) return snap;
+    return null;
+  }
+
   async getActiveSessionByPhone() {
     return this.session?.status === "active" ? this.session : null;
   }
@@ -214,6 +221,23 @@ const cloud = new MockCloud();
   const orch = new WhatsAppInboundOrchestrator({ repo, cloud, questionnaire });
   await orch.handleInboundMessage({ id: "r1", from: "233241234567", type: "text", text: { body: "hi" } });
   assert.ok(repo.outbounds.at(-1).body.includes("Who is this check"));
+
+  const patientWithFacility = {
+    ...patient,
+    primary_facility_name: "MamaSafe Demo Clinic",
+  };
+  const repoFac = new StatefulRecordingRepo(patientWithFacility);
+  const orchFac = new WhatsAppInboundOrchestrator({ repo: repoFac, cloud, questionnaire });
+  await orchFac.handleInboundMessage({
+    id: "r1b",
+    from: "233241234567",
+    type: "text",
+    text: { body: "hello" },
+  });
+  assert.ok(
+    repoFac.outbounds.at(-1).body.includes("MamaSafe Demo Clinic"),
+    "privacy line should name the patient's facility when available"
+  );
   await orch.handleInboundMessage({ id: "r2", from: "233241234567", type: "text", text: { body: "1" } });
   assert.ok(/severe headache|blurred vision|bleeding|fever/i.test(repo.outbounds.at(-1).body));
 

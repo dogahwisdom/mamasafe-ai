@@ -170,6 +170,8 @@ export class WhatsAppInboundOrchestrator {
     }
 
     const activeSession = await this.repo.getActiveSessionByPhone(phone);
+    const facilityDisplayName = patient ? await this.repo.resolveFacilityDisplayName(patient) : null;
+
     if (!patient && !activeSession) {
       const responseText = [
         "Hello, welcome to MamaSafe AI. I can guide a quick health check to support safe next steps.",
@@ -213,6 +215,7 @@ export class WhatsAppInboundOrchestrator {
         messageText: inboundBody,
         session: activeSession,
         patientName: this.getDisplayName(patient),
+        facilityName: facilityDisplayName || undefined,
       });
       responseText = flow.responseText;
       source = "whatsapp-webhook-questionnaire";
@@ -234,7 +237,11 @@ export class WhatsAppInboundOrchestrator {
           flow.kind === "complete" || flow.kind === "end" || flowStatus === "completed" || flowStatus === "cancelled";
       }
     } else {
-      triageResult = this.questionnaire.buildRuleBasedSymptomResponse(inboundBody);
+      triageResult = this.questionnaire.buildRuleBasedSymptomResponse(
+        inboundBody,
+        facilityDisplayName || undefined,
+        this.getDisplayName(patient)
+      );
       responseText = triageResult.draftResponse;
       source = "whatsapp-webhook-rule-based";
       flowType = activeSession?.flow_type || "free_text";

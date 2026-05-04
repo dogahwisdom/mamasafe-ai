@@ -24,7 +24,9 @@ export class WhatsAppRepository {
     const variants = WhatsAppPhoneNormalizer.variantsForQueries(canonical);
     const { data, error } = await this.client
       .from("patients")
-      .select("id, name, phone, gestational_weeks, alerts")
+      .select(
+        "id, name, phone, gestational_weeks, alerts, primary_facility_id, primary_facility_name, facility_id"
+      )
       .in("phone", variants)
       .limit(1);
     if (error) {
@@ -32,6 +34,30 @@ export class WhatsAppRepository {
       return null;
     }
     return Array.isArray(data) && data.length > 0 ? data[0] : null;
+  }
+
+  /**
+   * Display name for the patient's facility: snapshot column, else users.name via primary_facility_id or facility_id.
+   * @param {{ primary_facility_name?: string | null; primary_facility_id?: string | null; facility_id?: string | null } | null} patient
+   * @returns {Promise<string | null>}
+   */
+  async resolveFacilityDisplayName(patient) {
+    if (!patient) return null;
+    const snapshot = String(patient.primary_facility_name ?? "").trim();
+    if (snapshot) return snapshot;
+    const facilityUserId = patient.primary_facility_id || patient.facility_id;
+    if (!facilityUserId || !this.client) return null;
+    const { data, error } = await this.client
+      .from("users")
+      .select("name, role")
+      .eq("id", facilityUserId)
+      .maybeSingle();
+    if (error) {
+      console.error("Failed to resolve facility user name:", error.message);
+      return null;
+    }
+    const n = String(data?.name ?? "").trim();
+    return n || null;
   }
 
   async createOrFindPatientByPhone(phone, name = "WhatsApp Patient") {
