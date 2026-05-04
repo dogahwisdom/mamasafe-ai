@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { UserProfile, Patient, ClinicVisit, ClinicalHistory, LabRequest, Diagnosis, Payment } from '../types';
 import { backend } from '../services/backend';
 import { 
@@ -52,6 +52,18 @@ const EMPTY_HISTORY_FORM: HistoryFormState = {
 };
 
 /** Map saved clinical history into controlled form fields (JSONB vitals may use camelCase or snake_case). */
+/** Normalize stored patient.next_appointment to YYYY-MM-DD for date inputs and comparisons. */
+function normalizeAppointmentDay(value: string | undefined | null): string {
+  if (!value || !String(value).trim()) return '';
+  try {
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return '';
+    return d.toISOString().slice(0, 10);
+  } catch {
+    return '';
+  }
+}
+
 function clinicalHistoryToHistoryForm(history: ClinicalHistory): HistoryFormState {
   const v = history.vitalSigns as Record<string, unknown> | undefined;
   const numStr = (n: unknown) => (n != null && n !== '' && Number.isFinite(Number(n)) ? String(n) : '');
@@ -124,6 +136,99 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
     rationale: string;
   } | null>(null);
   const [loadingSuggestion, setLoadingSuggestion] = useState(false);
+
+  /** idle | pending (debouncing) | saving | saved | error */
+  const [nextAppointmentSaveState, setNextAppointmentSaveState] = useState<
+    'idle' | 'pending' | 'saving' | 'saved' | 'error'
+  >('idle');
+
+  const selectedPatientIdRef = useRef<string | null>(null);
+  const nextAppointmentDateRef = useRef('');
+  const appointmentDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastPersistedNextApptRef = useRef<string | null>(null);
+  const savedStatusClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    selectedPatientIdRef.current = selectedPatient?.id ?? null;
+  }, [selectedPatient?.id]);
+
+  const runPersistNextAppointment = useCallback(async (): Promise<boolean> => {
+    const patientId = selectedPatientIdRef.current;
+    if (!patientId) return true;
+    const raw = nextAppointmentDateRef.current.trim();
+    const last = lastPersistedNextApptRef.current ?? '';
+    if ((raw || '') === (last || '')) return true;
+
+    setNextAppointmentSaveState('saving');
+    try {
+      await backend.workflow.updateNextAppointment(patientId, raw || null);
+      lastPersistedNextApptRef.current = raw || null;
+      setNextAppointmentSaveState('saved');
+      if (savedStatusClearTimerRef.current) clearTimeout(savedStatusClearTimerRef.current);
+      savedStatusClearTimerRef.current = setTimeout(() => {
+        setNextAppointmentSaveState('idle');
+        savedStatusClearTimerRef.current = null;
+      }, 2200);
+      return true;
+    } catch (e) {
+      console.error(e);
+      setNextAppointmentSaveState('error');
+      return false;
+    }
+  }, []);
+
+  const applyNextAppointmentDate = useCallback(
+    (calendarDate: string, opts?: { skipBackend?: boolean }) => {
+      setNextAppointmentDate(calendarDate);
+      nextAppointmentDateRef.current = calendarDate;
+      setSelectedPatient((prev) =>
+        prev ? { ...prev, nextAppointment: calendarDate || '' } : prev
+      );
+
+      if (opts?.skipBackend) {
+        const n = calendarDate.trim();
+        lastPersistedNextApptRef.current = n || null;
+        setNextAppointmentSaveState('idle');
+        if (appointmentDebounceTimerRef.current) {
+          clearTimeout(appointmentDebounceTimerRef.current);
+          appointmentDebounceTimerRef.current = null;
+        }
+        return;
+      }
+
+      if (!selectedPatientIdRef.current) return;
+
+      const n = calendarDate.trim();
+      const last = lastPersistedNextApptRef.current ?? '';
+      if ((n || '') === (last || '')) {
+        setNextAppointmentSaveState('idle');
+        return;
+      }
+
+      setNextAppointmentSaveState('pending');
+      if (appointmentDebounceTimerRef.current) clearTimeout(appointmentDebounceTimerRef.current);
+      appointmentDebounceTimerRef.current = setTimeout(() => {
+        appointmentDebounceTimerRef.current = null;
+        void runPersistNextAppointment();
+      }, 650);
+    },
+    [runPersistNextAppointment]
+  );
+
+  const flushNextAppointmentSave = useCallback(async (): Promise<boolean> => {
+    if (appointmentDebounceTimerRef.current) {
+      clearTimeout(appointmentDebounceTimerRef.current);
+      appointmentDebounceTimerRef.current = null;
+    }
+    return runPersistNextAppointment();
+  }, [runPersistNextAppointment]);
+
+  useEffect(() => {
+    return () => {
+      if (appointmentDebounceTimerRef.current) clearTimeout(appointmentDebounceTimerRef.current);
+      if (savedStatusClearTimerRef.current) clearTimeout(savedStatusClearTimerRef.current);
+    };
+  }, []);
 
   const [paymentForm, setPaymentForm] = useState({
     paymentType: 'consultation' as 'consultation' | 'lab' | 'pharmacy' | 'procedure' | 'other',
@@ -236,7 +341,16 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
     try {
       const visitData = await backend.workflow.getVisitById(visit.id);
       const patient = patients.find((p) => p.id === visit.patientId) || null;
-      setSelectedPatient(patient);
+      if (patient) {
+        const day = normalizeAppointmentDay(patient.nextAppointment);
+        setSelectedPatient({ ...patient, nextAppointment: day || '' });
+        setNextAppointmentDate(day);
+        nextAppointmentDateRef.current = day;
+        lastPersistedNextApptRef.current = day || null;
+        setNextAppointmentSaveState('idle');
+      } else {
+        setSelectedPatient(null);
+      }
       setCurrentVisit(visitData.visit);
       setClinicalHistory(visitData.clinicalHistory || null);
       setLabRequests(visitData.labRequests);
@@ -349,19 +463,8 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
       setCurrentVisit(visit);
       setActiveStage('history');
 
-      // Initialise next appointment control from existing patient value if present
-      if (selectedPatient.nextAppointment) {
-        try {
-          const existing = new Date(selectedPatient.nextAppointment);
-          if (!isNaN(existing.getTime())) {
-            setNextAppointmentDate(existing.toISOString().split('T')[0]);
-          }
-        } catch {
-          setNextAppointmentDate('');
-        }
-      } else {
-        setNextAppointmentDate('');
-      }
+      const day = normalizeAppointmentDay(selectedPatient.nextAppointment);
+      applyNextAppointmentDate(day, { skipBackend: true });
       setNextAppointmentSuggestion(null);
     } catch (error) {
       console.error('Error creating visit:', error);
@@ -476,6 +579,12 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
 
     setSaving(true);
     try {
+      const appointmentSaved = await flushNextAppointmentSave();
+      if (!appointmentSaved) {
+        alert('Could not save the next clinic appointment. Please try again or clear the date.');
+        return;
+      }
+
       const diagnosis = await backend.workflow.createDiagnosis(
         currentVisit.id,
         currentVisit.patientId,
@@ -495,24 +604,6 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
         description: '', 
         severity: 'mild' 
       });
-
-      // If clinician set a next appointment date, persist it on the patient record
-      if (nextAppointmentDate) {
-        try {
-          await backend.workflow.updateNextAppointment(
-            currentVisit.patientId,
-            nextAppointmentDate
-          );
-
-          // Keep local patient state in sync so UI updates immediately
-          setSelectedPatient(prev =>
-            prev ? { ...prev, nextAppointment: nextAppointmentDate } : prev
-          );
-        } catch (error) {
-          console.error('Error updating next appointment:', error);
-          alert('Diagnosis saved, but failed to update next appointment.');
-        }
-      }
 
       alert('Diagnosis added successfully');
     } catch (error) {
@@ -543,7 +634,7 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
         } as any
       );
 
-      setNextAppointmentDate(suggestion.suggestedDate);
+      applyNextAppointmentDate(suggestion.suggestedDate);
       setNextAppointmentSuggestion({
         date: suggestion.suggestedDate,
         rationale: suggestion.rationale,
@@ -607,6 +698,15 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
       setCurrentVisit({ ...currentVisit, status: 'completed' });
       alert('Visit completed successfully');
       // Reset for new visit
+      if (appointmentDebounceTimerRef.current) clearTimeout(appointmentDebounceTimerRef.current);
+      if (savedStatusClearTimerRef.current) clearTimeout(savedStatusClearTimerRef.current);
+      appointmentDebounceTimerRef.current = null;
+      savedStatusClearTimerRef.current = null;
+      setNextAppointmentDate('');
+      nextAppointmentDateRef.current = '';
+      lastPersistedNextApptRef.current = null;
+      setNextAppointmentSaveState('idle');
+      setNextAppointmentSuggestion(null);
       setCurrentVisit(null);
       setSelectedPatient(null);
       setActiveStage('registration');
@@ -1237,7 +1337,7 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
                           type="date"
                           className="px-3 py-2 rounded-lg bg-white dark:bg-black border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white"
                           value={nextAppointmentDate}
-                          onChange={e => setNextAppointmentDate(e.target.value)}
+                          onChange={e => applyNextAppointmentDate(e.target.value)}
                         />
                         <div className="flex flex-wrap gap-1">
                           <button
@@ -1245,7 +1345,7 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
                             onClick={() => {
                               const d = new Date();
                               d.setDate(d.getDate() + 7);
-                              setNextAppointmentDate(d.toISOString().split('T')[0]);
+                              applyNextAppointmentDate(d.toISOString().split('T')[0]);
                             }}
                             className="px-2 py-1 text-[11px] rounded-full bg-slate-100 dark:bg-[#2c2c2e] text-slate-700 dark:text-slate-200 hover:bg-slate-200"
                           >
@@ -1256,7 +1356,7 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
                             onClick={() => {
                               const d = new Date();
                               d.setDate(d.getDate() + 14);
-                              setNextAppointmentDate(d.toISOString().split('T')[0]);
+                              applyNextAppointmentDate(d.toISOString().split('T')[0]);
                             }}
                             className="px-2 py-1 text-[11px] rounded-full bg-slate-100 dark:bg-[#2c2c2e] text-slate-700 dark:text-slate-200 hover:bg-slate-200"
                           >
@@ -1267,7 +1367,7 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
                             onClick={() => {
                               const d = new Date();
                               d.setMonth(d.getMonth() + 1);
-                              setNextAppointmentDate(d.toISOString().split('T')[0]);
+                              applyNextAppointmentDate(d.toISOString().split('T')[0]);
                             }}
                             className="px-2 py-1 text-[11px] rounded-full bg-slate-100 dark:bg-[#2c2c2e] text-slate-700 dark:text-slate-200 hover:bg-slate-200"
                           >
@@ -1285,9 +1385,45 @@ export const ClinicWorkflow: React.FC<ClinicWorkflowProps> = ({ user, onNavigate
                       </button>
                     </div>
                   </div>
-                  <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
-                    Appointment reminders will be generated automatically based on this date.
-                  </p>
+                  <div className="mt-2 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      Appointment reminders will be generated automatically based on this date.
+                    </p>
+                    {nextAppointmentSaveState !== 'idle' && (
+                      <p
+                        className={`text-[11px] font-semibold flex items-center gap-1 ${
+                          nextAppointmentSaveState === 'pending'
+                            ? 'text-amber-600 dark:text-amber-400'
+                            : nextAppointmentSaveState === 'saving'
+                              ? 'text-slate-600 dark:text-slate-300'
+                              : nextAppointmentSaveState === 'saved'
+                                ? 'text-emerald-600 dark:text-emerald-400'
+                                : 'text-red-600 dark:text-red-400'
+                        }`}
+                      >
+                        {nextAppointmentSaveState === 'pending' && (
+                          <>
+                            <Clock size={12} /> Unsaved — saving shortly…
+                          </>
+                        )}
+                        {nextAppointmentSaveState === 'saving' && (
+                          <>
+                            <Loader2 className="animate-spin" size={12} /> Saving appointment…
+                          </>
+                        )}
+                        {nextAppointmentSaveState === 'saved' && (
+                          <>
+                            <CheckCircle size={12} /> Saved to patient record
+                          </>
+                        )}
+                        {nextAppointmentSaveState === 'error' && (
+                          <>
+                            <AlertCircle size={12} /> Could not save — try again
+                          </>
+                        )}
+                      </p>
+                    )}
+                  </div>
                   {nextAppointmentSuggestion && (
                     <div className="mt-3 p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-900/40">
                       <p className="text-[11px] text-emerald-900 dark:text-emerald-200 font-semibold">
