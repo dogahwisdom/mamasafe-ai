@@ -280,12 +280,16 @@ export class PatientService {
           });
       }
 
-      // Send credentials via SMS and WhatsApp for new enrollments
-      if (isNewUser) {
+      // Welcome + credentials: new login account OR first patient row for this phone (existing user
+      // without prior patient record used to skip WhatsApp entirely).
+      const isFirstPatientRowForPhone = !existing;
+      const shouldSendEnrollmentWelcome = isNewUser || isFirstPatientRowForPhone;
+
+      if (shouldSendEnrollmentWelcome) {
         try {
           const messagingService = new MessagingService();
           const portalUrl = typeof window !== 'undefined' ? window.location.origin : 'https://mamasafe.ai';
-          await messagingService.sendEnrollmentCredentials(
+          const sendResult = await messagingService.sendEnrollmentCredentials(
             cleanPhone,
             patient.name,
             defaultPassword,
@@ -296,6 +300,12 @@ export class PatientService {
               patientId: finalPatientId,
             }
           );
+          if (patient.whatsappMessagingOptIn !== false && !sendResult.whatsapp) {
+            console.warn(
+              '[MamaSafe] Enrollment WhatsApp did not send. Check: (1) app hosted on Netlify so /.netlify/functions/whatsapp-send exists, (2) Meta WhatsApp Cloud env vars, (3) recipient opted in / number in correct international format.',
+              sendResult
+            );
+          }
         } catch (error) {
           console.error('Error sending enrollment credentials:', error);
           // Don't throw - enrollment should succeed even if messaging fails
@@ -403,9 +413,10 @@ export class PatientService {
     storage.set(KEYS.USERS, users);
 
     const enrolledNewUserAccount = userIndex < 0;
+    const insertedNewPatientRow = existingIndex < 0;
+    const shouldSendEnrollmentWelcomeLocal = enrolledNewUserAccount || insertedNewPatientRow;
 
-    // Send credentials via SMS / WhatsApp for new patient logins only
-    if (enrolledNewUserAccount) {
+    if (shouldSendEnrollmentWelcomeLocal) {
       try {
         const messagingService = new MessagingService();
         const portalUrl = typeof window !== 'undefined' ? window.location.origin : 'https://mamasafe.ai';
@@ -413,7 +424,7 @@ export class PatientService {
           typeof window !== 'undefined' ?
             (storage.get<UserProfile | null>(KEYS.CURRENT_USER, null)?.name ?? patient.primaryFacilityName)
           : patient.primaryFacilityName;
-        await messagingService.sendEnrollmentCredentials(
+        const sendResult = await messagingService.sendEnrollmentCredentials(
           cleanPhone,
           patient.name,
           defaultPassword,
@@ -424,6 +435,12 @@ export class PatientService {
             patientId: finalPatient.id,
           }
         );
+        if (patient.whatsappMessagingOptIn !== false && !sendResult.whatsapp) {
+          console.warn(
+            '[MamaSafe] Enrollment WhatsApp did not send (local mode). Deploy on Netlify with whatsapp-send configured, or check browser network tab for function errors.',
+            sendResult
+          );
+        }
       } catch (error) {
         console.error('Error sending enrollment credentials:', error);
         // Don't throw - enrollment should succeed even if messaging fails
