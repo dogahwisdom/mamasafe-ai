@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Logo } from './components/Logo';
 import { DashboardView } from './views/Dashboard';
 import { EnrollmentView } from './views/Enrollment';
@@ -39,22 +39,6 @@ export const App: React.FC = () => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState<Alert[]>([]);
   const notificationRef = useRef<HTMLDivElement>(null);
-  const desktopNavRef = useRef<HTMLElement>(null);
-
-  // Scroll the tab strip only enough to keep the active tab visible. Avoid `inline: "center"`
-  // — it hides the start of the nav (Overview, Team, …) on narrow / split screens.
-  useLayoutEffect(() => {
-    const nav = desktopNavRef.current;
-    if (!nav) return;
-    const active = nav.querySelector('[data-desktop-nav-active="true"]');
-    if (!(active instanceof HTMLElement)) return;
-    const navRect = nav.getBoundingClientRect();
-    const tabRect = active.getBoundingClientRect();
-    const pad = 6;
-    if (tabRect.left < navRect.left + pad || tabRect.right > navRect.right - pad) {
-      active.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
-    }
-  }, [currentView]);
 
   useEffect(() => {
     // Initial Theme Check
@@ -320,14 +304,14 @@ export const App: React.FC = () => {
 
       {/* Desktop Header */}
       <header className="fixed top-0 w-full bg-white/70 dark:bg-[#1c1c1e]/70 backdrop-blur-xl border-b border-slate-200/50 dark:border-slate-800/50 z-50 saturate-150 supports-[backdrop-filter]:bg-white/60">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 h-16 md:h-20 flex items-center gap-2 sm:gap-3 min-w-0 relative">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 min-h-16 py-2 md:py-2.5 flex flex-wrap items-center gap-x-2 gap-y-2 sm:gap-3 min-w-0 relative overflow-visible">
 
           <div
-            className="cursor-pointer group flex items-center flex-shrink-0 min-w-0"
+            className="cursor-pointer group flex items-center flex-shrink-0 min-w-0 order-1"
             onClick={() => setCurrentView('dashboard')}
           >
-            <Logo size={32} className="transition-transform duration-300 group-hover:scale-105 md:scale-100 scale-90" />
-            <div className="hidden sm:flex items-center gap-2 ml-3">
+            <Logo size={32} className="transition-transform duration-300 group-hover:scale-105 md:scale-100 scale-90 [&_span]:max-[900px]:hidden" />
+            <div className="hidden sm:flex items-center gap-2 ml-3 max-[900px]:hidden">
               {currentUser?.role === 'patient' && <span className="text-xs font-bold text-brand-600 bg-brand-50 border border-brand-100 px-2.5 py-0.5 rounded-full self-center">Patient Portal</span>}
               {currentUser?.role === 'pharmacy' &&
                 (Permissions.isOwnerOrAdmin(currentUser) ? (
@@ -366,38 +350,42 @@ export const App: React.FC = () => {
           </div>
 
           <nav
-            ref={desktopNavRef}
-            className="hidden md:flex flex-1 min-w-0 justify-center overflow-x-auto overflow-y-hidden overscroll-x-contain scroll-smooth touch-pan-x py-0.5 [scrollbar-width:thin]"
+            className="hidden md:flex w-full basis-full shrink-0 order-3 justify-center overflow-visible"
             aria-label="Primary navigation"
           >
-            <div className="flex w-max items-center gap-0.5 sm:gap-1 bg-slate-100/50 dark:bg-slate-800/50 p-1 rounded-full backdrop-blur-sm ring-1 ring-slate-200/40 dark:ring-slate-700/50">
+            <div
+              role="tablist"
+              className="flex w-full max-w-full flex-wrap items-center justify-center gap-0.5 sm:gap-1 rounded-xl bg-slate-100/90 p-0.5 sm:p-1 dark:bg-slate-800/70 ring-1 ring-slate-200/60 dark:ring-slate-700/60"
+            >
               {getNavItems().map((item) => (
                 <button
                   key={item.id}
                   type="button"
-                  data-desktop-nav-active={currentView === item.id ? 'true' : undefined}
+                  role="tab"
+                  aria-selected={currentView === item.id}
                   onClick={() => setCurrentView(item.id as ViewState)}
+                  title={item.label}
+                  aria-label={item.label}
                   className={`
-                  flex shrink-0 items-center gap-1.5 sm:gap-2 whitespace-nowrap rounded-full py-2.5 text-xs sm:text-sm font-semibold transition-all duration-300 ease-out
-                  px-3 sm:px-4 lg:px-5
+                  inline-flex min-w-0 max-w-full shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-2.5 py-2 text-[13px] font-medium leading-none transition-colors duration-200 sm:px-3 sm:text-sm
                   ${currentView === item.id
-                    ? 'bg-white dark:bg-[#2c2c2e] text-black dark:text-white shadow-sm sm:scale-[1.02]'
-                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-black/5 dark:hover:bg-white/5'
+                    ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/90 dark:bg-[#2c2c2e] dark:text-white dark:ring-slate-600/70'
+                    : 'text-slate-600 hover:bg-slate-200/70 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-slate-100'
                   }
                 `}
                 >
                   <item.icon
                     size={16}
-                    strokeWidth={2.5}
-                    className={`shrink-0 ${currentView === item.id ? 'text-brand-500' : ''}`}
+                    strokeWidth={currentView === item.id ? 2.5 : 2}
+                    className={`shrink-0 ${currentView === item.id ? 'text-brand-600 dark:text-brand-400' : 'text-slate-500 dark:text-slate-500'}`}
                   />
-                  {item.label}
+                  <span>{item.label}</span>
                 </button>
               ))}
             </div>
           </nav>
 
-          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2 md:gap-4">
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2 md:gap-4 order-2 ml-auto md:ml-0">
             {/* Notification Bell */}
             <div className="relative" ref={notificationRef}>
               <button
@@ -516,7 +504,7 @@ export const App: React.FC = () => {
       </header>
 
       {/* Main Content Area */}
-      <main className="pt-20 pb-28 md:pb-8 px-4 md:px-8 max-w-7xl mx-auto min-h-screen">
+      <main className="pt-24 pb-28 md:pb-8 md:pt-32 px-4 md:px-8 max-w-7xl mx-auto min-h-screen">
         {currentView === 'dashboard' && currentUser?.role === 'patient' && (
           <PatientDashboard user={currentUser} onNavigate={setCurrentView} onLogout={handleLogout} />
         )}
@@ -656,22 +644,24 @@ export const App: React.FC = () => {
         className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/90 dark:bg-[#1c1c1e]/90 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 pb-[env(safe-area-inset-bottom)]"
         aria-label="Mobile navigation"
       >
-        <div className="flex h-16 items-stretch overflow-x-auto overflow-y-hidden overscroll-x-contain scroll-smooth touch-pan-x gap-1 px-2 [scrollbar-width:thin]">
+        <div className="flex max-h-[42vh] min-h-14 flex-wrap items-center justify-center gap-x-1 gap-y-2 overflow-y-auto overflow-x-visible px-2 py-2 no-scrollbar [scrollbar-width:none]">
           {getNavItems().map((item) => (
             <button
               key={item.id}
               type="button"
               onClick={() => setCurrentView(item.id as ViewState)}
+              title={item.label}
+              aria-label={item.label}
               className={`
-                     flex min-w-[4.25rem] max-w-[5.5rem] shrink-0 snap-start flex-col items-center justify-center gap-0.5 px-1.5 transition-colors
+                     flex min-w-[4.5rem] max-w-[6.5rem] shrink-0 flex-col items-center justify-center gap-1 rounded-xl px-1.5 py-1.5 transition-colors
                      ${currentView === item.id
-                  ? 'text-brand-600 dark:text-brand-400'
-                  : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'
+                  ? 'bg-brand-50 text-brand-700 ring-1 ring-brand-200/80 dark:bg-brand-950/40 dark:text-brand-300 dark:ring-brand-800/60'
+                  : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800/80'
                 }
                   `}
             >
               <item.icon size={22} strokeWidth={currentView === item.id ? 2.5 : 2} />
-              <span className="line-clamp-2 text-center text-[10px] font-bold leading-tight tracking-tight">
+              <span className="w-full text-center text-[10px] font-semibold leading-tight tracking-tight">
                 {item.label}
               </span>
             </button>
