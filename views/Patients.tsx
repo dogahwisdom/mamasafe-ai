@@ -26,6 +26,8 @@ export const PatientsView: React.FC<PatientsViewProps> = ({ onNavigate, patients
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [appointmentDraft, setAppointmentDraft] = useState('');
   const [savingNextAppointment, setSavingNextAppointment] = useState(false);
+  const [editingNextAppointment, setEditingNextAppointment] = useState(false);
+  const [appointmentSaveNotice, setAppointmentSaveNotice] = useState('');
 
   const filteredPatients = patients.filter(p => {
     const q = searchTerm.toLowerCase().trim();
@@ -46,7 +48,10 @@ export const PatientsView: React.FC<PatientsViewProps> = ({ onNavigate, patients
   }, [selectedPatient]);
 
   useEffect(() => {
-    setAppointmentDraft(toDateInputValue(selectedPatient?.nextAppointment));
+    const initialDate = toDateInputValue(selectedPatient?.nextAppointment);
+    setAppointmentDraft(initialDate);
+    setEditingNextAppointment(!initialDate);
+    setAppointmentSaveNotice('');
   }, [selectedPatient?.id, selectedPatient?.nextAppointment]);
 
   const loadPatientHistory = async () => {
@@ -133,16 +138,25 @@ export const PatientsView: React.FC<PatientsViewProps> = ({ onNavigate, patients
     if (!selectedPatient || savingNextAppointment) return;
 
     const normalizedDate = appointmentDraft.trim() || null;
+    const today = toDateInputValue(new Date().toISOString());
 
     if (normalizedDate && !/^\d{4}-\d{2}-\d{2}$/.test(normalizedDate)) {
       alert('Please choose a valid appointment date.');
       return;
     }
+    if (normalizedDate && normalizedDate < today) {
+      alert('Next appointment cannot be in the past.');
+      return;
+    }
 
     setSavingNextAppointment(true);
+    setAppointmentSaveNotice('');
     try {
       await backend.workflow.updateNextAppointment(selectedPatient.id, normalizedDate);
       setSelectedPatient(prev => (prev ? { ...prev, nextAppointment: normalizedDate || '' } : prev));
+      setEditingNextAppointment(false);
+      setAppointmentSaveNotice('Saved');
+      window.setTimeout(() => setAppointmentSaveNotice(''), 1800);
     } catch (error) {
       console.error('Error saving next appointment:', error);
       alert('Could not save appointment date. Please try again.');
@@ -579,23 +593,58 @@ export const PatientsView: React.FC<PatientsViewProps> = ({ onNavigate, patients
                           {formatDate(selectedPatient.nextAppointment, {day: 'numeric', month: 'short', year: 'numeric'}, 'Not scheduled')}
                         </span>
                       </div>
-                      <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-2">
-                        <input
-                          type="date"
-                          value={appointmentDraft}
-                          onChange={(e) => setAppointmentDraft(e.target.value)}
-                          className="w-full sm:w-auto px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1c1c1e] text-sm font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500/40"
-                          aria-label="Set next appointment date"
-                        />
-                        <button
-                          type="button"
-                          onClick={handleSaveNextAppointment}
-                          disabled={savingNextAppointment}
-                          className="px-3 py-2 rounded-xl bg-brand-600 text-white text-sm font-semibold hover:bg-brand-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
-                        >
-                          {savingNextAppointment ? 'Saving...' : 'Save date'}
-                        </button>
-                      </div>
+                      {editingNextAppointment ? (
+                        <div className="mt-3 space-y-2">
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                            <input
+                              type="date"
+                              value={appointmentDraft}
+                              onChange={(e) => {
+                                setAppointmentDraft(e.target.value);
+                                setAppointmentSaveNotice('');
+                              }}
+                              className="w-full sm:w-auto px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1c1c1e] text-sm font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+                              aria-label="Set next appointment date"
+                            />
+                            <button
+                              type="button"
+                              onClick={handleSaveNextAppointment}
+                              disabled={savingNextAppointment || appointmentDraft === toDateInputValue(selectedPatient.nextAppointment)}
+                              className="px-3 py-2 rounded-xl bg-brand-600 text-white text-sm font-semibold hover:bg-brand-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                            >
+                              {savingNextAppointment ? 'Saving...' : 'Save changes'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAppointmentDraft(toDateInputValue(selectedPatient.nextAppointment));
+                                setEditingNextAppointment(false);
+                                setAppointmentSaveNotice('');
+                              }}
+                              disabled={savingNextAppointment}
+                              className="px-3 py-2 rounded-xl bg-slate-200 text-slate-700 text-sm font-semibold hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                          {appointmentSaveNotice ? (
+                            <p className="text-xs font-semibold text-green-600 dark:text-green-400">{appointmentSaveNotice}</p>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <div className="mt-3 flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setEditingNextAppointment(true)}
+                            className="px-3 py-2 rounded-xl bg-slate-200 text-slate-700 text-sm font-semibold hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600 transition-colors"
+                          >
+                            Edit
+                          </button>
+                          {appointmentSaveNotice ? (
+                            <p className="text-xs font-semibold text-green-600 dark:text-green-400">{appointmentSaveNotice}</p>
+                          ) : null}
+                        </div>
+                      )}
                     </div>
                     {selectedPatient.nextFollowUpDate && (
                       <div className="p-4 bg-slate-50 dark:bg-[#2c2c2e] rounded-2xl">
