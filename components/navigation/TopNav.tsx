@@ -96,14 +96,14 @@ export function TopNav<TView extends string>({
                   : 'text-slate-600 hover:bg-slate-200/70 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-slate-100',
               ].join(' ')}
             >
-              <Icon
-                size={17}
-                strokeWidth={isActive ? 2.6 : 2.3}
-                className={[
-                  'shrink-0',
-                  isActive ? 'text-brand-600 dark:text-brand-300' : 'text-slate-600 dark:text-slate-300',
-                ].join(' ')}
-              />
+              <span className="inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center">
+                <Icon
+                  size={17}
+                  absoluteStrokeWidth
+                  strokeWidth={isActive ? 2.6 : 2.3}
+                  className={isActive ? 'text-brand-600 dark:text-brand-300' : 'text-slate-600 dark:text-slate-300'}
+                />
+              </span>
               <span>{item.label}</span>
             </button>
           );
@@ -125,7 +125,7 @@ export function TopNav<TView extends string>({
               ].join(' ')}
             >
               <span>{moreLabel}</span>
-              <ChevronDown size={14} className="text-slate-500 dark:text-slate-300" />
+              <ChevronDown size={14} absoluteStrokeWidth className="text-slate-500 dark:text-slate-300" />
             </button>
 
             {isMoreOpen && (
@@ -149,11 +149,14 @@ export function TopNav<TView extends string>({
                           : 'text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-white/5',
                       ].join(' ')}
                     >
-                      <Icon
-                        size={17}
-                        strokeWidth={isActive ? 2.6 : 2.3}
-                        className={isActive ? 'text-brand-600 dark:text-brand-300' : 'text-slate-500 dark:text-slate-300'}
-                      />
+                      <span className="inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center">
+                        <Icon
+                          size={17}
+                          absoluteStrokeWidth
+                          strokeWidth={isActive ? 2.6 : 2.3}
+                          className={isActive ? 'text-brand-600 dark:text-brand-300' : 'text-slate-500 dark:text-slate-300'}
+                        />
+                      </span>
                       <span className="flex-1">{item.label}</span>
                     </button>
                   );

@@ -634,7 +634,14 @@ export const App: React.FC = () => {
                 }
                   `}
             >
-              <item.icon size={22} strokeWidth={currentView === item.id ? 2.5 : 2} />
+              <span className="inline-flex h-[22px] w-[22px] shrink-0 items-center justify-center">
+                <item.icon
+                  size={22}
+                  absoluteStrokeWidth
+                  strokeWidth={currentView === item.id ? 2.5 : 2.2}
+                  className={currentView === item.id ? 'text-brand-600 dark:text-brand-300' : 'text-slate-600 dark:text-slate-300'}
+                />
+              </span>
               <span className="w-full text-center text-[10px] font-semibold leading-tight tracking-tight">
                 {item.label}
               </span>
