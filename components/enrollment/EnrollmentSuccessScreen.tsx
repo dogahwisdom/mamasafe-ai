@@ -4,6 +4,8 @@ interface EnrollmentSuccessScreenProps {
   firstName: string;
   lastName: string;
   phone: string;
+  /** Patient agreed to WhatsApp alerts — welcome + login details are sent there. */
+  whatsappOptIn?: boolean;
   onEnrollAnother: () => void;
 }
 
@@ -11,6 +13,7 @@ export const EnrollmentSuccessScreen: React.FC<EnrollmentSuccessScreenProps> = (
   firstName,
   lastName,
   phone,
+  whatsappOptIn = true,
   onEnrollAnother,
 }) => (
   <div className="min-h-[60vh] flex flex-col items-center justify-center text-center p-8 animate-fade-in">
@@ -32,10 +35,22 @@ export const EnrollmentSuccessScreen: React.FC<EnrollmentSuccessScreenProps> = (
       <div className="flex items-start gap-3">
         <MessageSquare className="text-blue-500 mt-1" size={20} />
         <div className="text-left">
-          <h4 className="font-bold text-blue-800 dark:text-blue-300 mb-1">Credentials Sent</h4>
+          <h4 className="font-bold text-blue-800 dark:text-blue-300 mb-1">
+            {whatsappOptIn ? 'Welcome sent' : 'Login details sent'}
+          </h4>
           <p className="text-sm text-blue-700 dark:text-blue-400 leading-snug">
-            An SMS and WhatsApp message has been sent to <strong>{phone}</strong> with their login
-            PIN and app link. They can log in immediately.
+            {whatsappOptIn ? (
+              <>
+                A <strong>welcome message on WhatsApp</strong> plus login PIN and portal link were sent to{' '}
+                <strong>{phone}</strong>. An SMS backup with the same credentials was also sent where
+                SMS is configured.
+              </>
+            ) : (
+              <>
+                An SMS has been sent to <strong>{phone}</strong> with their login PIN and app link (
+                WhatsApp unchecked on consent). They can log in immediately.
+              </>
+            )}
           </p>
         </div>
       </div>

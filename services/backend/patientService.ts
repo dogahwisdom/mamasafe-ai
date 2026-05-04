@@ -289,7 +289,12 @@ export class PatientService {
             cleanPhone,
             patient.name,
             defaultPassword,
-            portalUrl
+            portalUrl,
+            {
+              facilityName: patient.primaryFacilityName || currentUser?.name || undefined,
+              whatsappOptIn: patient.whatsappMessagingOptIn !== false,
+              patientId: finalPatientId,
+            }
           );
         } catch (error) {
           console.error('Error sending enrollment credentials:', error);
@@ -397,16 +402,27 @@ export class PatientService {
 
     storage.set(KEYS.USERS, users);
 
-    // Send credentials via SMS and WhatsApp for new enrollments
-    if (isNewUser) {
+    const enrolledNewUserAccount = userIndex < 0;
+
+    // Send credentials via SMS / WhatsApp for new patient logins only
+    if (enrolledNewUserAccount) {
       try {
         const messagingService = new MessagingService();
         const portalUrl = typeof window !== 'undefined' ? window.location.origin : 'https://mamasafe.ai';
+        const enrollingFacility =
+          typeof window !== 'undefined' ?
+            (storage.get<UserProfile | null>(KEYS.CURRENT_USER, null)?.name ?? patient.primaryFacilityName)
+          : patient.primaryFacilityName;
         await messagingService.sendEnrollmentCredentials(
           cleanPhone,
           patient.name,
           defaultPassword,
-          portalUrl
+          portalUrl,
+          {
+            facilityName: patient.primaryFacilityName || enrollingFacility || undefined,
+            whatsappOptIn: patient.whatsappMessagingOptIn !== false,
+            patientId: finalPatient.id,
+          }
         );
       } catch (error) {
         console.error('Error sending enrollment credentials:', error);

@@ -29,7 +29,7 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [consent, setConsent] = useState(false);
-  const [whatsappOptIn, setWhatsappOptIn] = useState(false);
+  const [whatsappOptIn, setWhatsappOptIn] = useState(true);
   const [checkingPatient, setCheckingPatient] = useState(false);
   const [existingPatient, setExistingPatient] = useState<{
     exists: boolean;
@@ -212,6 +212,7 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({
             ]
           : undefined,
         alerts: [],
+        whatsappMessagingOptIn: whatsappOptIn,
         primaryFacilityId:
           primaryFacilityChoice === "existing"
             ? existingPatient?.facilityId
@@ -240,7 +241,7 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({
     setSubmitted(false);
     setStep(1);
     setConsent(false);
-    setWhatsappOptIn(false);
+    setWhatsappOptIn(true);
     setFormData(createEmptyEnrollmentForm());
   };
 
@@ -250,6 +251,7 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({
         firstName={formData.firstName}
         lastName={formData.lastName}
         phone={formData.phone}
+        whatsappOptIn={whatsappOptIn}
         onEnrollAnother={resetWizard}
       />
     );

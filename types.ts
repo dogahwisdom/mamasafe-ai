@@ -101,6 +101,12 @@ export interface Patient {
 
   /** QA / automation record — excluded from default referrals & tasks lists for clinic/pharmacy. */
   isTest?: boolean;
+
+  /**
+   * Enrollment only: patient consented to WhatsApp care messages.
+   * When true, enrollment sends welcome + login details on WhatsApp.
+   */
+  whatsappMessagingOptIn?: boolean;
 }
 
 export interface Alert {

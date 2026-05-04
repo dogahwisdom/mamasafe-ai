@@ -58,7 +58,9 @@ export const EnrollmentStepConsent: React.FC<EnrollmentStepConsentProps> = ({
 
       <div className="p-6 bg-slate-50 dark:bg-[#2c2c2e] rounded-2xl border border-slate-100 dark:border-slate-800">
         <p className="text-sm text-slate-600 dark:text-slate-300 mb-4 leading-relaxed">
-          The platform uses WhatsApp to send automated appointment reminders and health tips.
+          The platform uses WhatsApp for appointment reminders and care messages. When this is
+          checked, the patient receives a <strong>welcome message on WhatsApp</strong> after
+          enrollment (with login details), in addition to SMS where SMS is configured.
         </p>
 
         <label className="flex items-start gap-4 p-4 bg-white dark:bg-black rounded-xl border border-slate-200 dark:border-slate-700 cursor-pointer hover:border-brand-500 transition-colors">

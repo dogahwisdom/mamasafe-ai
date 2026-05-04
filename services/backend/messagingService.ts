@@ -16,18 +16,26 @@ interface WhatsAppSendContext {
   relatedReminderId?: string;
 }
 
+export type EnrollmentCredentialsOptions = {
+  facilityName?: string;
+  /** When false, only SMS is sent (no WhatsApp). Default true including when omitted (legacy callers). */
+  whatsappOptIn?: boolean;
+  patientId?: string;
+};
+
 export class MessagingService {
   private readonly AT_SMS_URL = 'https://api.africastalking.com/version1/messaging';
   private readonly WHATSAPP_FUNCTION_URL = '/.netlify/functions/whatsapp-send';
 
   /**
-   * Send credentials to newly enrolled patient
+   * SMS: credentials (always attempted). WhatsApp: welcome + credentials when `whatsappOptIn` is not false.
    */
   public async sendEnrollmentCredentials(
     phone: string,
     patientName: string,
     pin: string,
-    portalUrl?: string
+    portalUrl?: string,
+    options?: EnrollmentCredentialsOptions
   ): Promise<{ sms: boolean; whatsapp: boolean }> {
     // Get portal URL from window if not provided
     if (!portalUrl && typeof window !== 'undefined') {
@@ -36,35 +44,49 @@ export class MessagingService {
       portalUrl = 'https://mamasafe.ai'; // Default fallback
     }
     const firstName = patientName.split(' ')[0];
-    
-    const message = `Habari ${firstName}! Karibu kwenye MamaSafe.
+    const facility = options?.facilityName?.trim();
+    const facilityLine = facility ? ` Umepokelewa na ${facility}.` : '';
 
-AKOUNTI YAKO:
-Nambari: ${phone}
-PIN: ${pin}
+    const credentialsBlock = `AKOUNTI YAKO\nNambari ya simu: ${phone}\nPIN: ${pin}\n\nFUNGUA: ${portalUrl}`;
 
-LINGANIA HAPA:
-${portalUrl}
+    const smsBody = `Karibu MamaSafe, ${firstName}!${facilityLine}
 
-Unaweza kuingia sasa na kuanza kutumia huduma zetu za afya ya uzazi.
+${credentialsBlock}
 
-Asante!`;
+Huduma za mama na mtoto.`;
+
+    const whatsappWelcomeBody = `Karibu MamaSafe — ${firstName}!${facilityLine}
+
+Tumerekodi usajili wako. Huu ni ujumbe wa kuakaribisha; utaweza kupokea vivyo hivyo makumbusho ya huduma kutoka kwenye kliniki yako ikiwa umekubali kwenye fomu.
+
+${credentialsBlock}
+
+Kama una swali lolote, pigia au tembelea kliniki yako.
+
+— MamaSafe`;
 
     const results = {
       sms: false,
       whatsapp: false,
     };
 
+    const sendWhatsApp = options?.whatsappOptIn !== false;
+
     // Send via SMS
     try {
-      results.sms = await this.sendSMS(phone, message);
+      results.sms = await this.sendSMS(phone, smsBody);
     } catch (error) {
       console.error('Error sending SMS:', error);
     }
 
-    // Send via WhatsApp
+    if (!sendWhatsApp) {
+      return results;
+    }
+
+    // Send WhatsApp welcome + credentials (via Netlify whatsapp-send)
     try {
-      results.whatsapp = await this.sendWhatsApp(phone, message);
+      const ctx = options?.patientId ? ({ patientId: options.patientId } as WhatsAppSendContext) : undefined;
+      results.whatsapp = await this.sendWhatsApp(phone, whatsappWelcomeBody, ctx);
     } catch (error) {
       console.error('Error sending WhatsApp:', error);
     }
