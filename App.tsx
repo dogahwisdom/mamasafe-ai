@@ -19,6 +19,7 @@ import { SuperadminDashboard } from './views/SuperadminDashboard';
 import { ClinicWorkflow } from './views/ClinicWorkflow';
 import { FacilityStaffView } from './views/FacilityStaffView';
 import { OutreachMonitorView } from './views/OutreachMonitorView';
+import { TopNav } from './components/navigation/TopNav';
 import { backend } from './services/backend';
 import { ViewState, Alert, Patient, UserProfile } from './types';
 import { Permissions } from './services/permissions';
@@ -303,15 +304,15 @@ export const App: React.FC = () => {
       )}
 
       {/* Desktop Header */}
-      <header className="fixed top-0 w-full bg-white/70 dark:bg-[#1c1c1e]/70 backdrop-blur-xl border-b border-slate-200/50 dark:border-slate-800/50 z-50 saturate-150 supports-[backdrop-filter]:bg-white/60">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 min-h-16 py-2 md:py-2.5 flex flex-wrap items-center gap-x-2 gap-y-2 sm:gap-3 min-w-0 relative overflow-visible">
+      <header className="fixed top-0 w-full bg-white/75 dark:bg-[#1c1c1e]/80 backdrop-blur-xl border-b border-slate-200/50 dark:border-slate-800/50 z-50 saturate-150 supports-[backdrop-filter]:bg-white/60">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 min-h-16 py-2 md:py-2.5 flex items-center gap-2 sm:gap-3 min-w-0 relative overflow-visible">
 
           <div
             className="cursor-pointer group flex items-center flex-shrink-0 min-w-0 order-1"
             onClick={() => setCurrentView('dashboard')}
           >
-            <Logo size={32} className="transition-transform duration-300 group-hover:scale-105 md:scale-100 scale-90 [&_span]:max-[900px]:hidden" />
-            <div className="hidden sm:flex items-center gap-2 ml-3 max-[900px]:hidden">
+            <Logo size={32} className="transition-transform duration-300 group-hover:scale-105 md:scale-100 scale-90 [&_span]:max-[1200px]:hidden" />
+            <div className="hidden xl:flex items-center gap-2 ml-3">
               {currentUser?.role === 'patient' && <span className="text-xs font-bold text-brand-600 bg-brand-50 border border-brand-100 px-2.5 py-0.5 rounded-full self-center">Patient Portal</span>}
               {currentUser?.role === 'pharmacy' &&
                 (Permissions.isOwnerOrAdmin(currentUser) ? (
@@ -349,43 +350,16 @@ export const App: React.FC = () => {
             </div>
           </div>
 
-          <nav
-            className="hidden md:flex w-full basis-full shrink-0 order-3 justify-center overflow-visible"
-            aria-label="Primary navigation"
-          >
-            <div
-              role="tablist"
-              className="flex w-full max-w-full flex-wrap items-center justify-center gap-0.5 sm:gap-1 rounded-xl bg-slate-100/90 p-0.5 sm:p-1 dark:bg-slate-800/70 ring-1 ring-slate-200/60 dark:ring-slate-700/60"
-            >
-              {getNavItems().map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={currentView === item.id}
-                  onClick={() => setCurrentView(item.id as ViewState)}
-                  title={item.label}
-                  aria-label={item.label}
-                  className={`
-                  inline-flex min-w-0 max-w-full shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-2.5 py-2 text-[13px] font-medium leading-none transition-colors duration-200 sm:px-3 sm:text-sm
-                  ${currentView === item.id
-                    ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/90 dark:bg-[#2c2c2e] dark:text-white dark:ring-slate-600/70'
-                    : 'text-slate-600 hover:bg-slate-200/70 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-slate-100'
-                  }
-                `}
-                >
-                  <item.icon
-                    size={16}
-                    strokeWidth={currentView === item.id ? 2.5 : 2}
-                    className={`shrink-0 ${currentView === item.id ? 'text-brand-600 dark:text-brand-400' : 'text-slate-500 dark:text-slate-500'}`}
-                  />
-                  <span>{item.label}</span>
-                </button>
-              ))}
-            </div>
+          <nav className="hidden md:flex min-w-0 flex-1 order-2 justify-center overflow-visible px-1">
+            <TopNav<ViewState>
+              items={getNavItems()}
+              currentView={currentView}
+              onNavigate={setCurrentView}
+              className="w-full max-w-none"
+            />
           </nav>
 
-          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2 md:gap-4 order-2 ml-auto md:ml-0">
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2 md:gap-4 order-3 ml-auto">
             {/* Notification Bell */}
             <div className="relative" ref={notificationRef}>
               <button
@@ -504,7 +478,7 @@ export const App: React.FC = () => {
       </header>
 
       {/* Main Content Area */}
-      <main className="pt-24 pb-28 md:pb-8 md:pt-32 px-4 md:px-8 max-w-7xl mx-auto min-h-screen">
+      <main className="pt-24 pb-28 md:pb-8 px-4 md:px-8 max-w-7xl mx-auto min-h-screen">
         {currentView === 'dashboard' && currentUser?.role === 'patient' && (
           <PatientDashboard user={currentUser} onNavigate={setCurrentView} onLogout={handleLogout} />
         )}
