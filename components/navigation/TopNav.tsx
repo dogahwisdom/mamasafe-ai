@@ -22,6 +22,7 @@ export function TopNav<TView extends string>({
   className,
 }: TopNavProps<TView>) {
   const railRef = useRef<HTMLDivElement | null>(null);
+  const contentRef = useRef<HTMLDivElement | null>(null);
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
@@ -31,9 +32,10 @@ export function TopNav<TView extends string>({
   const updateScrollState = useCallback(() => {
     const rail = railRef.current;
     if (!rail) return;
-    const maxLeft = rail.scrollWidth - rail.clientWidth;
-    setCanScrollLeft(rail.scrollLeft > 4);
-    setCanScrollRight(rail.scrollLeft < maxLeft - 4);
+    const maxLeft = Math.max(0, rail.scrollWidth - rail.clientWidth);
+    const epsilon = 2;
+    setCanScrollLeft(rail.scrollLeft > epsilon);
+    setCanScrollRight(rail.scrollLeft < maxLeft - epsilon);
   }, []);
 
   const scrollRail = useCallback((direction: 'left' | 'right') => {
@@ -58,13 +60,23 @@ export function TopNav<TView extends string>({
 
   useEffect(() => {
     const rail = railRef.current;
+    const content = contentRef.current;
     if (!rail) return;
     updateScrollState();
     rail.addEventListener('scroll', updateScrollState, { passive: true });
     window.addEventListener('resize', updateScrollState);
+    const ro = new ResizeObserver(() => updateScrollState());
+    ro.observe(rail);
+    if (content) ro.observe(content);
+    // Re-check after layout settles (fonts / dynamic badge width).
+    const rafId = requestAnimationFrame(updateScrollState);
+    const timeoutId = window.setTimeout(updateScrollState, 120);
     return () => {
       rail.removeEventListener('scroll', updateScrollState);
       window.removeEventListener('resize', updateScrollState);
+      ro.disconnect();
+      cancelAnimationFrame(rafId);
+      window.clearTimeout(timeoutId);
     };
   }, [updateScrollState, normalizedItems]);
 
@@ -100,6 +112,7 @@ export function TopNav<TView extends string>({
 
       <div ref={railRef} className={railMaskClass}>
         <div
+          ref={contentRef}
           role="tablist"
           aria-label="Primary navigation"
           className="flex w-max min-w-full items-center gap-1 rounded-xl bg-slate-100/90 p-1 dark:bg-slate-800/70 ring-1 ring-slate-200/60 dark:ring-slate-700/60"
@@ -119,7 +132,7 @@ export function TopNav<TView extends string>({
                 onClick={() => onNavigate(item.id as TView)}
                 title={item.label}
                 className={[
-                  'inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-2 text-[13px] font-semibold leading-none transition-colors duration-200',
+                  'inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-2 py-1.5 text-xs font-semibold leading-none transition-colors duration-200',
                   isActive
                     ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/90 dark:bg-[#2c2c2e] dark:text-white dark:ring-slate-600/70'
                     : 'text-slate-600 hover:bg-slate-200/70 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-slate-100',
@@ -127,13 +140,13 @@ export function TopNav<TView extends string>({
               >
                 <span className="inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center">
                   <Icon
-                    size={17}
+                    size={16}
                     absoluteStrokeWidth
                     strokeWidth={isActive ? 2.6 : 2.3}
                     className={isActive ? 'text-brand-600 dark:text-brand-300' : 'text-slate-600 dark:text-slate-300'}
                   />
                 </span>
-                <span className="text-[13px]">{item.label}</span>
+                <span>{item.label}</span>
               </button>
             );
           })}
