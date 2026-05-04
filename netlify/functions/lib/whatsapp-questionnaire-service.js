@@ -324,7 +324,9 @@ export class WhatsAppQuestionnaireService {
     }
 
     const questions = FLOW_QUESTION_BANK[session.flow_type] || [];
-    const current = questions[session.step_index];
+    const rawIdx = Number(session.step_index);
+    const idx = Number.isFinite(rawIdx) && rawIdx >= 0 ? rawIdx : 0;
+    const current = questions[idx];
     if (!current) {
       return {
         kind: "complete",
@@ -350,7 +352,7 @@ export class WhatsAppQuestionnaireService {
     }
 
     const answers = [...(session.answers || []), { key: current.key, value: option }];
-    const nextIndex = session.step_index + 1;
+    const nextIndex = idx + 1;
     if (nextIndex < questions.length) {
       const next = questions[nextIndex];
       return {
@@ -392,7 +394,9 @@ export class WhatsAppQuestionnaireService {
       return `${this.startMessage(patientName, facilityName)}\n\nReply with 1, 2, or 3, or send 'end' to stop.`;
     }
     const questions = FLOW_QUESTION_BANK[s.flow_type] || [];
-    const current = questions[s.step_index];
+    const ridx = Number(s.step_index);
+    const sidx = Number.isFinite(ridx) && ridx >= 0 ? ridx : 0;
+    const current = questions[sidx];
     if (!current) {
       return "Your session is almost complete. Send 'restart' to begin again or 'end' to close this session.";
     }

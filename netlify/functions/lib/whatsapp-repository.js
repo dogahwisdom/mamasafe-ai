@@ -180,45 +180,33 @@ export class WhatsAppRepository {
     if (!this.client || !phone) return { ok: false, reason: "supabase_not_configured" };
     const canonical = WhatsAppPhoneNormalizer.canonicalFromAny(phone);
     if (!canonical) return { ok: false, reason: "invalid_phone" };
-    const variants = WhatsAppPhoneNormalizer.variantsForQueries(canonical);
+    const stepNum =
+      stepIndex !== undefined && stepIndex !== null && !Number.isNaN(Number(stepIndex))
+        ? Number(stepIndex)
+        : 0;
+
     const patch = {
       phone: canonical,
       patient_id: patientId || null,
       flow_type: flowType || "intake",
       step_key: stepKey || "choose_profile",
-      step_index:
-        stepIndex !== undefined && stepIndex !== null ? Number(stepIndex) : 0,
+      step_index: stepNum,
       answers: Array.isArray(answers) ? answers : [],
       status: status || "active",
       completed_at: completedAt || null,
       last_user_message_at: nowIso(),
     };
 
-    const { data: existingRows, error: findErr } = await this.client
-      .from("whatsapp_sessions")
-      .select("id")
-      .in("phone", variants)
-      .eq("status", "active")
-      .order("updated_at", { ascending: false })
-      .limit(1);
-    if (findErr) {
-      console.error("Failed to locate whatsapp session for upsert:", findErr.message);
-      return { ok: false, reason: findErr.message };
-    }
-    const existingId = Array.isArray(existingRows) && existingRows[0]?.id;
-
-    if (existingId) {
-      const { error } = await this.client.from("whatsapp_sessions").update(patch).eq("id", existingId);
-      if (error) {
-        console.error("Failed to update whatsapp session:", error.message);
-        return { ok: false, reason: error.message };
-      }
-      return { ok: true };
-    }
-
-    const { error } = await this.client.from("whatsapp_sessions").insert(patch);
+    /**
+     * Single upsert on `phone` UNIQUE — avoids the failure mode where we only looked for
+     * `status=active`, missed a completed/cancelled row, then INSERT hit duplicate key and
+     * silently left the session stuck (next "1" was parsed as a fresh intake pregnancy pick).
+     */
+    const { error } = await this.client.from("whatsapp_sessions").upsert(patch, {
+      onConflict: "phone",
+    });
     if (error) {
-      console.error("Failed to insert whatsapp session:", error.message);
+      console.error("Failed to upsert whatsapp session:", error.message, { phone: canonical });
       return { ok: false, reason: error.message };
     }
     return { ok: true };
