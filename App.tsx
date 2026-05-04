@@ -41,12 +41,18 @@ export const App: React.FC = () => {
   const notificationRef = useRef<HTMLDivElement>(null);
   const desktopNavRef = useRef<HTMLElement>(null);
 
+  // Scroll the tab strip only enough to keep the active tab visible. Avoid `inline: "center"`
+  // — it hides the start of the nav (Overview, Team, …) on narrow / split screens.
   useLayoutEffect(() => {
     const nav = desktopNavRef.current;
     if (!nav) return;
     const active = nav.querySelector('[data-desktop-nav-active="true"]');
-    if (active instanceof HTMLElement) {
-      active.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    if (!(active instanceof HTMLElement)) return;
+    const navRect = nav.getBoundingClientRect();
+    const tabRect = active.getBoundingClientRect();
+    const pad = 6;
+    if (tabRect.left < navRect.left + pad || tabRect.right > navRect.right - pad) {
+      active.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
     }
   }, [currentView]);
 
