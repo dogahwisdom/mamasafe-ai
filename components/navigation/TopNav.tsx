@@ -93,13 +93,16 @@ export function TopNav<TView extends string>({
                 'inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-2 text-[13px] font-semibold leading-none transition-colors duration-200',
                 isActive
                   ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/90 dark:bg-[#2c2c2e] dark:text-white dark:ring-slate-600/70'
-                  : 'text-slate-600 hover:bg-slate-200/70 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-slate-100',
+                  : 'text-slate-600 hover:bg-slate-200/70 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-slate-100',
               ].join(' ')}
             >
               <Icon
-                size={16}
-                strokeWidth={isActive ? 2.5 : 2}
-                className={isActive ? 'text-brand-600 dark:text-brand-400' : 'text-slate-500 dark:text-slate-500'}
+                size={17}
+                strokeWidth={isActive ? 2.6 : 2.3}
+                className={[
+                  'shrink-0',
+                  isActive ? 'text-brand-600 dark:text-brand-300' : 'text-slate-600 dark:text-slate-300',
+                ].join(' ')}
               />
               <span>{item.label}</span>
             </button>
@@ -118,11 +121,11 @@ export function TopNav<TView extends string>({
                 'inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-2 text-[13px] font-semibold leading-none transition-colors duration-200',
                 isMoreOpen
                   ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/90 dark:bg-[#2c2c2e] dark:text-white dark:ring-slate-600/70'
-                  : 'text-slate-600 hover:bg-slate-200/70 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-slate-100',
+                  : 'text-slate-600 hover:bg-slate-200/70 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-slate-100',
               ].join(' ')}
             >
               <span>{moreLabel}</span>
-              <ChevronDown size={14} className="text-slate-400 dark:text-slate-500" />
+              <ChevronDown size={14} className="text-slate-500 dark:text-slate-300" />
             </button>
 
             {isMoreOpen && (
@@ -147,9 +150,9 @@ export function TopNav<TView extends string>({
                       ].join(' ')}
                     >
                       <Icon
-                        size={16}
-                        strokeWidth={isActive ? 2.5 : 2}
-                        className={isActive ? 'text-brand-600 dark:text-brand-400' : 'text-slate-400 dark:text-slate-500'}
+                        size={17}
+                        strokeWidth={isActive ? 2.6 : 2.3}
+                        className={isActive ? 'text-brand-600 dark:text-brand-300' : 'text-slate-500 dark:text-slate-300'}
                       />
                       <span className="flex-1">{item.label}</span>
                     </button>
