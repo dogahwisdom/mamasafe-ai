@@ -27,7 +27,7 @@ const StatCard: React.FC<{
   value: number;
   icon: React.ElementType;
   toneClass: string;
-  hint?: string;
+  hint?: React.ReactNode;
 }> = ({ title, value, icon: Icon, toneClass, hint }) => (
   <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1c1c1e] p-5">
     <div className="flex items-center justify-between">
@@ -181,7 +181,18 @@ export const OutreachMonitorView: React.FC<OutreachMonitorViewProps> = ({ user, 
           value={summary.sentCheckups}
           icon={MessageSquareShare}
           toneClass="bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300"
-          hint="Patients with at least one logged proactive check-up in this window. Zero usually means the scheduled job has not successfully sent and logged to Supabase yet (enable flag, Meta credentials, or quiet-hours skips)."
+          hint={
+            <>
+              Rows must exist in{' '}
+              <code className="text-[11px] bg-slate-100 dark:bg-slate-800 px-1 rounded">whatsapp_messages</code>{' '}
+              (outbound, tagged by the check-up job). If Netlify sends succeed but this stays zero, anon RLS often
+              blocks reads — apply migration{' '}
+              <code className="text-[11px] bg-slate-100 dark:bg-slate-800 px-1 rounded">
+                20260504100000_whatsapp_messages_rls_select
+              </code>
+              . Otherwise check cron logs or Meta rejecting non-template sends.
+            </>
+          }
         />
         <StatCard
           title="Replied after outreach"
