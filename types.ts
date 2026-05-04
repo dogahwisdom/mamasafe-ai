@@ -98,6 +98,9 @@ export interface Patient {
   paymentPlanDailyKes?: number | null;
   paymentPlanMonthlyKes?: number | null;
   paymentPlanAnnualKes?: number | null;
+
+  /** QA / automation record — excluded from default referrals & tasks lists for clinic/pharmacy. */
+  isTest?: boolean;
 }
 
 export interface Alert {

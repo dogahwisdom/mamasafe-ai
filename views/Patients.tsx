@@ -49,14 +49,13 @@ export const PatientsView: React.FC<PatientsViewProps> = ({ onNavigate, patients
     setLoadingHistory(true);
     try {
       const [referrals, tasks, reminders] = await Promise.all([
-        backend.referrals.getAll(),
-        backend.clinic.getTasks(),
+        backend.referrals.listForPatient(selectedPatient.id),
+        backend.clinic.getTasksForPatient(selectedPatient.id),
         backend.reminders.getAll(),
       ]);
 
-      // Filter by patient ID
-      setPatientReferrals(referrals.filter(r => r.patientId === selectedPatient.id));
-      setPatientTasks(tasks.filter(t => t.patientId === selectedPatient.id));
+      setPatientReferrals(referrals);
+      setPatientTasks(tasks);
       setPatientReminders(reminders.filter(r => r.patientId === selectedPatient.id));
     } catch (error) {
       console.error('Error loading patient history:', error);

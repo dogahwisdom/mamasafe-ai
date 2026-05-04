@@ -46,6 +46,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export const DashboardView: React.FC<DashboardProps> = ({ onNavigate, user }) => {
+  const [showTestActionItems, setShowTestActionItems] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [earlyEnrollmentRate, setEarlyEnrollmentRate] = useState<number | null>(null);
   const [followup24hRate, setFollowup24hRate] = useState<number | null>(null);
@@ -80,7 +81,9 @@ export const DashboardView: React.FC<DashboardProps> = ({ onNavigate, user }) =>
     const loadData = async () => {
       try {
         const [taskData, patients] = await Promise.all([
-          backend.clinic.getTasks(),
+          backend.clinic.getTasks({
+            includeTestPatients: user?.role === 'superadmin' && showTestActionItems,
+          }),
           backend.patients.getAll(),
         ]);
         setTasks(taskData);
@@ -361,7 +364,7 @@ export const DashboardView: React.FC<DashboardProps> = ({ onNavigate, user }) =>
       }
     };
     loadData();
-  }, []);
+  }, [user?.id, user?.role, showTestActionItems]);
 
   const resolveTask = async (id: string) => {
     // Optimistic update
@@ -687,9 +690,22 @@ export const DashboardView: React.FC<DashboardProps> = ({ onNavigate, user }) =>
 
         {/* Task tracker + patient entry (reminder queue hidden; generation still runs above) */}
         <div className="bg-white dark:bg-[#1c1c1e] p-6 md:p-8 rounded-[2rem] shadow-sm flex flex-col border border-slate-100 dark:border-slate-800/50 max-h-[520px]">
-           <div className="flex items-center justify-between mb-6">
-             <h3 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">Action Items</h3>
-             <span className="bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-xs font-bold px-2 py-1 rounded-md">{activeTasks.length} PENDING</span>
+           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
+             <div className="flex items-center gap-3">
+               <h3 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">Action Items</h3>
+               <span className="bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-xs font-bold px-2 py-1 rounded-md">{activeTasks.length} PENDING</span>
+             </div>
+             {user?.role === 'superadmin' && (
+               <label className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-400 cursor-pointer select-none">
+                 <input
+                   type="checkbox"
+                   className="rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                   checked={showTestActionItems}
+                   onChange={(e) => setShowTestActionItems(e.target.checked)}
+                 />
+                 Show QA / test patients
+               </label>
+             )}
            </div>
            
            <div className="space-y-3 flex-1 overflow-y-auto no-scrollbar pr-1">

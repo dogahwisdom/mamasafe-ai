@@ -59,6 +59,7 @@ export class PatientService {
         paymentPlanDailyKes: p.payment_plan_daily_kes ?? null,
         paymentPlanMonthlyKes: p.payment_plan_monthly_kes ?? null,
         paymentPlanAnnualKes: p.payment_plan_annual_kes ?? null,
+        isTest: p.is_test === true,
         alerts: (p.alerts as any) || [],
         medications: (p.medications || []).map((m: any) => ({
           id: m.id,
@@ -318,6 +319,7 @@ export class PatientService {
         nextAppointment: fullPatient.next_appointment || '',
         primaryFacilityId: fullPatient.primary_facility_id || undefined,
         primaryFacilityName: fullPatient.primary_facility_name || undefined,
+        isTest: fullPatient.is_test === true,
         alerts: (fullPatient.alerts as any) || [],
         medications: (fullPatient.medications || []).map((m: any) => ({
           id: m.id,

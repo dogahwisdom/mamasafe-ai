@@ -615,7 +615,7 @@ export const App: React.FC = () => {
           />
         )}
         {currentView === 'referrals' && (
-          <ReferralsView onBack={() => setCurrentView('dashboard')} />
+          <ReferralsView onBack={() => setCurrentView('dashboard')} currentUser={currentUser} />
         )}
       </main>
 

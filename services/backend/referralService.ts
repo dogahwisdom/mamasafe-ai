@@ -1,36 +1,89 @@
 import { Referral, Patient } from "../../types";
 import { KEYS, storage } from "./shared";
 import { supabase, isSupabaseConfigured } from "../supabaseClient";
+import { TestPatientVisibility } from "../testPatientVisibility";
+
+function mapReferralRow(r: any): Referral {
+  return {
+    id: r.id,
+    patientId: r.patient_id,
+    patientName: r.patient_name,
+    fromFacility: r.from_facility,
+    toFacility: r.to_facility,
+    reason: r.reason,
+    status: r.status as Referral["status"],
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}
 
 export class ReferralService {
-  public async getAll(): Promise<Referral[]> {
-    // Use Supabase if configured
+  /**
+   * Facility-wide referral list. Excludes test/QA patients unless `includeTestPatients`.
+   */
+  public async getAll(options?: { includeTestPatients?: boolean }): Promise<Referral[]> {
+    const includeTest = options?.includeTestPatients === true;
+
     if (isSupabaseConfigured()) {
       const { data, error } = await supabase
-        .from('referrals')
-        .select('*')
-        .order('created_at', { ascending: false });
+        .from("referrals")
+        .select(
+          `
+          id,
+          patient_id,
+          patient_name,
+          from_facility,
+          to_facility,
+          reason,
+          status,
+          created_at,
+          updated_at,
+          patients ( is_test )
+        `
+        )
+        .order("created_at", { ascending: false });
 
       if (error) {
-        console.error('Error fetching referrals:', error);
+        console.error("Error fetching referrals:", error);
         return storage.get<Referral[]>(KEYS.REFERRALS, []);
       }
 
-      return (data || []).map((r: any) => ({
-        id: r.id,
-        patientId: r.patient_id,
-        patientName: r.patient_name,
-        fromFacility: r.from_facility,
-        toFacility: r.to_facility,
-        reason: r.reason,
-        status: r.status as 'pending' | 'in_progress' | 'completed' | 'cancelled',
-        createdAt: r.created_at,
-        updatedAt: r.updated_at,
-      }));
+      let rows = data || [];
+      if (!includeTest) {
+        rows = rows.filter((r: any) => {
+          const flag = r.patients?.is_test;
+          if (flag === true) return false;
+          if (flag === false) return true;
+          return !TestPatientVisibility.nameLooksLikeTestData(r.patient_name);
+        });
+      }
+
+      return rows.map((r: any) => mapReferralRow(r));
     }
 
-    // Fallback to localStorage
-    return storage.get<Referral[]>(KEYS.REFERRALS, []);
+    const stored = storage.get<Referral[]>(KEYS.REFERRALS, []);
+    if (includeTest) return stored;
+    return stored.filter((r) => !TestPatientVisibility.nameLooksLikeTestData(r.patientName));
+  }
+
+  /** All referrals for one patient (profile / PDF) — not filtered by is_test. */
+  public async listForPatient(patientId: string): Promise<Referral[]> {
+    if (isSupabaseConfigured()) {
+      const { data, error } = await supabase
+        .from("referrals")
+        .select("*")
+        .eq("patient_id", patientId)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error("Error fetching referrals for patient:", error);
+        return [];
+      }
+      return (data || []).map(mapReferralRow);
+    }
+
+    const stored = storage.get<Referral[]>(KEYS.REFERRALS, []);
+    return stored.filter((r) => r.patientId === patientId);
   }
 
   public async createFromTriage(
@@ -38,14 +91,9 @@ export class ReferralService {
     reason: string,
     toFacility: string
   ): Promise<Referral> {
-    // Get patient name
     let patientName = "Unknown";
     if (isSupabaseConfigured()) {
-      const { data } = await supabase
-        .from('patients')
-        .select('name')
-        .eq('id', patientId)
-        .single();
+      const { data } = await supabase.from("patients").select("name").eq("id", patientId).single();
       patientName = data?.name || "Unknown";
     } else {
       const patients = storage.get<Patient[]>(KEYS.PATIENTS, []);
@@ -66,67 +114,50 @@ export class ReferralService {
       updatedAt: now,
     };
 
-    // Save to Supabase or localStorage
     if (isSupabaseConfigured()) {
       const { data, error } = await supabase
-        .from('referrals')
+        .from("referrals")
         .insert({
           patient_id: patientId,
           patient_name: patientName,
           from_facility: referral.fromFacility,
           to_facility: toFacility,
           reason,
-          status: 'pending',
+          status: "pending",
         })
         .select()
         .single();
 
       if (error) {
-        console.error('Error creating referral:', error);
+        console.error("Error creating referral:", error);
         throw error;
       }
 
-      return {
-        id: data.id,
-        patientId: data.patient_id,
-        patientName: data.patient_name,
-        fromFacility: data.from_facility,
-        toFacility: data.to_facility,
-        reason: data.reason,
-        status: data.status,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
-      };
+      return mapReferralRow(data);
     }
 
-    // Fallback to localStorage
     const existing = storage.get<Referral[]>(KEYS.REFERRALS, []);
     storage.set(KEYS.REFERRALS, [referral, ...existing]);
     return referral;
   }
 
-  public async updateStatus(
-    id: string,
-    status: Referral["status"]
-  ): Promise<void> {
-    // Use Supabase if configured
+  public async updateStatus(id: string, status: Referral["status"]): Promise<void> {
     if (isSupabaseConfigured()) {
       const { error } = await supabase
-        .from('referrals')
+        .from("referrals")
         .update({
           status,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', id);
+        .eq("id", id);
 
       if (error) {
-        console.error('Error updating referral:', error);
+        console.error("Error updating referral:", error);
         throw error;
       }
       return;
     }
 
-    // Fallback to localStorage
     const referrals = storage.get<Referral[]>(KEYS.REFERRALS, []);
     const updated = referrals.map((r) =>
       r.id === id ? { ...r, status, updatedAt: new Date().toISOString() } : r
@@ -134,4 +165,3 @@ export class ReferralService {
     storage.set(KEYS.REFERRALS, updated);
   }
 }
-

@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { backend } from '../services/backend';
-import { Referral } from '../types';
+import { Referral, UserProfile } from '../types';
 import { Activity, ArrowRight, CheckCircle, AlertTriangle, Clock } from 'lucide-react';
 
 interface ReferralsViewProps {
   onBack: () => void;
+  currentUser?: UserProfile | null;
 }
 
 const statusLabel: Record<Referral['status'], string> = {
@@ -21,7 +22,8 @@ const statusColor: Record<Referral['status'], string> = {
   cancelled: 'bg-slate-100 text-slate-500',
 };
 
-export const ReferralsView: React.FC<ReferralsViewProps> = ({ onBack }) => {
+export const ReferralsView: React.FC<ReferralsViewProps> = ({ onBack, currentUser }) => {
+  const [showTestPatients, setShowTestPatients] = useState(false);
   const [referrals, setReferrals] = useState<Referral[]>([]);
   const [filter, setFilter] = useState<Referral['status'] | 'all'>('all');
   const [loading, setLoading] = useState(false);
@@ -29,12 +31,14 @@ export const ReferralsView: React.FC<ReferralsViewProps> = ({ onBack }) => {
   useEffect(() => {
     const load = async () => {
       setLoading(true);
-      const data = await backend.referrals.getAll();
+      const data = await backend.referrals.getAll({
+        includeTestPatients: currentUser?.role === 'superadmin' && showTestPatients,
+      });
       setReferrals(data);
       setLoading(false);
     };
     load();
-  }, []);
+  }, [currentUser?.id, currentUser?.role, showTestPatients]);
 
   const updateStatus = async (id: string, status: Referral['status']) => {
     setReferrals(prev =>
@@ -76,7 +80,18 @@ export const ReferralsView: React.FC<ReferralsViewProps> = ({ onBack }) => {
           </span>
         </div>
 
-        <div className="ml-auto flex gap-2 text-xs font-semibold">
+        <div className="ml-auto flex flex-wrap items-center gap-2 text-xs font-semibold">
+          {currentUser?.role === 'superadmin' && (
+            <label className="flex items-center gap-2 text-slate-600 dark:text-slate-400 font-semibold cursor-pointer select-none mr-1">
+              <input
+                type="checkbox"
+                className="rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                checked={showTestPatients}
+                onChange={e => setShowTestPatients(e.target.checked)}
+              />
+              Show QA / test patients
+            </label>
+          )}
           {(['all', 'pending', 'in_progress', 'completed', 'cancelled'] as const).map(v => (
             <button
               key={v}
