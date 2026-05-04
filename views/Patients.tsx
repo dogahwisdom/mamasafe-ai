@@ -24,6 +24,8 @@ export const PatientsView: React.FC<PatientsViewProps> = ({ onNavigate, patients
   const [patientTasks, setPatientTasks] = useState<Task[]>([]);
   const [patientReminders, setPatientReminders] = useState<Reminder[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [appointmentDraft, setAppointmentDraft] = useState('');
+  const [savingNextAppointment, setSavingNextAppointment] = useState(false);
 
   const filteredPatients = patients.filter(p => {
     const q = searchTerm.toLowerCase().trim();
@@ -42,6 +44,10 @@ export const PatientsView: React.FC<PatientsViewProps> = ({ onNavigate, patients
       loadPatientHistory();
     }
   }, [selectedPatient]);
+
+  useEffect(() => {
+    setAppointmentDraft(toDateInputValue(selectedPatient?.nextAppointment));
+  }, [selectedPatient?.id, selectedPatient?.nextAppointment]);
 
   const loadPatientHistory = async () => {
     if (!selectedPatient) return;
@@ -111,6 +117,38 @@ export const PatientsView: React.FC<PatientsViewProps> = ({ onNavigate, patients
   ): string => {
     const parsed = parseDateValue(value);
     return parsed ? parsed.toLocaleString() : fallback;
+  };
+
+  const toDateInputValue = (value: string | null | undefined): string => {
+    if (!value) return '';
+    const parsed = parseDateValue(value);
+    if (!parsed) return '';
+    const year = parsed.getFullYear();
+    const month = String(parsed.getMonth() + 1).padStart(2, '0');
+    const day = String(parsed.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const handleSaveNextAppointment = async () => {
+    if (!selectedPatient || savingNextAppointment) return;
+
+    const normalizedDate = appointmentDraft.trim() || null;
+
+    if (normalizedDate && !/^\d{4}-\d{2}-\d{2}$/.test(normalizedDate)) {
+      alert('Please choose a valid appointment date.');
+      return;
+    }
+
+    setSavingNextAppointment(true);
+    try {
+      await backend.workflow.updateNextAppointment(selectedPatient.id, normalizedDate);
+      setSelectedPatient(prev => (prev ? { ...prev, nextAppointment: normalizedDate || '' } : prev));
+    } catch (error) {
+      console.error('Error saving next appointment:', error);
+      alert('Could not save appointment date. Please try again.');
+    } finally {
+      setSavingNextAppointment(false);
+    }
   };
 
   return (
@@ -540,6 +578,23 @@ export const PatientsView: React.FC<PatientsViewProps> = ({ onNavigate, patients
                         <span className="font-bold text-slate-900 dark:text-white">
                           {formatDate(selectedPatient.nextAppointment, {day: 'numeric', month: 'short', year: 'numeric'}, 'Not scheduled')}
                         </span>
+                      </div>
+                      <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-2">
+                        <input
+                          type="date"
+                          value={appointmentDraft}
+                          onChange={(e) => setAppointmentDraft(e.target.value)}
+                          className="w-full sm:w-auto px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1c1c1e] text-sm font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+                          aria-label="Set next appointment date"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleSaveNextAppointment}
+                          disabled={savingNextAppointment}
+                          className="px-3 py-2 rounded-xl bg-brand-600 text-white text-sm font-semibold hover:bg-brand-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                        >
+                          {savingNextAppointment ? 'Saving...' : 'Save date'}
+                        </button>
                       </div>
                     </div>
                     {selectedPatient.nextFollowUpDate && (
