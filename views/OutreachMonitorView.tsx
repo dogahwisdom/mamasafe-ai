@@ -27,7 +27,8 @@ const StatCard: React.FC<{
   value: number;
   icon: React.ElementType;
   toneClass: string;
-}> = ({ title, value, icon: Icon, toneClass }) => (
+  hint?: string;
+}> = ({ title, value, icon: Icon, toneClass, hint }) => (
   <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1c1c1e] p-5">
     <div className="flex items-center justify-between">
       <p className="text-xs uppercase tracking-wide font-bold text-slate-500 dark:text-slate-400">
@@ -38,6 +39,9 @@ const StatCard: React.FC<{
       </div>
     </div>
     <p className="text-3xl font-bold text-slate-900 dark:text-white mt-3">{value}</p>
+    {hint ? (
+      <p className="text-xs text-slate-500 dark:text-slate-400 mt-3 leading-snug">{hint}</p>
+    ) : null}
   </div>
 );
 
@@ -177,6 +181,7 @@ export const OutreachMonitorView: React.FC<OutreachMonitorViewProps> = ({ user, 
           value={summary.sentCheckups}
           icon={MessageSquareShare}
           toneClass="bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300"
+          hint="Patients with at least one logged proactive check-up in this window. Zero usually means the scheduled job has not successfully sent and logged to Supabase yet (enable flag, Meta credentials, or quiet-hours skips)."
         />
         <StatCard
           title="Replied after outreach"

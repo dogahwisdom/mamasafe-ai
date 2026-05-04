@@ -1,8 +1,9 @@
 import { OutreachMonitorSummary, OutreachPatientRow, UserProfile } from "../../types";
 import { supabase, isSupabaseConfigured } from "../supabaseClient";
-import { normalizePhone } from "./shared";
+import { normalizePhone, phoneLookupVariants } from "./shared";
 
 const CHECKUP_SOURCE = "whatsapp-system-checkup";
+const CHECKUP_FLOW = "system_checkup";
 
 interface OutreachMonitorData {
   summary: OutreachMonitorSummary;
@@ -18,6 +19,7 @@ type PatientDbRow = {
 };
 
 type MessageDbRow = {
+  id: string;
   patient_id: string | null;
   phone: string;
   direction: "inbound" | "outbound";
@@ -64,7 +66,7 @@ export class OutreachMonitorService {
     const sinceIso = new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000).toISOString();
     const patientIds = patients.map((p) => p.id);
     const [outreachRows, inboundRows] = await Promise.all([
-      this.loadOutreachRows(patientIds, sinceIso),
+      this.loadOutreachRows(patients, sinceIso),
       this.loadInboundRows(patientIds, sinceIso),
     ]);
 
@@ -131,19 +133,54 @@ export class OutreachMonitorService {
     return (data || []) as PatientDbRow[];
   }
 
-  private async loadOutreachRows(
-    patientIds: string[],
-    sinceIso: string
-  ): Promise<MessageDbRow[]> {
-    const { data, error } = await supabase
-      .from("whatsapp_messages")
-      .select("patient_id, phone, direction, created_at")
-      .eq("direction", "outbound")
-      .contains("raw_payload", { source: CHECKUP_SOURCE })
-      .gte("created_at", sinceIso)
-      .in("patient_id", patientIds);
-    if (error) throw new Error(error.message);
-    return (data || []) as MessageDbRow[];
+  /**
+   * Counts rows logged by the Netlify system-checkup job (`raw_payload.source` or `flow_type`).
+   * Matches by patient_id and by known phone variants so rows are not missed if `patient_id` was null.
+   */
+  private async loadOutreachRows(patients: PatientDbRow[], sinceIso: string): Promise<MessageDbRow[]> {
+    const patientIds = patients.map((p) => p.id);
+    const phoneVariants = [
+      ...new Set(patients.flatMap((p) => phoneLookupVariants(p.phone))),
+    ].filter(Boolean);
+    if (patientIds.length === 0) return [];
+
+    const baseSelect = "id, patient_id, phone, direction, created_at";
+    const sourcePayload = { source: CHECKUP_SOURCE };
+    const flowPayload = { flow_type: CHECKUP_FLOW };
+
+    const fetchChunk = async (
+      scope: "patient" | "phone",
+      payload: typeof sourcePayload | typeof flowPayload
+    ) => {
+      let q = supabase
+        .from("whatsapp_messages")
+        .select(baseSelect)
+        .eq("direction", "outbound")
+        .gte("created_at", sinceIso)
+        .contains("raw_payload", payload);
+      if (scope === "patient") {
+        q = q.in("patient_id", patientIds);
+      } else if (phoneVariants.length > 0) {
+        q = q.in("phone", phoneVariants);
+      } else {
+        return [] as MessageDbRow[];
+      }
+      const { data, error } = await q;
+      if (error) throw new Error(error.message);
+      return (data || []) as MessageDbRow[];
+    };
+
+    const parts = await Promise.all([
+      fetchChunk("patient", sourcePayload),
+      fetchChunk("patient", flowPayload),
+      fetchChunk("phone", sourcePayload),
+      fetchChunk("phone", flowPayload),
+    ]);
+    const byId = new Map<string, MessageDbRow>();
+    for (const row of parts.flat()) {
+      if (row?.id && !byId.has(row.id)) byId.set(row.id, row);
+    }
+    return [...byId.values()];
   }
 
   private async loadInboundRows(
@@ -152,7 +189,7 @@ export class OutreachMonitorService {
   ): Promise<MessageDbRow[]> {
     const { data, error } = await supabase
       .from("whatsapp_messages")
-      .select("patient_id, phone, direction, created_at")
+      .select("id, patient_id, phone, direction, created_at")
       .eq("direction", "inbound")
       .gte("created_at", sinceIso)
       .in("patient_id", patientIds);
