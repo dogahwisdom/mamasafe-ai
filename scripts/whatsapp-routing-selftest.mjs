@@ -152,6 +152,55 @@ const cloud = new MockCloud();
   );
 }
 
+// Registered patient, no session row yet (e.g. only saw a template / outbound): "1" must not repeat the intro
+{
+  const patient = {
+    id: "p-no-session",
+    name: "Edward",
+    phone: "+233241234567",
+    gestational_weeks: 12,
+    alerts: [],
+  };
+  const repo = new StatefulRecordingRepo(patient);
+  repo.session = null;
+  const orch = new WhatsAppInboundOrchestrator({ repo, cloud, questionnaire });
+  await orch.handleInboundMessage({
+    id: "ns1",
+    from: "233241234567",
+    type: "text",
+    text: { body: "1" },
+  });
+  assert.ok(
+    /severe headache|blurred vision|bleeding|fever/i.test(repo.outbounds.at(-1).body),
+    "first inbound 1 without session should go to pregnancy Q1, not repeat intake intro"
+  );
+  assert.ok(!repo.outbounds.at(-1).body.includes("Who is this check"), "should not loop intake prompt");
+}
+
+// "Choose 1" without session routes to questionnaire (not generic triage stub)
+{
+  const patient = {
+    id: "p-choose",
+    name: "Edward",
+    phone: "+254712000003",
+    gestational_weeks: 10,
+    alerts: [],
+  };
+  const repo = new StatefulRecordingRepo(patient);
+  repo.session = null;
+  const orch = new WhatsAppInboundOrchestrator({ repo, cloud, questionnaire });
+  await orch.handleInboundMessage({
+    id: "ch1",
+    from: "254712000003",
+    type: "text",
+    text: { body: "Choose 1" },
+  });
+  assert.ok(
+    /severe headache|blurred vision/i.test(repo.outbounds.at(-1).body),
+    "Choose 1 should parse as intake option 1"
+  );
+}
+
 // Registered patient: hi → intake; "1" → pregnancy Q1; tap "No" (interactive) counts as answering that question
 {
   const patient = {

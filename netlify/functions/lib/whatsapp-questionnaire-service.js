@@ -81,13 +81,59 @@ const FLOW_QUESTION_BANK = {
   ],
 };
 
-function isNumericOption(text) {
-  const trimmed = String(text || "").trim();
-  return /^[1-3]$/.test(trimmed) ? Number(trimmed) : null;
+/**
+ * Handles reply-in-thread and quoted lines: users often put "1" on the last line after a quote block.
+ */
+function sanitizeQuestionnaireInput(raw) {
+  const s0 = String(raw ?? "")
+    .replace(/[\u200e\u200f]/g, "")
+    .trim();
+  if (!s0) return "";
+  const lines = s0.split(/\r?\n/).map((l) => l.replace(/^\s*>\s?/, "").trim());
+  const nonempty = lines.filter(Boolean);
+  if (nonempty.length === 0) return "";
+  const last = nonempty[nonempty.length - 1];
+  if (nonempty.length >= 2) {
+    if (/^[1-3]([\s.\)]|$)/.test(last)) return last;
+    if (/^(yes|no)\b/i.test(last) || /^[yn]\b/i.test(last)) return last;
+  }
+  return nonempty.join(" ");
 }
 
 function normalizeText(text) {
   return String(text || "").trim().toLowerCase();
+}
+
+/** Intake "who is this check for" — 1 / 2 / 3 and common natural-language patterns. */
+function parseIntakeChoice(text) {
+  const s = String(text || "").trim();
+  if (!s) return null;
+  const lower = s.toLowerCase();
+  const onlyDigit = s.match(/^([1-3])[\s.)]*$/);
+  if (onlyDigit) return Number(onlyDigit[1]);
+  const bracket = s.match(/\b([1-3])\b/);
+  if (bracket) return Number(bracket[1]);
+  if (/(^|\s)(option|choose|select|pick)\s*[:\-]?\s*([1-3])\b/i.test(s)) {
+    const m = s.match(/\b([1-3])\b/);
+    if (m) return Number(m[1]);
+  }
+  if (lower.includes("pregnant") || lower.includes("mother") || lower.includes("mum")) return 1;
+  if (lower.includes("baby") || lower.includes("newborn") || lower.includes("infant")) return 2;
+  if (lower.includes("general") || /\bgeneral\s+patient\b/i.test(s) || /^patient$/i.test(s.trim()) || lower.includes("adult"))
+    return 3;
+  return null;
+}
+
+/** Yes/No questionnaire steps — 1 / 2, words, or a digit embedded in a short reply. */
+function parseBinaryChoice(text) {
+  const s = String(text || "").trim();
+  const t = normalizeText(s);
+  if (t === "1" || t === "2") return Number(t);
+  const d = s.match(/\b([12])\b/);
+  if (d) return Number(d[1]);
+  if (/^(yes|y|true)\b/.test(t)) return 1;
+  if (/^(no|n|false)\b/.test(t)) return 2;
+  return null;
 }
 
 function renderQuestion(prompt, options) {
@@ -109,11 +155,18 @@ export class WhatsAppQuestionnaireService {
 
   shouldStartFlow(messageText, existingSession) {
     if (existingSession?.status === "active") return true;
-    const normalized = String(messageText || "").trim().toLowerCase();
+    const sanitized = sanitizeQuestionnaireInput(messageText);
+    const normalized = normalizeText(sanitized);
     if (!normalized) return true;
     if (this.startKeywords.has(normalized)) return true;
     if (/^[1-3]$/.test(normalized)) return true;
-    if (normalized.includes("pregnant") || normalized.includes("baby") || normalized.includes("patient")) {
+    if (parseIntakeChoice(sanitized)) return true;
+    if (
+      normalized.includes("pregnant") ||
+      normalized.includes("baby") ||
+      /\bgeneral\b/.test(normalized) ||
+      /\bgeneral\s+patient\b/.test(normalized)
+    ) {
       return true;
     }
     return false;
@@ -133,19 +186,56 @@ export class WhatsAppQuestionnaireService {
   }
 
   buildStartSession(flowOwnerPatientId) {
+    const id = flowOwnerPatientId || null;
     return {
       phone: null,
-      patientId: flowOwnerPatientId || null,
+      patientId: id,
+      patient_id: id,
       flowType: "intake",
+      flow_type: "intake",
       stepKey: "choose_profile",
+      step_key: "choose_profile",
       stepIndex: 0,
+      step_index: 0,
       answers: [],
       status: "active",
     };
   }
 
+  /** @private */
+  ownerPatientId(session) {
+    return session?.patient_id ?? session?.patientId ?? null;
+  }
+
+  /** First question after user picks 1/2/3 on intake (works even when there was no DB session yet). */
+  transitionIntakeToBranch(option, priorSession) {
+    const flowTypeName = option === 1 ? "pregnancy" : option === 2 ? "baby" : "general";
+    const first = FLOW_QUESTION_BANK[flowTypeName][0];
+    const ownerId = this.ownerPatientId(priorSession);
+    return {
+      kind: "question",
+      responseText: renderQuestion(first.text, first.options),
+      nextSession: {
+        patient_id: ownerId,
+        patientId: ownerId,
+        flow_type: flowTypeName,
+        flowType: flowTypeName,
+        step_key: first.key,
+        stepKey: first.key,
+        step_index: 0,
+        stepIndex: 0,
+        answers: [],
+        status: "active",
+        completed_at: null,
+        completedAt: null,
+      },
+    };
+  }
+
   handleMessage({ messageText, session, patientName }) {
-    const normalizedMessage = normalizeText(messageText);
+    const sanitized = sanitizeQuestionnaireInput(messageText);
+    const normalizedMessage = normalizeText(sanitized);
+
     if (session?.status === "active" && this.startKeywords.has(normalizedMessage)) {
       const resume = this.resumePromptForActiveSession(session, patientName);
       return {
@@ -159,7 +249,7 @@ export class WhatsAppQuestionnaireService {
       return {
         kind: "restart",
         responseText: this.startMessage(patientName),
-        nextSession: this.buildStartSession(session?.patient_id || null),
+        nextSession: this.buildStartSession(this.ownerPatientId(session)),
       };
     }
     if (this.endKeywords.has(normalizedMessage)) {
@@ -168,19 +258,25 @@ export class WhatsAppQuestionnaireService {
         responseText:
           "Your health check session has been ended. Send 'hello' anytime when you want to continue.",
         nextSession: {
-          ...(session || this.buildStartSession(session?.patient_id || null)),
+          ...(session || this.buildStartSession(this.ownerPatientId(session))),
           status: "cancelled",
           completed_at: new Date().toISOString(),
         },
       };
     }
 
-    const option = this.resolveOption(messageText, session);
-    if (!session || session.status !== "active") {
+    const option = this.resolveOption(sanitized, session);
+    const inactive = !session || session.status !== "active";
+
+    if (inactive) {
+      const intakePick = parseIntakeChoice(sanitized);
+      if (intakePick >= 1 && intakePick <= 3) {
+        return this.transitionIntakeToBranch(intakePick, session);
+      }
       return {
         kind: "start",
         responseText: this.startMessage(patientName),
-        nextSession: this.buildStartSession(session?.patient_id || null),
+        nextSession: this.buildStartSession(this.ownerPatientId(session)),
       };
     }
 
@@ -194,18 +290,7 @@ export class WhatsAppQuestionnaireService {
         };
       }
 
-      const flowType = option === 1 ? "pregnancy" : option === 2 ? "baby" : "general";
-      const first = FLOW_QUESTION_BANK[flowType][0];
-      return {
-        kind: "question",
-        responseText: renderQuestion(first.text, first.options),
-        nextSession: {
-          ...session,
-          flow_type: flowType,
-          step_key: first.key,
-          step_index: 0,
-        },
-      };
+      return this.transitionIntakeToBranch(option, session);
     }
 
     const questions = FLOW_QUESTION_BANK[session.flow_type] || [];
@@ -281,7 +366,7 @@ export class WhatsAppQuestionnaireService {
   }
 
   buildRuleBasedSymptomResponse(messageText) {
-    const normalized = normalizeText(messageText);
+    const normalized = normalizeText(sanitizeQuestionnaireInput(messageText));
     const hits = DANGER_KEYWORDS.filter((term) => normalized.includes(term));
     if (hits.length >= 2) {
       return {
@@ -339,24 +424,19 @@ export class WhatsAppQuestionnaireService {
     return { riskLevel, reasoning, recommendedAction };
   }
 
-  resolveOption(messageText, session) {
-    const numeric = isNumericOption(messageText);
-    if (numeric) return numeric;
-    const normalized = normalizeText(messageText);
+  resolveOption(sanitizedText, session) {
+    const text = String(sanitizedText || "").trim();
+    const flow = session?.flow_type ?? session?.flowType;
+    const isIntake = !session || flow === "intake";
 
-    if (!session || session.flow_type === "intake") {
-      if (normalized.includes("pregnant") || normalized.includes("mother") || normalized.includes("mum")) {
-        return 1;
-      }
-      if (normalized.includes("baby") || normalized.includes("newborn") || normalized.includes("infant")) {
-        return 2;
-      }
-      if (normalized.includes("general") || normalized.includes("patient") || normalized.includes("adult")) {
-        return 3;
-      }
-      return null;
+    if (isIntake) {
+      return parseIntakeChoice(text);
     }
 
+    const binary = parseBinaryChoice(text);
+    if (binary !== null) return binary;
+
+    const normalized = normalizeText(text);
     if (["yes", "y", "true"].includes(normalized)) return 1;
     if (["no", "n", "false"].includes(normalized)) return 2;
     return null;
