@@ -11,13 +11,12 @@ import {
 } from "lucide-react";
 import { backend } from "../services/backend";
 import type { OutreachMonitorSummary, OutreachPatientRow, Task, UserProfile } from "../types";
+import { ClinicTimestampFormatter } from "../services/formatClinicTimestamp";
 
 interface OutreachMonitorViewProps {
   user: UserProfile;
   onBack: () => void;
 }
-
-const formatDate = (value?: string) => (value ? new Date(value).toLocaleString() : "-");
 
 const toCsvCell = (value: string | number | boolean | undefined) =>
   `"${String(value ?? "").replace(/"/g, '""')}"`;
@@ -108,11 +107,11 @@ export const OutreachMonitorView: React.FC<OutreachMonitorViewProps> = ({ user, 
         toCsvCell(row.patientName),
         toCsvCell(row.phone),
         toCsvCell(row.checkupSentCount),
-        toCsvCell(row.lastCheckupSentAt || ""),
+        toCsvCell(ClinicTimestampFormatter.formatDateTime(row.lastCheckupSentAt)),
         toCsvCell(row.repliedAfterOutreach ? "Yes" : "No"),
-        toCsvCell(row.lastReplyAt || ""),
+        toCsvCell(ClinicTimestampFormatter.formatDateTime(row.lastReplyAt)),
         toCsvCell(row.optedOut ? "Yes" : "No"),
-        toCsvCell(row.optedOutAt || ""),
+        toCsvCell(ClinicTimestampFormatter.formatDateTime(row.optedOutAt)),
       ].join(",")
     );
     const csv = `${header.join(",")}\n${lines.join("\n")}`;
@@ -135,9 +134,9 @@ export const OutreachMonitorView: React.FC<OutreachMonitorViewProps> = ({ user, 
         type: "Missed Visit",
         deadline: "Follow up within 24h",
         resolved: false,
-        notes: `No reply after outreach checkup. Last sent: ${row.lastCheckupSentAt || "n/a"} · Phone: ${
-          row.phone
-        }`,
+        notes: `No reply after outreach checkup. Last sent: ${ClinicTimestampFormatter.formatDateTime(
+          row.lastCheckupSentAt
+        )} · Phone: ${row.phone}`,
         timestamp: Date.now(),
       };
       await backend.clinic.addTask(task);
@@ -299,12 +298,12 @@ export const OutreachMonitorView: React.FC<OutreachMonitorViewProps> = ({ user, 
                       <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{row.phone}</td>
                       <td className="px-4 py-3">{row.checkupSentCount}</td>
                       <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-                        {formatDate(row.lastCheckupSentAt)}
+                        {ClinicTimestampFormatter.formatDateTime(row.lastCheckupSentAt)}
                       </td>
                       <td className="px-4 py-3">
                         {row.repliedAfterOutreach ? (
                           <span className="text-green-700 dark:text-green-300 font-semibold">
-                            Replied ({formatDate(row.lastReplyAt)})
+                            Replied ({ClinicTimestampFormatter.formatDateTime(row.lastReplyAt)})
                           </span>
                         ) : (
                           <span className="text-slate-500 dark:text-slate-400">No reply yet</span>
@@ -313,7 +312,7 @@ export const OutreachMonitorView: React.FC<OutreachMonitorViewProps> = ({ user, 
                       <td className="px-4 py-3">
                         {row.optedOut ? (
                           <span className="text-amber-700 dark:text-amber-300 font-semibold">
-                            Yes ({formatDate(row.optedOutAt)})
+                            Yes ({ClinicTimestampFormatter.formatDateTime(row.optedOutAt)})
                           </span>
                         ) : (
                           <span className="text-slate-500 dark:text-slate-400">No</span>

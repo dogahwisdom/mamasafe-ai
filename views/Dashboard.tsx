@@ -13,6 +13,7 @@ import {
 } from '../components/reports/AgeGroupReport';
 import { FinancialReportsPanel } from '../components/reports/FinancialReportsPanel';
 import { PermissionsManager } from '../components/admin/PermissionsManager';
+import { ClinicTimestampFormatter } from '../services/formatClinicTimestamp';
 
 // Mock Data for Analytics
 const visitData = [
@@ -708,7 +709,11 @@ export const DashboardView: React.FC<DashboardProps> = ({ onNavigate, user }) =>
                  </div>
                  
                  <h4 className="font-bold text-slate-900 dark:text-white">{task.patientName}</h4>
-                 <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">{task.notes}</p>
+                 <p className="text-xs text-slate-500 dark:text-slate-400 mb-3 leading-relaxed">
+                  {task.notes
+                    ? ClinicTimestampFormatter.formatNotesWithEmbeddedIso(task.notes)
+                    : ''}
+                </p>
                  
                  <button 
                    onClick={() => resolveTask(task.id)}
