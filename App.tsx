@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { Logo } from './components/Logo';
 import { DashboardView } from './views/Dashboard';
 import { EnrollmentView } from './views/Enrollment';
@@ -39,6 +39,16 @@ export const App: React.FC = () => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState<Alert[]>([]);
   const notificationRef = useRef<HTMLDivElement>(null);
+  const desktopNavRef = useRef<HTMLElement>(null);
+
+  useLayoutEffect(() => {
+    const nav = desktopNavRef.current;
+    if (!nav) return;
+    const active = nav.querySelector('[data-desktop-nav-active="true"]');
+    if (active instanceof HTMLElement) {
+      active.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }
+  }, [currentView]);
 
   useEffect(() => {
     // Initial Theme Check
@@ -304,9 +314,12 @@ export const App: React.FC = () => {
 
       {/* Desktop Header */}
       <header className="fixed top-0 w-full bg-white/70 dark:bg-[#1c1c1e]/70 backdrop-blur-xl border-b border-slate-200/50 dark:border-slate-800/50 z-50 saturate-150 supports-[backdrop-filter]:bg-white/60">
-        <div className="max-w-7xl mx-auto px-6 h-16 md:h-20 flex items-center justify-between relative">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 h-16 md:h-20 flex items-center gap-2 sm:gap-3 min-w-0 relative">
 
-          <div className="cursor-pointer group flex items-center" onClick={() => setCurrentView('dashboard')}>
+          <div
+            className="cursor-pointer group flex items-center flex-shrink-0 min-w-0"
+            onClick={() => setCurrentView('dashboard')}
+          >
             <Logo size={32} className="transition-transform duration-300 group-hover:scale-105 md:scale-100 scale-90" />
             <div className="hidden sm:flex items-center gap-2 ml-3">
               {currentUser?.role === 'patient' && <span className="text-xs font-bold text-brand-600 bg-brand-50 border border-brand-100 px-2.5 py-0.5 rounded-full self-center">Patient Portal</span>}
@@ -346,26 +359,39 @@ export const App: React.FC = () => {
             </div>
           </div>
 
-          <nav className="hidden md:flex items-center gap-1 bg-slate-100/50 dark:bg-slate-800/50 p-1 rounded-full backdrop-blur-sm">
-            {getNavItems().map((item) => (
-              <button
-                key={item.id}
-                onClick={() => setCurrentView(item.id as ViewState)}
-                className={`
-                  flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold transition-all duration-300 ease-out
+          <nav
+            ref={desktopNavRef}
+            className="hidden md:flex flex-1 min-w-0 justify-center overflow-x-auto overflow-y-hidden overscroll-x-contain scroll-smooth touch-pan-x py-0.5 [scrollbar-width:thin]"
+            aria-label="Primary navigation"
+          >
+            <div className="flex w-max items-center gap-0.5 sm:gap-1 bg-slate-100/50 dark:bg-slate-800/50 p-1 rounded-full backdrop-blur-sm ring-1 ring-slate-200/40 dark:ring-slate-700/50">
+              {getNavItems().map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  data-desktop-nav-active={currentView === item.id ? 'true' : undefined}
+                  onClick={() => setCurrentView(item.id as ViewState)}
+                  className={`
+                  flex shrink-0 items-center gap-1.5 sm:gap-2 whitespace-nowrap rounded-full py-2.5 text-xs sm:text-sm font-semibold transition-all duration-300 ease-out
+                  px-3 sm:px-4 lg:px-5
                   ${currentView === item.id
-                    ? 'bg-white dark:bg-[#2c2c2e] text-black dark:text-white shadow-sm scale-105'
+                    ? 'bg-white dark:bg-[#2c2c2e] text-black dark:text-white shadow-sm sm:scale-[1.02]'
                     : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-black/5 dark:hover:bg-white/5'
                   }
                 `}
-              >
-                <item.icon size={16} strokeWidth={2.5} className={currentView === item.id ? 'text-brand-500' : ''} />
-                {item.label}
-              </button>
-            ))}
+                >
+                  <item.icon
+                    size={16}
+                    strokeWidth={2.5}
+                    className={`shrink-0 ${currentView === item.id ? 'text-brand-500' : ''}`}
+                  />
+                  {item.label}
+                </button>
+              ))}
+            </div>
           </nav>
 
-          <div className="flex items-center gap-2 md:gap-4">
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2 md:gap-4">
             {/* Notification Bell */}
             <div className="relative" ref={notificationRef}>
               <button
@@ -620,14 +646,18 @@ export const App: React.FC = () => {
       </main>
 
       {/* Mobile Bottom Navigation */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/90 dark:bg-[#1c1c1e]/90 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 pb-[env(safe-area-inset-bottom)]">
-        <div className="flex justify-around items-center h-16 px-2">
+      <nav
+        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/90 dark:bg-[#1c1c1e]/90 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 pb-[env(safe-area-inset-bottom)]"
+        aria-label="Mobile navigation"
+      >
+        <div className="flex h-16 items-stretch overflow-x-auto overflow-y-hidden overscroll-x-contain scroll-smooth touch-pan-x gap-1 px-2 [scrollbar-width:thin]">
           {getNavItems().map((item) => (
             <button
               key={item.id}
+              type="button"
               onClick={() => setCurrentView(item.id as ViewState)}
               className={`
-                     flex flex-col items-center justify-center w-full h-full gap-1 transition-colors
+                     flex min-w-[4.25rem] max-w-[5.5rem] shrink-0 snap-start flex-col items-center justify-center gap-0.5 px-1.5 transition-colors
                      ${currentView === item.id
                   ? 'text-brand-600 dark:text-brand-400'
                   : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'
@@ -635,7 +665,9 @@ export const App: React.FC = () => {
                   `}
             >
               <item.icon size={22} strokeWidth={currentView === item.id ? 2.5 : 2} />
-              <span className="text-[10px] font-bold tracking-tight">{item.label}</span>
+              <span className="line-clamp-2 text-center text-[10px] font-bold leading-tight tracking-tight">
+                {item.label}
+              </span>
             </button>
           ))}
         </div>
