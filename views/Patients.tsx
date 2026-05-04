@@ -78,6 +78,41 @@ export const PatientsView: React.FC<PatientsViewProps> = ({ onNavigate, patients
     }
   };
 
+  const parseDateValue = (value?: string | null): Date | null => {
+    if (!value) return null;
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+
+    const ymdMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
+    if (ymdMatch) {
+      const year = Number(ymdMatch[1]);
+      const month = Number(ymdMatch[2]) - 1;
+      const day = Number(ymdMatch[3]);
+      const localDate = new Date(year, month, day);
+      return Number.isNaN(localDate.getTime()) ? null : localDate;
+    }
+
+    const parsed = new Date(trimmed);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  };
+
+  const formatDate = (
+    value: string | null | undefined,
+    options?: Intl.DateTimeFormatOptions,
+    fallback: string = '-',
+  ): string => {
+    const parsed = parseDateValue(value);
+    return parsed ? parsed.toLocaleDateString(undefined, options) : fallback;
+  };
+
+  const formatDateTime = (
+    value: string | null | undefined,
+    fallback: string = '-',
+  ): string => {
+    const parsed = parseDateValue(value);
+    return parsed ? parsed.toLocaleString() : fallback;
+  };
+
   return (
     <div className="max-w-4xl mx-auto space-y-6 relative">
       
@@ -156,7 +191,7 @@ export const PatientsView: React.FC<PatientsViewProps> = ({ onNavigate, patients
                   <div className="hidden md:block text-right mr-2">
                     <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Next Visit</p>
                     <p className="text-sm font-semibold text-slate-900 dark:text-slate-200">
-                      {new Date(patient.nextAppointment).toLocaleDateString('en-GB', {day: 'numeric', month: 'short'})}
+                      {formatDate(patient.nextAppointment, { day: 'numeric', month: 'short' }, 'Not scheduled')}
                     </p>
                   </div>
                   
@@ -474,7 +509,7 @@ export const PatientsView: React.FC<PatientsViewProps> = ({ onNavigate, patients
                             <p className="font-semibold text-slate-900 dark:text-white capitalize">{condition.type}</p>
                             {condition.diagnosisDate && (
                               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                                Diagnosed: {new Date(condition.diagnosisDate).toLocaleDateString()}
+                                Diagnosed: {formatDate(condition.diagnosisDate, undefined, 'Unknown')}
                               </p>
                             )}
                             {condition.severity && (
@@ -503,7 +538,7 @@ export const PatientsView: React.FC<PatientsViewProps> = ({ onNavigate, patients
                       <div className="flex items-center gap-2">
                         <Calendar size={18} className="text-purple-500" />
                         <span className="font-bold text-slate-900 dark:text-white">
-                          {selectedPatient.nextAppointment ? new Date(selectedPatient.nextAppointment).toLocaleDateString(undefined, {day: 'numeric', month: 'short', year: 'numeric'}) : 'Not scheduled'}
+                          {formatDate(selectedPatient.nextAppointment, {day: 'numeric', month: 'short', year: 'numeric'}, 'Not scheduled')}
                         </span>
                       </div>
                     </div>
@@ -513,7 +548,7 @@ export const PatientsView: React.FC<PatientsViewProps> = ({ onNavigate, patients
                         <div className="flex items-center gap-2">
                           <Calendar size={18} className="text-green-500" />
                           <span className="font-bold text-slate-900 dark:text-white">
-                            {new Date(selectedPatient.nextFollowUpDate).toLocaleDateString(undefined, {day: 'numeric', month: 'short', year: 'numeric'})}
+                            {formatDate(selectedPatient.nextFollowUpDate, {day: 'numeric', month: 'short', year: 'numeric'}, 'Not scheduled')}
                           </span>
                         </div>
                       </div>
@@ -523,7 +558,7 @@ export const PatientsView: React.FC<PatientsViewProps> = ({ onNavigate, patients
                       <div className="flex items-center gap-2">
                         <Clock size={18} className="text-blue-500" />
                         <span className="font-semibold text-slate-900 dark:text-white">
-                          {selectedPatient.lastCheckIn ? new Date(selectedPatient.lastCheckIn).toLocaleDateString(undefined, {day: 'numeric', month: 'short', year: 'numeric'}) : 'Never'}
+                          {formatDate(selectedPatient.lastCheckIn, {day: 'numeric', month: 'short', year: 'numeric'}, 'Never')}
                         </span>
                       </div>
                     </div>
@@ -620,7 +655,7 @@ export const PatientsView: React.FC<PatientsViewProps> = ({ onNavigate, patients
                                  reminder.type === 'medication' ? 'Medication Reminder' : 'Symptom Check-in'}
                               </p>
                               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                                {new Date(reminder.scheduledFor).toLocaleString()}
+                                {formatDateTime(reminder.scheduledFor, 'Not scheduled')}
                               </p>
                               <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 line-clamp-2">
                                 {reminder.message}
@@ -674,12 +709,12 @@ export const PatientsView: React.FC<PatientsViewProps> = ({ onNavigate, patients
                       <div className="flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400">
                         <div className="flex items-center gap-1.5">
                           <Calendar size={12} />
-                          <span>Created {new Date(referral.createdAt).toLocaleDateString()}</span>
+                          <span>Created {formatDate(referral.createdAt, undefined, 'Unknown')}</span>
                         </div>
                         {referral.updatedAt !== referral.createdAt && (
                           <div className="flex items-center gap-1.5">
                             <Clock size={12} />
-                            <span>Updated {new Date(referral.updatedAt).toLocaleDateString()}</span>
+                            <span>Updated {formatDate(referral.updatedAt, undefined, 'Unknown')}</span>
                           </div>
                         )}
                       </div>
@@ -759,7 +794,7 @@ export const PatientsView: React.FC<PatientsViewProps> = ({ onNavigate, patients
                                   )}
                                 </div>
                                 <span className="text-xs text-slate-500 dark:text-slate-400">
-                                  {task.resolvedAt ? new Date(task.resolvedAt).toLocaleDateString() : 'Resolved'}
+                                  {task.resolvedAt ? formatDate(task.resolvedAt, undefined, 'Resolved') : 'Resolved'}
                                 </span>
                               </div>
                             </div>
@@ -812,7 +847,7 @@ export const PatientsView: React.FC<PatientsViewProps> = ({ onNavigate, patients
                                     {reminder.message}
                                   </p>
                                   <p className="text-xs text-slate-500 dark:text-slate-400">
-                                    Scheduled: {new Date(reminder.scheduledFor).toLocaleString()}
+                                    Scheduled: {formatDateTime(reminder.scheduledFor, 'Not scheduled')}
                                   </p>
                                 </div>
                               </div>
@@ -845,11 +880,11 @@ export const PatientsView: React.FC<PatientsViewProps> = ({ onNavigate, patients
                                     {reminder.message}
                                   </p>
                                   <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
-                                    <span>Scheduled: {new Date(reminder.scheduledFor).toLocaleString()}</span>
+                                    <span>Scheduled: {formatDateTime(reminder.scheduledFor, 'Not scheduled')}</span>
                                     {reminder.sentAt && (
                                       <>
                                         <span>•</span>
-                                        <span>Sent: {new Date(reminder.sentAt).toLocaleString()}</span>
+                                        <span>Sent: {formatDateTime(reminder.sentAt, 'Unknown')}</span>
                                       </>
                                     )}
                                   </div>
