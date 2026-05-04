@@ -183,7 +183,7 @@ export class WhatsAppInboundOrchestrator {
         "",
         "Reply with 1, 2, or 3, or send 'end' to stop.",
       ].join("\n");
-      await this.repo.upsertSession({
+      const welcomeUpsert = await this.repo.upsertSession({
         phone,
         patientId: null,
         flowType: "intake",
@@ -193,6 +193,9 @@ export class WhatsAppInboundOrchestrator {
         status: "active",
         completedAt: null,
       });
+      if (!welcomeUpsert?.ok) {
+        console.error("WhatsApp welcome session upsert failed:", welcomeUpsert?.reason, phone);
+      }
       await this.maybeSendOutbound({
         phone,
         patientId: null,
@@ -220,7 +223,7 @@ export class WhatsAppInboundOrchestrator {
       responseText = flow.responseText;
       source = "whatsapp-webhook-questionnaire";
       flowType = flow.nextSession?.flow_type || flow.nextSession?.flowType || flowType;
-      await this.repo.upsertSession({
+      const upsertResult = await this.repo.upsertSession({
         phone,
         patientId: patient?.id || null,
         flowType: flow.nextSession?.flow_type || flow.nextSession?.flowType || "intake",
@@ -230,6 +233,13 @@ export class WhatsAppInboundOrchestrator {
         status: flow.nextSession?.status || "active",
         completedAt: flow.nextSession?.completed_at || flow.nextSession?.completedAt || null,
       });
+      if (!upsertResult?.ok) {
+        console.error(
+          "WhatsApp session upsert failed (next inbound may lose flow state):",
+          upsertResult?.reason,
+          { phone, flowType: flow.nextSession?.flow_type || flow.nextSession?.flowType }
+        );
+      }
       triageResult = flow.triageResult || null;
       if (!isRegisteredPatient) {
         const flowStatus = flow.nextSession?.status || "active";

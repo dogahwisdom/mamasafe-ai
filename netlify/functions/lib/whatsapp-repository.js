@@ -186,7 +186,8 @@ export class WhatsAppRepository {
       patient_id: patientId || null,
       flow_type: flowType || "intake",
       step_key: stepKey || "choose_profile",
-      step_index: Number(stepIndex || 0),
+      step_index:
+        stepIndex !== undefined && stepIndex !== null ? Number(stepIndex) : 0,
       answers: Array.isArray(answers) ? answers : [],
       status: status || "active",
       completed_at: completedAt || null,

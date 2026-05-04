@@ -139,6 +139,23 @@ class MockCloud {
 const questionnaire = new WhatsAppQuestionnaireService();
 const cloud = new MockCloud();
 
+// Only camelCase flowType/stepIndex (some API paths): "1" = Yes on baby Q1 → baby Q2, not pregnancy intake
+{
+  const flow = questionnaire.handleMessage({
+    messageText: "1",
+    session: { status: "active", flowType: "baby", stepIndex: 0, answers: [] },
+    patientName: "Sam",
+  });
+  assert.ok(
+    /fever|difficulty breathing|convulsion/i.test(flow.responseText),
+    "camelCase baby session must advance to next baby question"
+  );
+  assert.ok(
+    !/severe headache, blurred vision, bleeding, or fever/i.test(flow.responseText),
+    "must not mis-route to pregnancy danger question"
+  );
+}
+
 // Unregistered user: hello → welcome; then "1" → pregnancy flow question
 {
   const repo = new StatefulRecordingRepo(null);

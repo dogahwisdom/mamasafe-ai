@@ -162,6 +162,19 @@ function completionLowRiskLine(facilityName) {
   return "Thank you for your responses. MamaSafe AI and your health facility will use your answers to provide the best care. We will not share your personal information without your permission.";
 }
 
+/**
+ * DB/API may expose snake_case or camelCase; missing keys made `flow_type` undefined so
+ * branching broke and bare "1" was misread as a new intake choice (pregnancy).
+ */
+function normalizeSessionRecord(row) {
+  if (!row) return null;
+  const flow_type = row.flow_type ?? row.flowType ?? "intake";
+  const rawStep = row.step_index ?? row.stepIndex;
+  const step_index =
+    rawStep !== undefined && rawStep !== null && !Number.isNaN(Number(rawStep)) ? Number(rawStep) : 0;
+  return { ...row, flow_type, step_index };
+}
+
 export class WhatsAppQuestionnaireService {
   constructor() {
     this.startKeywords = new Set(["start", "hello", "hi", "hey", "menu", "checkup"]);
@@ -248,7 +261,8 @@ export class WhatsAppQuestionnaireService {
     };
   }
 
-  handleMessage({ messageText, session, patientName, facilityName }) {
+  handleMessage({ messageText, session: sessionRow, patientName, facilityName }) {
+    const session = normalizeSessionRecord(sessionRow);
     const sanitized = sanitizeQuestionnaireInput(messageText);
     const normalizedMessage = normalizeText(sanitized);
 
@@ -346,7 +360,11 @@ export class WhatsAppQuestionnaireService {
           ...session,
           answers,
           step_index: nextIndex,
+          stepIndex: nextIndex,
           step_key: next.key,
+          stepKey: next.key,
+          flow_type: session.flow_type,
+          flowType: session.flow_type,
         },
       };
     }
@@ -366,14 +384,15 @@ export class WhatsAppQuestionnaireService {
   }
 
   resumePromptForActiveSession(session, patientName, facilityName) {
-    if (!session || session.status !== "active") {
+    const s = normalizeSessionRecord(session);
+    if (!s || s.status !== "active") {
       return this.startMessage(patientName, facilityName);
     }
-    if (session.flow_type === "intake") {
+    if (s.flow_type === "intake") {
       return `${this.startMessage(patientName, facilityName)}\n\nReply with 1, 2, or 3, or send 'end' to stop.`;
     }
-    const questions = FLOW_QUESTION_BANK[session.flow_type] || [];
-    const current = questions[session.step_index];
+    const questions = FLOW_QUESTION_BANK[s.flow_type] || [];
+    const current = questions[s.step_index];
     if (!current) {
       return "Your session is almost complete. Send 'restart' to begin again or 'end' to close this session.";
     }
@@ -457,8 +476,9 @@ export class WhatsAppQuestionnaireService {
 
   resolveOption(sanitizedText, session) {
     const text = String(sanitizedText || "").trim();
-    const flow = session?.flow_type ?? session?.flowType;
-    const isIntake = !session || flow === "intake";
+    const s = normalizeSessionRecord(session);
+    const flow = s?.flow_type ?? s?.flowType;
+    const isIntake = !s || flow === "intake";
 
     if (isIntake) {
       return parseIntakeChoice(text);
