@@ -404,7 +404,10 @@ export interface OutreachPatientRow {
 
 export interface OutreachMonitorSummary {
   totalPatients: number;
-  sentCheckups: number;
+  /** Patients with at least one logged outbound check-up in the lookback window */
+  patientsWithCheckupSent: number;
+  /** Sum of logged outbound check-up messages (one patient can have several in the window) */
+  totalCheckupMessagesLogged: number;
   optedOut: number;
   repliedAfterOutreach: number;
 }

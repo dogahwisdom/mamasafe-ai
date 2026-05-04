@@ -50,7 +50,8 @@ export const OutreachMonitorView: React.FC<OutreachMonitorViewProps> = ({ user, 
   const [rows, setRows] = useState<OutreachPatientRow[]>([]);
   const [summary, setSummary] = useState<OutreachMonitorSummary>({
     totalPatients: 0,
-    sentCheckups: 0,
+    patientsWithCheckupSent: 0,
+    totalCheckupMessagesLogged: 0,
     optedOut: 0,
     repliedAfterOutreach: 0,
   });
@@ -176,21 +177,32 @@ export const OutreachMonitorView: React.FC<OutreachMonitorViewProps> = ({ user, 
           toneClass="bg-brand-50 text-brand-700 dark:bg-brand-900/20 dark:text-brand-300"
         />
         <StatCard
-          title="Sent checkups"
-          value={summary.sentCheckups}
+          title="Patients w/ check-up sent"
+          value={summary.patientsWithCheckupSent}
           icon={MessageSquareShare}
           toneClass="bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300"
           hint={
-            <>
-              Rows must exist in{' '}
-              <code className="text-[11px] bg-slate-100 dark:bg-slate-800 px-1 rounded">whatsapp_messages</code>{' '}
-              (outbound, tagged by the check-up job). If Netlify sends succeed but this stays zero, anon RLS often
-              blocks reads — apply migration{' '}
-              <code className="text-[11px] bg-slate-100 dark:bg-slate-800 px-1 rounded">
-                20260504100000_whatsapp_messages_rls_select
-              </code>
-              . Otherwise check cron logs or Meta rejecting non-template sends.
-            </>
+            summary.totalPatients > 0 && summary.patientsWithCheckupSent === 0 ? (
+              <>
+                No outbound check-ups appear in{' '}
+                <code className="text-[11px] bg-slate-100 dark:bg-slate-800 px-1 rounded">whatsapp_messages</code>{' '}
+                for this window (job tags: <code className="text-[11px] px-1 rounded bg-slate-100 dark:bg-slate-800">whatsapp-system-checkup</code>). If cron/Netlify are sending but this stays 0, the browser uses the anon key — RLS may block SELECT. Run migration{' '}
+                <code className="text-[11px] bg-slate-100 dark:bg-slate-800 px-1 rounded">
+                  20260504100000_whatsapp_messages_rls_select
+                </code>
+                . Also confirm Meta/cron logs if sends fail.
+              </>
+            ) : (
+              <>
+                <span className="font-medium text-slate-600 dark:text-slate-300">
+                  {summary.totalCheckupMessagesLogged} logged send
+                  {summary.totalCheckupMessagesLogged === 1 ? "" : "s"}
+                </span>{' '}
+                in this window (count of outbound rows tagged by the system check-up job). This number is{' '}
+                <span className="font-medium">patients with at least one send</span>, not your facility&apos;s total
+                message volume.
+              </>
+            )
           }
         />
         <StatCard

@@ -42,7 +42,8 @@ export class OutreachMonitorService {
       return {
         summary: {
           totalPatients: 0,
-          sentCheckups: 0,
+          patientsWithCheckupSent: 0,
+          totalCheckupMessagesLogged: 0,
           optedOut: 0,
           repliedAfterOutreach: 0,
         },
@@ -55,7 +56,8 @@ export class OutreachMonitorService {
       return {
         summary: {
           totalPatients: 0,
-          sentCheckups: 0,
+          patientsWithCheckupSent: 0,
+          totalCheckupMessagesLogged: 0,
           optedOut: 0,
           repliedAfterOutreach: 0,
         },
@@ -113,10 +115,14 @@ export class OutreachMonitorService {
       return bKey.localeCompare(aKey);
     });
 
+    const patientsWithCheckupSent = rows.filter((r) => r.checkupSentCount > 0).length;
+    const totalCheckupMessagesLogged = rows.reduce((acc, r) => acc + r.checkupSentCount, 0);
+
     return {
       summary: {
         totalPatients: rows.length,
-        sentCheckups: rows.filter((r) => r.checkupSentCount > 0).length,
+        patientsWithCheckupSent,
+        totalCheckupMessagesLogged,
         optedOut: rows.filter((r) => r.optedOut).length,
         repliedAfterOutreach: rows.filter((r) => r.repliedAfterOutreach).length,
       },
