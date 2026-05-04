@@ -50,12 +50,7 @@ export class ReferralService {
 
       let rows = data || [];
       if (!includeTest) {
-        rows = rows.filter((r: any) => {
-          const flag = r.patients?.is_test;
-          if (flag === true) return false;
-          if (flag === false) return true;
-          return !TestPatientVisibility.nameLooksLikeTestData(r.patient_name);
-        });
+        rows = rows.filter((r: any) => r.patients?.is_test !== true);
       }
 
       return rows.map((r: any) => mapReferralRow(r));

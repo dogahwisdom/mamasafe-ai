@@ -47,6 +47,7 @@ CREATE TABLE IF NOT EXISTS patients (
   next_appointment DATE,
   alerts JSONB DEFAULT '[]'::jsonb,
   preferred_channel TEXT DEFAULT 'both' CHECK (preferred_channel IN ('whatsapp', 'sms', 'both')),
+  is_test BOOLEAN NOT NULL DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -56,6 +57,7 @@ CREATE INDEX IF NOT EXISTS idx_patients_user_id ON patients(user_id);
 CREATE INDEX IF NOT EXISTS idx_patients_phone ON patients(phone);
 CREATE INDEX IF NOT EXISTS idx_patients_risk_status ON patients(risk_status);
 CREATE INDEX IF NOT EXISTS idx_patients_next_appointment ON patients(next_appointment);
+CREATE INDEX IF NOT EXISTS idx_patients_is_test ON patients (is_test) WHERE is_test = true;
 
 -- ============================================
 -- MEDICATIONS TABLE

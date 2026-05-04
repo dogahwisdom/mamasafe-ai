@@ -37,12 +37,7 @@ export class ClinicService {
 
       let rows = data || [];
       if (!includeTest) {
-        rows = rows.filter((t: any) => {
-          const flag = t.patients?.is_test;
-          if (flag === true) return false;
-          if (flag === false) return true;
-          return !TestPatientVisibility.nameLooksLikeTestData(t.patient_name);
-        });
+        rows = rows.filter((t: any) => t.patients?.is_test !== true);
       }
 
       return rows.map((t: any) => {
