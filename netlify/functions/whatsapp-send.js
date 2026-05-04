@@ -29,12 +29,20 @@ export async function handler(event) {
     const patient =
       payload.patientId || !repo.isEnabled() ? null : await repo.findPatientByPhone(phone);
 
+    const metaRaw =
+      sendResult.raw && typeof sendResult.raw === "object" ? sendResult.raw : {};
+    const logSource = payload.logSource ? String(payload.logSource).trim() : "";
+    const rawPayload = {
+      ...metaRaw,
+      ...(logSource ? { outboundSource: logSource } : {}),
+    };
+
     const logResult = await repo.logOutboundMessage({
       patientId: payload.patientId || patient?.id || null,
       phone,
       body,
       metaMessageId: sendResult.metaMessageId,
-      rawPayload: sendResult.raw,
+      rawPayload,
       relatedReminderId: payload.relatedReminderId || null,
     });
 

@@ -14,6 +14,8 @@ interface MessageResult {
 interface WhatsAppSendContext {
   patientId?: string;
   relatedReminderId?: string;
+  /** Stored on `whatsapp_messages.raw_payload.outboundSource` for analytics / SQL filters. */
+  logSource?: string;
 }
 
 export type EnrollmentCredentialsOptions = {
@@ -85,7 +87,10 @@ Kama una swali lolote, pigia au tembelea kliniki yako.
 
     // Send WhatsApp welcome + credentials (via Netlify whatsapp-send)
     try {
-      const ctx = options?.patientId ? ({ patientId: options.patientId } as WhatsAppSendContext) : undefined;
+      const ctx: WhatsAppSendContext = {
+        patientId: options?.patientId,
+        logSource: 'enrollment_welcome',
+      };
       results.whatsapp = await this.sendWhatsApp(phone, whatsappWelcomeBody, ctx);
     } catch (error) {
       console.error('Error sending WhatsApp:', error);
@@ -113,6 +118,7 @@ Kama una swali lolote, pigia au tembelea kliniki yako.
           message,
           patientId: context?.patientId,
           relatedReminderId: context?.relatedReminderId,
+          logSource: context?.logSource,
         }),
       });
 
