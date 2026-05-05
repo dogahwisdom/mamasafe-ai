@@ -5,6 +5,50 @@ import { supabase, isSupabaseConfigured } from "../supabaseClient";
 const HOURS_24 = 24 * 60 * 60 * 1000;
 
 export class ReminderService {
+  public async dispatchDueReminders(): Promise<{
+    ok: boolean;
+    scanned?: number;
+    sent?: number;
+    failed?: number;
+    skipped?: number;
+    reason?: string;
+    error?: string;
+  }> {
+    try {
+      const response = await fetch('/.netlify/functions/reminder-dispatch', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        return {
+          ok: false,
+          reason: payload?.reason || payload?.error || `http_${response.status}`,
+          error: payload?.error,
+          scanned: payload?.scanned,
+          sent: payload?.sent,
+          failed: payload?.failed,
+          skipped: payload?.skipped,
+        };
+      }
+      return {
+        ok: !!payload?.ok,
+        scanned: payload?.scanned,
+        sent: payload?.sent,
+        failed: payload?.failed,
+        skipped: payload?.skipped,
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        reason: 'dispatch_request_failed',
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+
   public async getAll(): Promise<Reminder[]> {
     // Use Supabase if configured
     if (isSupabaseConfigured()) {

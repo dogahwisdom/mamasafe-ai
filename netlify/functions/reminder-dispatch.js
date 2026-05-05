@@ -1,6 +1,10 @@
 import { createClient } from "@supabase/supabase-js";
 import { WhatsAppCloudService } from "./lib/whatsapp-cloud-service.js";
 
+const DISPATCH_COOLDOWN_MS = 60 * 1000;
+let dispatchInProgress = false;
+let lastDispatchStartedAt = 0;
+
 function json(statusCode, body) {
   return {
     statusCode,
@@ -139,7 +143,29 @@ export async function handler(event) {
     return json(405, { error: "Method not allowed." });
   }
 
-  const result = await processDueReminders();
-  const statusCode = result.ok ? 200 : 500;
-  return json(statusCode, result);
+  const now = Date.now();
+  if (dispatchInProgress) {
+    return json(429, {
+      ok: false,
+      reason: "dispatch_in_progress",
+      error: "Reminder dispatch is already running. Please wait for completion.",
+    });
+  }
+  if (now - lastDispatchStartedAt < DISPATCH_COOLDOWN_MS) {
+    return json(429, {
+      ok: false,
+      reason: "dispatch_cooldown",
+      error: "Reminder dispatch was run recently. Please wait one minute before retrying.",
+    });
+  }
+
+  dispatchInProgress = true;
+  lastDispatchStartedAt = now;
+  try {
+    const result = await processDueReminders();
+    const statusCode = result.ok ? 200 : 500;
+    return json(statusCode, result);
+  } finally {
+    dispatchInProgress = false;
+  }
 }
