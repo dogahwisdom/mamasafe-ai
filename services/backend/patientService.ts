@@ -286,10 +286,20 @@ export class PatientService {
       // 3) Existing row was unassigned and is now being formally attached to a facility (common after
       //    WhatsApp auto-created shell records).
       const isFirstPatientRowForPhone = !existing;
+      const enrollingFacilityId = facilityId || patient.primaryFacilityId || null;
       const wasUnassignedToFacility = Boolean(
         existing && !existing.primary_facility_id && !existing.facility_id
       );
       const isNowAssignedToFacility = Boolean(patientData.primary_facility_id || patientData.facility_id);
+      const existingFacilityLinks = existing
+        ? [existing.facility_id, existing.primary_facility_id].filter(Boolean)
+        : [];
+      const isExistingLinkedToSameFacility = Boolean(
+        existing && enrollingFacilityId && existingFacilityLinks.includes(enrollingFacilityId)
+      );
+      const isFirstLinkToThisFacility = Boolean(
+        existing && enrollingFacilityId && !existingFacilityLinks.includes(enrollingFacilityId)
+      );
 
       let hasPriorEnrollmentWelcome = false;
       if (existing) {
@@ -306,7 +316,11 @@ export class PatientService {
       const shouldSendEnrollmentWelcome =
         isNewUser ||
         isFirstPatientRowForPhone ||
-        (wasUnassignedToFacility && isNowAssignedToFacility && !hasPriorEnrollmentWelcome);
+        (wasUnassignedToFacility && isNowAssignedToFacility && !hasPriorEnrollmentWelcome) ||
+        // If the patient is now being added to this facility for the first time, send welcome for this onboarding.
+        isFirstLinkToThisFacility ||
+        // Backfill old missed sends: same facility link exists but no tracked enrollment welcome yet.
+        (isExistingLinkedToSameFacility && !hasPriorEnrollmentWelcome);
 
       if (shouldSendEnrollmentWelcome) {
         try {
