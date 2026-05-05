@@ -280,10 +280,33 @@ export class PatientService {
           });
       }
 
-      // Welcome + credentials: new login account OR first patient row for this phone (existing user
-      // without prior patient record used to skip WhatsApp entirely).
+      // Welcome + credentials:
+      // 1) New login account, or
+      // 2) First patient row for this phone, or
+      // 3) Existing row was unassigned and is now being formally attached to a facility (common after
+      //    WhatsApp auto-created shell records).
       const isFirstPatientRowForPhone = !existing;
-      const shouldSendEnrollmentWelcome = isNewUser || isFirstPatientRowForPhone;
+      const wasUnassignedToFacility = Boolean(
+        existing && !existing.primary_facility_id && !existing.facility_id
+      );
+      const isNowAssignedToFacility = Boolean(patientData.primary_facility_id || patientData.facility_id);
+
+      let hasPriorEnrollmentWelcome = false;
+      if (existing) {
+        const { data: taggedWelcomeRows } = await supabase
+          .from('whatsapp_messages')
+          .select('id')
+          .eq('direction', 'outbound')
+          .eq('phone', cleanPhone)
+          .contains('raw_payload', { outboundSource: 'enrollment_welcome' })
+          .limit(1);
+        hasPriorEnrollmentWelcome = (taggedWelcomeRows?.length || 0) > 0;
+      }
+
+      const shouldSendEnrollmentWelcome =
+        isNewUser ||
+        isFirstPatientRowForPhone ||
+        (wasUnassignedToFacility && isNowAssignedToFacility && !hasPriorEnrollmentWelcome);
 
       if (shouldSendEnrollmentWelcome) {
         try {
