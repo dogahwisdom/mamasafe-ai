@@ -3,6 +3,7 @@ import { TriageResult, RiskLevel } from "../types";
 
 class TriageAnalysisService {
   private client: TriageEngineClient | null;
+  private modelName: string;
 
   private triageSchema = {
     type: Type.OBJECT,
@@ -33,7 +34,12 @@ class TriageAnalysisService {
   };
 
   constructor() {
-    const apiKey = process.env.TRIAGE_ENGINE_API_KEY;
+    const apiKey =
+      (import.meta.env.VITE_TRIAGE_ENGINE_API_KEY as string) ||
+      (import.meta.env.VITE_GEMINI_API_KEY as string) ||
+      "";
+    this.modelName =
+      (import.meta.env.VITE_TRIAGE_MODEL as string) || "gemini-2.0-flash";
     this.client = apiKey ? new TriageEngineClient({ apiKey }) : null;
   }
 
@@ -88,7 +94,7 @@ class TriageAnalysisService {
     `;
 
       const response = await this.client.models.generateContent({
-        model: "triage-engine-fast",
+        model: this.modelName,
         contents: prompt,
         config: {
           responseMimeType: "application/json",
