@@ -47,6 +47,25 @@ async function logReminderWhatsApp(client, row) {
   }
 }
 
+function templateConfigFromEnv() {
+  const templateName = String(process.env.WHATSAPP_REMINDER_TEMPLATE_NAME || "").trim();
+  const templateLang = String(process.env.WHATSAPP_REMINDER_TEMPLATE_LANGUAGE || "en").trim() || "en";
+  const templateHasBodyVars =
+    String(process.env.WHATSAPP_REMINDER_TEMPLATE_HAS_BODY_VARS ?? "true").toLowerCase() !== "false";
+  const paramMode = String(process.env.WHATSAPP_REMINDER_TEMPLATE_BODY_PARAM_MODE || "message").trim();
+
+  return { templateName, templateLang, templateHasBodyVars, paramMode };
+}
+
+function buildTemplateParams(reminder, paramMode) {
+  if (!reminder) return [];
+  if (paramMode === "patient_name") return [String(reminder.patient_name || "").trim()];
+  if (paramMode === "type") return [String(reminder.type || "").trim()];
+  if (paramMode === "scheduled_for_iso") return [String(reminder.scheduled_for || "").trim()];
+  // Default: "message"
+  return [String(reminder.message || "").trim()];
+}
+
 async function processDueReminders() {
   const client = createSupabaseAdmin();
   if (!client) {
@@ -58,10 +77,12 @@ async function processDueReminders() {
     return { ok: false, reason: "whatsapp_not_configured", processed: 0 };
   }
 
+  const { templateName, templateLang, templateHasBodyVars, paramMode } = templateConfigFromEnv();
+
   const nowIso = new Date().toISOString();
   const { data: reminders, error } = await client
     .from("reminders")
-    .select("id, patient_id, phone, message, channel, scheduled_for")
+    .select("id, patient_id, phone, message, channel, scheduled_for, patient_name, type")
     .eq("sent", false)
     .lte("scheduled_for", nowIso)
     .order("scheduled_for", { ascending: true })
@@ -84,10 +105,22 @@ async function processDueReminders() {
     }
 
     try {
-      const reply = await cloud.sendTextMessage({
-        phone: reminder.phone,
-        body: reminder.message,
-      });
+      const usingTemplate = !!templateName;
+      const reply = usingTemplate
+        ? await cloud.sendTemplateMessage({
+            phone: reminder.phone,
+            templateName,
+            languageCode: templateLang,
+            bodyParameters: templateHasBodyVars
+              ? buildTemplateParams(reminder, paramMode)
+              : [],
+          })
+        : await cloud.sendTextMessage({
+            phone: reminder.phone,
+            body: reminder.message,
+          });
+
+      const messageType = usingTemplate ? "template" : "text";
 
       await client
         .from("reminders")
@@ -100,8 +133,10 @@ async function processDueReminders() {
         related_reminder_id: reminder.id,
         phone: reminder.phone,
         direction: "outbound",
-        message_type: "text",
-        body: reminder.message,
+        message_type: messageType,
+        body: usingTemplate
+          ? `[template:${templateName}|${templateLang}] ${reminder.message}`
+          : reminder.message,
         status: "sent",
         meta_message_id: reply.metaMessageId || null,
         raw_payload: {
@@ -118,11 +153,12 @@ async function processDueReminders() {
         related_reminder_id: reminder.id,
         phone: reminder.phone,
         direction: "outbound",
-        message_type: "text",
+        message_type: templateName ? "template" : "text",
         body: reminder.message,
         status: "failed",
         raw_payload: {
           outboundSource: "scheduled_reminder_dispatch",
+          template_name: templateName || null,
           error: errorMessage,
         },
         failed_at: new Date().toISOString(),
