@@ -52,18 +52,30 @@ function templateConfigFromEnv() {
   const templateLang = String(process.env.WHATSAPP_REMINDER_TEMPLATE_LANGUAGE || "en").trim() || "en";
   const templateHasBodyVars =
     String(process.env.WHATSAPP_REMINDER_TEMPLATE_HAS_BODY_VARS ?? "true").toLowerCase() !== "false";
-  const paramMode = String(process.env.WHATSAPP_REMINDER_TEMPLATE_BODY_PARAM_MODE || "message").trim();
+  const paramMode = String(
+    process.env.WHATSAPP_REMINDER_TEMPLATE_BODY_PARAM_MODE || "patient_and_message"
+  ).trim();
 
   return { templateName, templateLang, templateHasBodyVars, paramMode };
 }
 
 function buildTemplateParams(reminder, paramMode) {
   if (!reminder) return [];
+  if (paramMode === "patient_and_message") {
+    return [
+      String(reminder.patient_name || "").trim(),
+      String(reminder.message || "").trim(),
+    ];
+  }
   if (paramMode === "patient_name") return [String(reminder.patient_name || "").trim()];
   if (paramMode === "type") return [String(reminder.type || "").trim()];
   if (paramMode === "scheduled_for_iso") return [String(reminder.scheduled_for || "").trim()];
-  // Default: "message"
-  return [String(reminder.message || "").trim()];
+  // Legacy single-var reminder body only
+  if (paramMode === "message") return [String(reminder.message || "").trim()];
+  return [
+    String(reminder.patient_name || "").trim(),
+    String(reminder.message || "").trim(),
+  ];
 }
 
 async function processDueReminders() {

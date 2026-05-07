@@ -325,15 +325,25 @@ export class WhatsAppRepository {
     return Array.isArray(data) && data.length > 0;
   }
 
-  async logOutboundMessage({ patientId, phone, body, metaMessageId, rawPayload, relatedReminderId }) {
+  async logOutboundMessage({
+    patientId,
+    phone,
+    body,
+    metaMessageId,
+    rawPayload,
+    relatedReminderId,
+    messageType = "text",
+  }) {
     if (!this.client) return { ok: false, reason: "supabase_not_configured" };
     const canonicalPhone = WhatsAppPhoneNormalizer.canonicalFromAny(phone) || phone;
     const phoneVariants = WhatsAppPhoneNormalizer.variantsForQueries(canonicalPhone);
+    const allowedTypes = new Set(["text", "template", "status", "system"]);
+    const safeType = allowedTypes.has(messageType) ? messageType : "text";
     const { error } = await this.client.from("whatsapp_messages").insert({
       patient_id: patientId || null,
       phone: canonicalPhone,
       direction: "outbound",
-      message_type: "text",
+      message_type: safeType,
       body,
       status: "sent",
       meta_message_id: metaMessageId,

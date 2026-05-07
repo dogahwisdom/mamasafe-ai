@@ -16,6 +16,10 @@ interface WhatsAppSendContext {
   relatedReminderId?: string;
   /** Stored on `whatsapp_messages.raw_payload.outboundSource` for analytics / SQL filters. */
   logSource?: string;
+  /** Used by Netlify `whatsapp-send` when `WHATSAPP_WELCOME_TEMPLATE_*` env is set. */
+  enrollmentPatientFirstName?: string;
+  enrollmentPin?: string;
+  enrollmentPortalUrl?: string;
 }
 
 export type EnrollmentCredentialsOptions = {
@@ -90,6 +94,9 @@ Kama una swali lolote, pigia au tembelea kliniki yako.
       const ctx: WhatsAppSendContext = {
         patientId: options?.patientId,
         logSource: 'enrollment_welcome',
+        enrollmentPatientFirstName: firstName,
+        enrollmentPin: pin,
+        enrollmentPortalUrl: portalUrl,
       };
       results.whatsapp = await this.sendWhatsApp(phone, whatsappWelcomeBody, ctx);
     } catch (error) {
@@ -119,6 +126,9 @@ Kama una swali lolote, pigia au tembelea kliniki yako.
           patientId: context?.patientId,
           relatedReminderId: context?.relatedReminderId,
           logSource: context?.logSource,
+          enrollmentPatientFirstName: context?.enrollmentPatientFirstName,
+          enrollmentPin: context?.enrollmentPin,
+          enrollmentPortalUrl: context?.enrollmentPortalUrl,
         }),
       });
 
