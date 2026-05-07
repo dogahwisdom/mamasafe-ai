@@ -13,6 +13,17 @@ function json(statusCode, body) {
   };
 }
 
+/** Basic UUID v1–v5 shape; avoids injecting odd values into PostgREST `or=` filters. */
+function isFacilityScopeUuidLike(value) {
+  const s = typeof value === "string" ? value.trim() : "";
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s);
+}
+
+function facilityPatientEnrollmentOrPrimaryFilter(scopeId) {
+  const s = String(scopeId).trim();
+  return `facility_id.eq.${s},primary_facility_id.eq.${s}`;
+}
+
 function createSupabaseAdmin() {
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
   const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
@@ -125,7 +136,20 @@ async function processDueReminders(options = {}) {
       : null;
 
   if (scope && reminders.length) {
-    const { data: allowedPatients } = await client.from("patients").select("id").eq("facility_id", scope);
+    if (!isFacilityScopeUuidLike(scope)) {
+      return {
+        ok: false,
+        reason: "invalid_facility_scope",
+        scanned: 0,
+        sent: 0,
+        failed: 0,
+        skipped: 0,
+      };
+    }
+    const { data: allowedPatients } = await client
+      .from("patients")
+      .select("id")
+      .or(facilityPatientEnrollmentOrPrimaryFilter(scope));
     const allow = new Set((allowedPatients || []).map((p) => p.id));
     reminders = reminders.filter((r) => r.patient_id && allow.has(r.patient_id));
   }
@@ -269,7 +293,7 @@ export async function handler(event) {
       reminderIds: manualSelect ? manualReminderIds : null,
       facilityScopeId,
     });
-    const statusCode = result.ok ? 200 : 500;
+    const statusCode = result.ok ? 200 : result.reason === "invalid_facility_scope" ? 400 : 500;
     return json(statusCode, result);
   } finally {
     dispatchInProgress = false;

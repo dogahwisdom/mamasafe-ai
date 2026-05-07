@@ -15,6 +15,7 @@ import { FinancialReportsPanel } from '../components/reports/FinancialReportsPan
 import { PermissionsManager } from '../components/admin/PermissionsManager';
 import { ClinicTimestampFormatter } from '../services/formatClinicTimestamp';
 import { ReminderQueueModal } from '../components/dashboard/ReminderQueueModal';
+import { Permissions } from '../services/permissions';
 
 // Mock Data for Analytics
 const visitData = [
@@ -378,8 +379,11 @@ export const DashboardView: React.FC<DashboardProps> = ({ onNavigate, user }) =>
   const canManageReminderDispatch =
     user?.role === 'superadmin' || user?.role === 'clinic' || user?.role === 'pharmacy';
 
-  /** Superadmin modal lists system-wide reminders; clinic/pharmacy see only `patients.facility_id`. */
-  const reminderFacilityScopeId = user?.role === 'superadmin' ? null : user?.id ?? null;
+  /** Superadmin: global list. Clinic/pharmacy (and employed staff): facility root matches patients panel. */
+  const reminderFacilityScopeId =
+    user?.role === 'superadmin'
+      ? null
+      : Permissions.facilityOwnerUserId(user ?? null) ?? user?.id ?? null;
 
   const activeTasks = tasks.filter(t => !t.resolved);
 

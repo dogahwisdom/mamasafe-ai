@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { X, Send } from 'lucide-react';
+import { X, Send, RefreshCw } from 'lucide-react';
 import { backend } from '../../services/backend';
 import type { Reminder } from '../../types';
 
@@ -160,7 +160,19 @@ export const ReminderQueueModal: React.FC<Props> = ({
           >
             Recently delivered
           </button>
-          {loading && <span className="ml-auto self-center text-[11px] text-slate-400">Loading…</span>}
+          <div className="ml-auto flex items-center gap-2">
+            {loading ? <span className="text-[11px] text-slate-400">Loading…</span> : null}
+            <button
+              type="button"
+              disabled={loading || busy}
+              onClick={() => void load()}
+              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+              title="Reload due and sent lists"
+            >
+              <RefreshCw size={12} aria-hidden />
+              Refresh
+            </button>
+          </div>
         </div>
 
         <div className="min-h-0 flex-1 overflow-auto px-5 py-3">

@@ -1,4 +1,5 @@
 import { Reminder, Patient, Medication } from "../../types";
+import { Permissions } from "../permissions";
 import { KEYS, storage } from "./shared";
 import { supabase, isSupabaseConfigured } from "../supabaseClient";
 
@@ -97,7 +98,7 @@ export class ReminderService {
     return storage.get<Reminder[]>(KEYS.REMINDERS, []);
   }
 
-  /** Pending reminders (due, unsent), scoped by `patients.facility_id` when `facilityUserId` is set. */
+  /** Pending reminders (due, unsent), scoped by enrolling or primary facility when `facilityUserId` is set. */
   public async getPendingForFacility(facilityUserId: string | null): Promise<Reminder[]> {
     if (isSupabaseConfigured()) {
       const now = new Date().toISOString();
@@ -117,17 +118,19 @@ export class ReminderService {
         return (data || []).map((r: any) => mapReminderRow(r));
       }
 
+      const patientFilter =
+        Permissions.facilityPatientPrimaryOrEnrollmentFilter(facilityUserId);
       const { data: patientRows, error: pe } = await supabase
         .from('patients')
         .select('id')
-        .eq('facility_id', facilityUserId);
+        .or(patientFilter);
 
       if (pe) {
         console.error('Error fetching facility patients for reminders:', pe);
         return [];
       }
 
-      const pids = (patientRows || []).map((row: any) => row.id as string).filter(Boolean);
+      const pids = [...new Set((patientRows || []).map((row: any) => row.id as string).filter(Boolean))];
       if (!pids.length) {
         return [];
       }
@@ -154,7 +157,12 @@ export class ReminderService {
     }
     const patients = storage.get<Patient[]>(KEYS.PATIENTS, []);
     const allowed = new Set(
-      patients.filter((p) => p.facilityId === facilityUserId).map((p) => p.id)
+      patients
+        .filter(
+          (p) =>
+            p.facilityId === facilityUserId || p.primaryFacilityId === facilityUserId
+        )
+        .map((p) => p.id)
     );
     return pending.filter((r) => allowed.has(r.patientId));
   }
@@ -185,17 +193,19 @@ export class ReminderService {
         return (data || []).map((r: any) => mapReminderRow(r));
       }
 
+      const sentPatientFilter =
+        Permissions.facilityPatientPrimaryOrEnrollmentFilter(facilityUserId);
       const { data: patientRows, error: pe } = await supabase
         .from('patients')
         .select('id')
-        .eq('facility_id', facilityUserId);
+        .or(sentPatientFilter);
 
       if (pe || !(patientRows || []).length) {
         if (pe) console.error('Error fetching facility patients for sent reminders:', pe);
         return [];
       }
 
-      const pids = (patientRows || []).map((row: any) => row.id as string).filter(Boolean);
+      const pids = [...new Set((patientRows || []).map((row: any) => row.id as string).filter(Boolean))];
 
       const { data, error } = await supabase
         .from('reminders')
@@ -231,7 +241,12 @@ export class ReminderService {
 
     const patients = storage.get<Patient[]>(KEYS.PATIENTS, []);
     const allowed = new Set(
-      patients.filter((p) => p.facilityId === facilityUserId).map((p) => p.id)
+      patients
+        .filter(
+          (p) =>
+            p.facilityId === facilityUserId || p.primaryFacilityId === facilityUserId
+        )
+        .map((p) => p.id)
     );
     return sent.filter((r) => allowed.has(r.patientId));
   }

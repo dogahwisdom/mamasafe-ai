@@ -22,6 +22,14 @@ export class Permissions {
     return null;
   }
 
+  /**
+   * PostgREST `.or(...)` clause: patients enrolled at this facility (`facility_id`) or with it as preferred
+   * primary site (`primary_facility_id`). Scope id must already be sanitized (facility root user id UUID).
+   */
+  static facilityPatientPrimaryOrEnrollmentFilter(scopeFacilityUserId: string): string {
+    return `facility_id.eq.${scopeFacilityUserId},primary_facility_id.eq.${scopeFacilityUserId}`;
+  }
+
   /** Whether `manager` may load/update `target` in the Permissions UI (server still uses RLS). */
   static canManageStaffProfile(
     manager: UserProfile | null | undefined,

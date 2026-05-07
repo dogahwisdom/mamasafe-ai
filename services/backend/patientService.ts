@@ -1,4 +1,5 @@
 import { UserProfile, Patient, RiskLevel } from "../types";
+import { Permissions } from "../permissions";
 import {
   KEYS,
   normalizePhone,
@@ -25,9 +26,12 @@ export class PatientService {
         )
         .order('created_at', { ascending: false });
 
-      // If a clinic or pharmacy is logged in, only fetch their patients
+      // Clinic/pharmacy (including employed staff): same panel as enrolling or primary coordinating facility.
       if (currentUser && (currentUser.role === 'clinic' || currentUser.role === 'pharmacy')) {
-        query = query.eq('facility_id', currentUser.id);
+        const scopeId = Permissions.facilityOwnerUserId(currentUser);
+        if (scopeId) {
+          query = query.or(Permissions.facilityPatientPrimaryOrEnrollmentFilter(scopeId));
+        }
       }
 
       const { data, error } = await query;
