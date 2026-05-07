@@ -582,6 +582,11 @@ export const App: React.FC = () => {
             patients={patients}
             currentUser={currentUser}
             onNavigate={setCurrentView}
+            onPatientPartialUpdate={(patientId, updates) => {
+              setPatients((prev) =>
+                prev.map((p) => (p.id === patientId ? { ...p, ...updates } : p))
+              );
+            }}
             onDeletePatient={async (id: string) => {
               await backend.patients.delete(id);
               const updated = await backend.patients.getAll();

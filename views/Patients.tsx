@@ -10,11 +10,19 @@ interface PatientsViewProps {
   onNavigate: (view: string) => void;
   patients: Patient[];
   onDeletePatient?: (id: string) => Promise<void>;
+  /** Keep parent patient list in sync after inline edits (e.g. next visit). */
+  onPatientPartialUpdate?: (patientId: string, updates: Partial<Patient>) => void;
   /** Logged-in facility (clinic/pharmacy) - used for PDF letterhead */
   currentUser?: UserProfile | null;
 }
 
-export const PatientsView: React.FC<PatientsViewProps> = ({ onNavigate, patients, onDeletePatient, currentUser }) => {
+export const PatientsView: React.FC<PatientsViewProps> = ({
+  onNavigate,
+  patients,
+  onDeletePatient,
+  onPatientPartialUpdate,
+  currentUser,
+}) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState<'all' | 'high_risk'>('all');
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
@@ -153,7 +161,9 @@ export const PatientsView: React.FC<PatientsViewProps> = ({ onNavigate, patients
     setAppointmentSaveNotice('');
     try {
       await backend.workflow.updateNextAppointment(selectedPatient.id, normalizedDate);
-      setSelectedPatient(prev => (prev ? { ...prev, nextAppointment: normalizedDate || '' } : prev));
+      const nextVisit = normalizedDate ?? '';
+      setSelectedPatient(prev => (prev ? { ...prev, nextAppointment: nextVisit } : prev));
+      onPatientPartialUpdate?.(selectedPatient.id, { nextAppointment: nextVisit });
       setEditingNextAppointment(false);
       setAppointmentSaveNotice('Saved');
       window.setTimeout(() => setAppointmentSaveNotice(''), 1800);
