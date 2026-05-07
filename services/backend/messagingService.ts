@@ -51,17 +51,20 @@ export class MessagingService {
     }
     const firstName = patientName.split(' ')[0];
     const facility = options?.facilityName?.trim();
-    const facilityLine = facility ? ` Umepokelewa na ${facility}.` : '';
+    const facilityLineSms = facility ? ` Umepokelewa na ${facility}.` : '';
+    const whatsappFacilityLine = facility
+      ? `\n\nYou're being onboarded through ${facility}.`
+      : '';
 
     const credentialsBlock = `AKOUNTI YAKO\nNambari ya simu: ${phone}\nPIN: ${pin}\n\nFUNGUA: ${portalUrl}`;
 
-    const smsBody = `Karibu MamaSafe, ${firstName}!${facilityLine}
+    const smsBody = `Karibu MamaSafe, ${firstName}!${facilityLineSms}
 
 ${credentialsBlock}
 
 Huduma za mama na mtoto.`;
 
-    const whatsappWelcomeBody = `Karibu MamaSafe — ${firstName}!${facilityLine}
+    const whatsappWelcomeBody = `Karibu MamaSafe — ${firstName}!${whatsappFacilityLine}
 
 Thank you for registering with us. Our team supports you throughout your maternity journey.
 
