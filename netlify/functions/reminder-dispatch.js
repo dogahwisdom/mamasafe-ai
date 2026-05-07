@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { WhatsAppCloudService } from "./lib/whatsapp-cloud-service.js";
+import { authorizeReminderDispatch } from "./lib/reminder-dispatch-auth.js";
 
 const DISPATCH_COOLDOWN_MS = 60 * 1000;
 let dispatchInProgress = false;
@@ -22,6 +23,26 @@ function isFacilityScopeUuidLike(value) {
 function facilityPatientEnrollmentOrPrimaryFilter(scopeId) {
   const s = String(scopeId).trim();
   return `facility_id.eq.${s},primary_facility_id.eq.${s}`;
+}
+
+function dispatchMaxScan() {
+  const n = Number(process.env.REMINDER_DISPATCH_MAX_PER_RUN ?? "75");
+  if (!Number.isFinite(n) || n < 1) return 75;
+  return Math.min(150, Math.max(1, Math.floor(n)));
+}
+
+async function filterRemindersAgainstTestPatients(client, reminders, includeTestPatients) {
+  if (includeTestPatients || reminders.length === 0) return reminders;
+  const pids = [...new Set(reminders.map((r) => r.patient_id).filter(Boolean))];
+  if (!pids.length) return reminders;
+  const banned = new Set();
+  for (let i = 0; i < pids.length; i += 200) {
+    const chunk = pids.slice(i, i + 200);
+    const { data, error } = await client.from("patients").select("id").in("id", chunk).eq("is_test", true);
+    if (error) break;
+    (data || []).forEach((row) => banned.add(row.id));
+  }
+  return reminders.filter((r) => !r.patient_id || !banned.has(r.patient_id));
 }
 
 function createSupabaseAdmin() {
@@ -90,7 +111,7 @@ function buildTemplateParams(reminder, paramMode) {
 }
 
 async function processDueReminders(options = {}) {
-  const { reminderIds = null, facilityScopeId = null } = options;
+  const { reminderIds = null, facilityScopeId = null, includeTestPatients = false } = options;
 
   const client = createSupabaseAdmin();
   if (!client) {
@@ -104,6 +125,7 @@ async function processDueReminders(options = {}) {
 
   const { templateName, templateLang, templateHasBodyVars, paramMode } = templateConfigFromEnv();
 
+  const maxScan = dispatchMaxScan();
   const nowIso = new Date().toISOString();
   let qb = client
     .from("reminders")
@@ -113,12 +135,12 @@ async function processDueReminders(options = {}) {
     .order("scheduled_for", { ascending: true });
 
   const idList =
-    reminderIds instanceof Array ? reminderIds.filter((id) => typeof id === "string" && id.length > 8).slice(0, 100) : [];
+    reminderIds instanceof Array ? reminderIds.filter((id) => typeof id === "string" && id.length > 8).slice(0, maxScan) : [];
 
   if (idList.length) {
     qb = qb.in("id", idList);
   } else {
-    qb = qb.limit(100);
+    qb = qb.limit(maxScan);
   }
 
   const { data: rawReminders, error } = await qb;
@@ -146,13 +168,19 @@ async function processDueReminders(options = {}) {
         skipped: 0,
       };
     }
-    const { data: allowedPatients } = await client
+    let allowedQb = client
       .from("patients")
       .select("id")
       .or(facilityPatientEnrollmentOrPrimaryFilter(scope));
+    if (!includeTestPatients) {
+      allowedQb = allowedQb.eq("is_test", false);
+    }
+    const { data: allowedPatients } = await allowedQb;
     const allow = new Set((allowedPatients || []).map((p) => p.id));
     reminders = reminders.filter((r) => r.patient_id && allow.has(r.patient_id));
   }
+
+  reminders = await filterRemindersAgainstTestPatients(client, reminders, includeTestPatients);
 
   let sent = 0;
   let failed = 0;
@@ -235,9 +263,9 @@ export const config = {
   schedule: "*/15 * * * *",
 };
 
-function parseManualDispatchBody(eventBody) {
+function parseDispatchRequestBody(eventBody) {
   if (!eventBody || typeof eventBody !== "string") {
-    return { reminderIds: [], facilityScopeId: null };
+    return { reminderIds: [], facilityScopeId: null, includeTestPatientsRequest: false };
   }
   try {
     const parsed = JSON.parse(eventBody);
@@ -248,11 +276,12 @@ function parseManualDispatchBody(eventBody) {
         : null;
     const reminderIds =
       idsRaw instanceof Array
-        ? idsRaw.filter((id) => typeof id === "string" && id.length > 8).slice(0, 100)
+        ? idsRaw.filter((id) => typeof id === "string" && id.length > 8).slice(0, 150)
         : [];
-    return { reminderIds, facilityScopeId };
+    const includeTestPatientsRequest = parsed?.includeTestPatients === true;
+    return { reminderIds, facilityScopeId, includeTestPatientsRequest };
   } catch {
-    return { reminderIds: [], facilityScopeId: null };
+    return { reminderIds: [], facilityScopeId: null, includeTestPatientsRequest: false };
   }
 }
 
@@ -261,8 +290,26 @@ export async function handler(event) {
     return json(405, { error: "Method not allowed." });
   }
 
-  const { reminderIds: manualReminderIds, facilityScopeId } = parseManualDispatchBody(event?.body || "");
+  const auth = await authorizeReminderDispatch(event, createSupabaseAdmin);
+  if (!auth.ok) {
+    return json(401, {
+      ok: false,
+      reason: auth.reason || "unauthorized_reminder_dispatch",
+      error: "Reminder dispatch is not authorized for this caller.",
+      scanned: 0,
+      sent: 0,
+      failed: 0,
+      skipped: 0,
+    });
+  }
+
+  const { reminderIds: manualReminderIds, facilityScopeId, includeTestPatientsRequest } = parseDispatchRequestBody(
+    event?.body || ""
+  );
   const manualSelect = manualReminderIds.length > 0;
+
+  /** Only authenticated superadmins may include QA/test patients (server-enforced). */
+  const includeTestPatients = auth.role === "superadmin" && includeTestPatientsRequest === true;
 
   const now = Date.now();
 
@@ -292,8 +339,13 @@ export async function handler(event) {
     const result = await processDueReminders({
       reminderIds: manualSelect ? manualReminderIds : null,
       facilityScopeId,
+      includeTestPatients,
     });
-    const statusCode = result.ok ? 200 : result.reason === "invalid_facility_scope" ? 400 : 500;
+    let statusCode = 200;
+    if (!result.ok) {
+      if (result.reason === "invalid_facility_scope") statusCode = 400;
+      else statusCode = 500;
+    }
     return json(statusCode, result);
   } finally {
     dispatchInProgress = false;

@@ -10,6 +10,8 @@ type Props = {
   facilityScopeId: string | null;
   /** When true, show a control to run the unscoped batch (first 100 due system-wide). */
   showGlobalDispatch?: boolean;
+  /** Superadmin QA: list and optionally send reminders tied to patients with `is_test`. */
+  showIncludeTestToggle?: boolean;
   onAmbientMessage?: (message: string) => void;
 };
 
@@ -26,11 +28,14 @@ function formatWhen(iso: string): string {
   }
 }
 
+const CLIENT_DISPATCH_ID_CAP = 75;
+
 export const ReminderQueueModal: React.FC<Props> = ({
   open,
   onClose,
   facilityScopeId,
   showGlobalDispatch = false,
+  showIncludeTestToggle = false,
   onAmbientMessage,
 }) => {
   const [tab, setTab] = useState<'due' | 'sent'>('due');
@@ -40,14 +45,17 @@ export const ReminderQueueModal: React.FC<Props> = ({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [statusLine, setStatusLine] = useState('');
+  const [includeTestPatients, setIncludeTestPatients] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     setStatusLine('');
+    const listOpts =
+      showIncludeTestToggle === true ? { includeTestPatients } : { includeTestPatients: false };
     try {
       const [due, sent] = await Promise.all([
-        backend.reminders.getPendingForFacility(facilityScopeId),
-        backend.reminders.getRecentlySentForFacility(facilityScopeId, 72, 50),
+        backend.reminders.getPendingForFacility(facilityScopeId, listOpts),
+        backend.reminders.getRecentlySentForFacility(facilityScopeId, 72, 50, listOpts),
       ]);
       setDueRows(due);
       setRecentSent(sent);
@@ -57,7 +65,7 @@ export const ReminderQueueModal: React.FC<Props> = ({
     } finally {
       setLoading(false);
     }
-  }, [facilityScopeId]);
+  }, [facilityScopeId, includeTestPatients, showIncludeTestToggle]);
 
   useEffect(() => {
     if (!open) return;
@@ -83,8 +91,9 @@ export const ReminderQueueModal: React.FC<Props> = ({
     setStatusLine(`${label}…`);
     try {
       const result = await backend.reminders.dispatchDueReminders({
-        reminderIds: ids,
+        reminderIds: ids.slice(0, CLIENT_DISPATCH_ID_CAP),
         facilityScopeId: facilityScopeId ?? undefined,
+        includeTestPatients: showIncludeTestToggle && includeTestPatients,
       });
       if (result.ok) {
         const msg = `Sent ${result.sent ?? 0}, failed ${result.failed ?? 0}, skipped ${result.skipped ?? 0}.`;
@@ -160,6 +169,19 @@ export const ReminderQueueModal: React.FC<Props> = ({
           >
             Recently delivered
           </button>
+          {showIncludeTestToggle ? (
+            <label className="flex shrink-0 items-center gap-1.5 px-2 text-[11px] text-slate-600 dark:text-slate-400">
+              <input
+                type="checkbox"
+                checked={includeTestPatients}
+                onChange={(e) => {
+                  setIncludeTestPatients(e.target.checked);
+                }}
+                className="rounded border-slate-300 dark:border-slate-600"
+              />
+              QA patients (is_test)
+            </label>
+          ) : null}
           <div className="ml-auto flex items-center gap-2">
             {loading ? <span className="text-[11px] text-slate-400">Loading…</span> : null}
             <button
@@ -286,10 +308,9 @@ export const ReminderQueueModal: React.FC<Props> = ({
               <button
                 type="button"
                 disabled={busy}
-                onClick={() => runDispatch(
-                  dueRows.map((r) => r.id).slice(0, 100),
-                  'Sending all listed due reminders',
-                )}
+                onClick={() =>
+                  runDispatch(dueRows.map((r) => r.id).slice(0, CLIENT_DISPATCH_ID_CAP), 'Sending all listed due reminders')
+                }
                 className="rounded-lg bg-teal-700 px-3 py-2 text-xs font-semibold text-white hover:bg-teal-800 disabled:opacity-50"
               >
                 Send all due listed
@@ -304,7 +325,10 @@ export const ReminderQueueModal: React.FC<Props> = ({
                 setBusy(true);
                 setStatusLine('System batch…');
                 try {
-                  const result = await backend.reminders.dispatchDueReminders({});
+                  const result = await backend.reminders.dispatchDueReminders({
+                    includeTestPatients:
+                      showIncludeTestToggle === true ? includeTestPatients : false,
+                  });
                   const msg = result.ok
                     ? `System batch: sent ${result.sent ?? 0}, failed ${result.failed ?? 0}, skipped ${result.skipped ?? 0}.`
                     : result.error || result.reason || 'Failed.';

@@ -15,7 +15,15 @@
 # Environment variables (set these in Netlify dashboard)
 # VITE_SUPABASE_URL
 # VITE_SUPABASE_ANON_KEY
+# SUPABASE_SERVICE_ROLE_KEY
+# SUPABASE_ANON_KEY   (recommended mirror of VITE key for JWT checks in reminder-dispatch)
 # TRIAGE_ENGINE_API_KEY
+#
+# reminder-dispatch (recommended for production):
+# REMINDER_DISPATCH_ENFORCE_AUTH=true
+# SUPABASE_ANON_KEY (or reuse VITE_SUPABASE_ANON_KEY) — validate logged-in callers
+# REMINDER_DISPATCH_SECRET optional — Bearer token shared with trusted cron/external jobs
+# REMINDER_DISPATCH_MAX_PER_RUN=75 optional — cap outbound batch per invocation
 
 # Headers for security
 [[headers]]

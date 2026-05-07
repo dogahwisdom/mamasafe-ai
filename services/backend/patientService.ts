@@ -1,5 +1,6 @@
 import { UserProfile, Patient, RiskLevel } from "../types";
 import { Permissions } from "../permissions";
+import { TestPatientVisibility } from "../testPatientVisibility";
 import {
   KEYS,
   normalizePhone,
@@ -10,11 +11,15 @@ import { supabase, isSupabaseConfigured } from "../supabaseClient";
 import { MessagingService } from "./messagingService";
 
 export class PatientService {
-  public async getAll(): Promise<Patient[]> {
+  public async getAll(options?: { includeTestPatients?: boolean }): Promise<Patient[]> {
     // Use Supabase if configured
     if (isSupabaseConfigured()) {
       // Determine current facility (clinic / pharmacy) from local session
       const currentUser = storage.get<UserProfile | null>(KEYS.CURRENT_USER, null);
+      const includeTest = TestPatientVisibility.includeTestInListApi(
+        currentUser,
+        options?.includeTestPatients === true
+      );
 
       let query = supabase
         .from('patients')
@@ -32,6 +37,10 @@ export class PatientService {
         if (scopeId) {
           query = query.or(Permissions.facilityPatientPrimaryOrEnrollmentFilter(scopeId));
         }
+      }
+
+      if (!includeTest) {
+        query = query.eq('is_test', false);
       }
 
       const { data, error } = await query;
@@ -80,7 +89,18 @@ export class PatientService {
     }
 
     // Fallback to localStorage
-    return storage.get<Patient[]>(KEYS.PATIENTS, []);
+    const currentUser = storage.get<UserProfile | null>(KEYS.CURRENT_USER, null);
+    const includeTest = TestPatientVisibility.includeTestInListApi(
+      currentUser,
+      options?.includeTestPatients === true
+    );
+    const stored = storage.get<Patient[]>(KEYS.PATIENTS, []);
+    if (includeTest) return stored;
+    return stored.filter(
+      (p) =>
+        !(p.isTest === true) &&
+        !TestPatientVisibility.nameLooksLikeTestData(p.name)
+    );
   }
 
   /**

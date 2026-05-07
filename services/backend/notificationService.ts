@@ -195,7 +195,7 @@ export class NotificationService {
       });
 
       // Pending reminders count
-      const reminders = await reminderService.getPending();
+      const reminders = await reminderService.getPending({ excludeTestPatients: true });
       if (reminders.length > 0) {
         notifications.push({
           id: 'pending_reminders',

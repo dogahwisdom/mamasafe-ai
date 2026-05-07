@@ -437,6 +437,7 @@ export const DashboardView: React.FC<DashboardProps> = ({ onNavigate, user }) =>
             onClose={() => setReminderQueueOpen(false)}
             facilityScopeId={reminderFacilityScopeId}
             showGlobalDispatch={user?.role === 'superadmin'}
+            showIncludeTestToggle={user?.role === 'superadmin'}
             onAmbientMessage={setReminderDispatchMessage}
           />
         </>
