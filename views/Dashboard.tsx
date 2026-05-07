@@ -14,6 +14,7 @@ import {
 import { FinancialReportsPanel } from '../components/reports/FinancialReportsPanel';
 import { PermissionsManager } from '../components/admin/PermissionsManager';
 import { ClinicTimestampFormatter } from '../services/formatClinicTimestamp';
+import { ReminderQueueModal } from '../components/dashboard/ReminderQueueModal';
 
 // Mock Data for Analytics
 const visitData = [
@@ -46,11 +47,8 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export const DashboardView: React.FC<DashboardProps> = ({ onNavigate, user }) => {
-  const DISPATCH_BUTTON_COOLDOWN_MS = 60 * 1000;
   const [showTestActionItems, setShowTestActionItems] = useState(false);
-  const [timeNowMs, setTimeNowMs] = useState<number>(Date.now());
-  const [dispatchingReminders, setDispatchingReminders] = useState(false);
-  const [lastReminderDispatchAt, setLastReminderDispatchAt] = useState<number | null>(null);
+  const [reminderQueueOpen, setReminderQueueOpen] = useState(false);
   const [reminderDispatchMessage, setReminderDispatchMessage] = useState<string>('');
   const [tasks, setTasks] = useState<Task[]>([]);
   const [earlyEnrollmentRate, setEarlyEnrollmentRate] = useState<number | null>(null);
@@ -82,11 +80,6 @@ export const DashboardView: React.FC<DashboardProps> = ({ onNavigate, user }) =>
     year: { totalKes: 0, byMethod: {} as Record<string, number> },
   });
   
-  useEffect(() => {
-    const tick = window.setInterval(() => setTimeNowMs(Date.now()), 1000);
-    return () => window.clearInterval(tick);
-  }, []);
-
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -382,39 +375,11 @@ export const DashboardView: React.FC<DashboardProps> = ({ onNavigate, user }) =>
     await backend.clinic.resolveTask(id);
   };
 
-  const dispatchCooldownRemainingMs = lastReminderDispatchAt
-    ? Math.max(0, DISPATCH_BUTTON_COOLDOWN_MS - (timeNowMs - lastReminderDispatchAt))
-    : 0;
-  const reminderDispatchButtonDisabled = dispatchingReminders || dispatchCooldownRemainingMs > 0;
-  const dispatchCooldownSeconds = Math.ceil(dispatchCooldownRemainingMs / 1000);
   const canManageReminderDispatch =
     user?.role === 'superadmin' || user?.role === 'clinic' || user?.role === 'pharmacy';
 
-  const handleReminderDispatch = async () => {
-    if (reminderDispatchButtonDisabled) return;
-    setDispatchingReminders(true);
-    setReminderDispatchMessage('Dispatch running...');
-    try {
-      const result = await backend.reminders.dispatchDueReminders();
-      setLastReminderDispatchAt(Date.now());
-      if (result.ok) {
-        setReminderDispatchMessage(
-          `Sent ${result.sent ?? 0}, failed ${result.failed ?? 0}, skipped ${result.skipped ?? 0}.`
-        );
-      } else if (result.reason === 'dispatch_in_progress' || result.reason === 'dispatch_cooldown') {
-        setReminderDispatchMessage('A recent dispatch is still active. Please wait a minute.');
-      } else {
-        setReminderDispatchMessage(result.error || 'Dispatch failed. Please retry in one minute.');
-      }
-    } catch (error) {
-      setLastReminderDispatchAt(Date.now());
-      setReminderDispatchMessage(
-        error instanceof Error ? error.message : 'Dispatch failed. Please retry in one minute.'
-      );
-    } finally {
-      setDispatchingReminders(false);
-    }
-  };
+  /** Superadmin modal lists system-wide reminders; clinic/pharmacy see only `patients.facility_id`. */
+  const reminderFacilityScopeId = user?.role === 'superadmin' ? null : user?.id ?? null;
 
   const activeTasks = tasks.filter(t => !t.resolved);
 
@@ -445,26 +410,32 @@ export const DashboardView: React.FC<DashboardProps> = ({ onNavigate, user }) =>
         </div>
       </div>
       {canManageReminderDispatch && (
-        <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200/70 dark:border-slate-700 bg-slate-50/80 dark:bg-[#2c2c2e] px-4 py-3">
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-slate-900 dark:text-white">Reminder Dispatch Control</p>
-            <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
-              {reminderDispatchMessage || 'Runs automatically every 15 minutes. Use only for urgent retries.'}
-            </p>
+        <>
+          <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200/70 dark:border-slate-700 bg-slate-50/80 dark:bg-[#2c2c2e] px-4 py-3">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-slate-900 dark:text-white">Reminder Dispatch Control</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                {reminderDispatchMessage ||
+                  'Runs automatically every 15 minutes. Open the queue to see who is due and send manually if needed.'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setReminderQueueOpen(true)}
+              className="shrink-0 rounded-lg bg-brand-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-brand-700"
+              title="Review due reminders for your clinic and send to selected recipients"
+            >
+              Send Due Reminders
+            </button>
           </div>
-          <button
-            onClick={handleReminderDispatch}
-            disabled={reminderDispatchButtonDisabled}
-            className="shrink-0 rounded-lg bg-brand-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60"
-            title="Dispatch due reminders now"
-          >
-            {dispatchingReminders
-              ? 'Dispatching...'
-              : dispatchCooldownRemainingMs > 0
-                ? `Wait ${dispatchCooldownSeconds}s`
-                : 'Send Due Reminders'}
-          </button>
-        </div>
+          <ReminderQueueModal
+            open={reminderQueueOpen}
+            onClose={() => setReminderQueueOpen(false)}
+            facilityScopeId={reminderFacilityScopeId}
+            showGlobalDispatch={user?.role === 'superadmin'}
+            onAmbientMessage={setReminderDispatchMessage}
+          />
+        </>
       )}
 
       {/* KPI Cards - Aligned with Requirements */}

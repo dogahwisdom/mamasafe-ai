@@ -78,7 +78,9 @@ function buildTemplateParams(reminder, paramMode) {
   ];
 }
 
-async function processDueReminders() {
+async function processDueReminders(options = {}) {
+  const { reminderIds = null, facilityScopeId = null } = options;
+
   const client = createSupabaseAdmin();
   if (!client) {
     return { ok: false, reason: "supabase_not_configured", processed: 0 };
@@ -92,17 +94,40 @@ async function processDueReminders() {
   const { templateName, templateLang, templateHasBodyVars, paramMode } = templateConfigFromEnv();
 
   const nowIso = new Date().toISOString();
-  const { data: reminders, error } = await client
+  let qb = client
     .from("reminders")
     .select("id, patient_id, phone, message, channel, scheduled_for, patient_name, type")
     .eq("sent", false)
     .lte("scheduled_for", nowIso)
-    .order("scheduled_for", { ascending: true })
-    .limit(100);
+    .order("scheduled_for", { ascending: true });
+
+  const idList =
+    reminderIds instanceof Array ? reminderIds.filter((id) => typeof id === "string" && id.length > 8).slice(0, 100) : [];
+
+  if (idList.length) {
+    qb = qb.in("id", idList);
+  } else {
+    qb = qb.limit(100);
+  }
+
+  const { data: rawReminders, error } = await qb;
 
   if (error) {
     console.error("Failed to fetch due reminders:", error.message);
     return { ok: false, reason: error.message, processed: 0 };
+  }
+
+  let reminders = rawReminders || [];
+
+  const scope =
+    typeof facilityScopeId === "string" && facilityScopeId.trim()
+      ? facilityScopeId.trim()
+      : null;
+
+  if (scope && reminders.length) {
+    const { data: allowedPatients } = await client.from("patients").select("id").eq("facility_id", scope);
+    const allow = new Set((allowedPatients || []).map((p) => p.id));
+    reminders = reminders.filter((r) => r.patient_id && allow.has(r.patient_id));
   }
 
   let sent = 0;
@@ -186,12 +211,37 @@ export const config = {
   schedule: "*/15 * * * *",
 };
 
+function parseManualDispatchBody(eventBody) {
+  if (!eventBody || typeof eventBody !== "string") {
+    return { reminderIds: [], facilityScopeId: null };
+  }
+  try {
+    const parsed = JSON.parse(eventBody);
+    const idsRaw = parsed?.reminderIds;
+    const facilityScopeId =
+      typeof parsed?.facilityScopeId === "string" && parsed.facilityScopeId.trim().length > 0
+        ? parsed.facilityScopeId.trim()
+        : null;
+    const reminderIds =
+      idsRaw instanceof Array
+        ? idsRaw.filter((id) => typeof id === "string" && id.length > 8).slice(0, 100)
+        : [];
+    return { reminderIds, facilityScopeId };
+  } catch {
+    return { reminderIds: [], facilityScopeId: null };
+  }
+}
+
 export async function handler(event) {
   if (event.httpMethod && event.httpMethod !== "POST" && event.httpMethod !== "GET") {
     return json(405, { error: "Method not allowed." });
   }
 
+  const { reminderIds: manualReminderIds, facilityScopeId } = parseManualDispatchBody(event?.body || "");
+  const manualSelect = manualReminderIds.length > 0;
+
   const now = Date.now();
+
   if (dispatchInProgress) {
     return json(429, {
       ok: false,
@@ -199,18 +249,26 @@ export async function handler(event) {
       error: "Reminder dispatch is already running. Please wait for completion.",
     });
   }
-  if (now - lastDispatchStartedAt < DISPATCH_COOLDOWN_MS) {
-    return json(429, {
-      ok: false,
-      reason: "dispatch_cooldown",
-      error: "Reminder dispatch was run recently. Please wait one minute before retrying.",
-    });
+
+  if (!manualSelect) {
+    if (now - lastDispatchStartedAt < DISPATCH_COOLDOWN_MS) {
+      return json(429, {
+        ok: false,
+        reason: "dispatch_cooldown",
+        error: "Reminder dispatch was run recently. Please wait one minute before retrying.",
+      });
+    }
   }
 
   dispatchInProgress = true;
-  lastDispatchStartedAt = now;
+  if (!manualSelect) {
+    lastDispatchStartedAt = now;
+  }
   try {
-    const result = await processDueReminders();
+    const result = await processDueReminders({
+      reminderIds: manualSelect ? manualReminderIds : null,
+      facilityScopeId,
+    });
     const statusCode = result.ok ? 200 : 500;
     return json(statusCode, result);
   } finally {
