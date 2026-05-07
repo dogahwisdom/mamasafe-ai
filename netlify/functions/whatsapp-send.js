@@ -29,18 +29,23 @@ export async function handler(event) {
     const welcomeTemplate = String(process.env.WHATSAPP_WELCOME_TEMPLATE_NAME || "").trim();
     const welcomeLang =
       String(process.env.WHATSAPP_WELCOME_TEMPLATE_LANGUAGE || "en").trim() || "en";
+    /** @type {"first_name_only"|"first_name_facility"} */
+    const welcomeParamModeRaw = (
+      process.env.WHATSAPP_WELCOME_TEMPLATE_BODY_PARAM_MODE || "first_name_only"
+    ).trim();
+    const welcomeParamMode =
+      welcomeParamModeRaw === "first_name_facility"
+        ? "first_name_facility"
+        : "first_name_only";
 
     const logSource = String(payload.logSource || "").trim();
     const enrollmentFirst = String(payload.enrollmentPatientFirstName ?? "").trim();
-    const enrollmentPin = String(payload.enrollmentPin ?? "").trim();
-    const enrollmentPortal = String(payload.enrollmentPortalUrl ?? "").trim();
+    const enrollmentFacility = String(payload.enrollmentFacilityName ?? "").trim();
 
     const useWelcomeTemplate =
       !!welcomeTemplate &&
       logSource === "enrollment_welcome" &&
-      enrollmentFirst.length > 0 &&
-      enrollmentPin.length > 0 &&
-      enrollmentPortal.length > 0;
+      enrollmentFirst.length > 0;
 
     const patient =
       payload.patientId || !repo.isEnabled() ? null : await repo.findPatientByPhone(phone);
@@ -51,11 +56,15 @@ export async function handler(event) {
     let bodyForLog = body;
 
     if (useWelcomeTemplate) {
+      const bodyParameters =
+        welcomeParamMode === "first_name_facility"
+          ? [enrollmentFirst, enrollmentFacility || "Your care facility"]
+          : [enrollmentFirst];
       sendResult = await cloud.sendTemplateMessage({
         phone,
         templateName: welcomeTemplate,
         languageCode: welcomeLang,
-        bodyParameters: [enrollmentFirst, enrollmentPin, enrollmentPortal],
+        bodyParameters,
       });
       outboundMessageType = "template";
       bodyForLog = `[template:${welcomeTemplate}|${welcomeLang}] ${body}`;

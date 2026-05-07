@@ -4,7 +4,7 @@ interface EnrollmentSuccessScreenProps {
   firstName: string;
   lastName: string;
   phone: string;
-  /** Patient agreed to WhatsApp alerts — welcome + login details are sent there. */
+  /** Patient agreed to WhatsApp alerts — a short welcome is sent there; login details remain on SMS where configured. */
   whatsappOptIn?: boolean;
   onEnrollAnother: () => void;
 }
@@ -41,9 +41,9 @@ export const EnrollmentSuccessScreen: React.FC<EnrollmentSuccessScreenProps> = (
           <p className="text-sm text-blue-700 dark:text-blue-400 leading-snug">
             {whatsappOptIn ? (
               <>
-                A <strong>welcome message on WhatsApp</strong> plus login PIN and portal link were sent to{' '}
-                <strong>{phone}</strong>. An SMS backup with the same credentials was also sent where
-                SMS is configured.
+                A <strong>professional welcome message on WhatsApp</strong> was sent to{' '}
+                <strong>{phone}</strong>. An SMS was also sent where SMS is configured with login PIN and
+                app link.
               </>
             ) : (
               <>

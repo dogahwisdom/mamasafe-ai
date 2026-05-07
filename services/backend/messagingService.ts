@@ -18,8 +18,8 @@ interface WhatsAppSendContext {
   logSource?: string;
   /** Used by Netlify `whatsapp-send` when `WHATSAPP_WELCOME_TEMPLATE_*` env is set. */
   enrollmentPatientFirstName?: string;
-  enrollmentPin?: string;
-  enrollmentPortalUrl?: string;
+  /** Optional second template variable when env `WHATSAPP_WELCOME_TEMPLATE_BODY_PARAM_MODE=first_name_facility`. */
+  enrollmentFacilityName?: string;
 }
 
 export type EnrollmentCredentialsOptions = {
@@ -34,7 +34,7 @@ export class MessagingService {
   private readonly WHATSAPP_FUNCTION_URL = '/.netlify/functions/whatsapp-send';
 
   /**
-   * SMS: credentials (always attempted). WhatsApp: welcome + credentials when `whatsappOptIn` is not false.
+   * SMS: enrolment credentials (PIN + portal) when SMS is configured. WhatsApp: short professional welcome only (no secrets in-chat).
    */
   public async sendEnrollmentCredentials(
     phone: string,
@@ -63,11 +63,9 @@ Huduma za mama na mtoto.`;
 
     const whatsappWelcomeBody = `Karibu MamaSafe — ${firstName}!${facilityLine}
 
-Tumerekodi usajili wako. Huu ni ujumbe wa kuakaribisha; utaweza kupokea vivyo hivyo makumbusho ya huduma kutoka kwenye kliniki yako ikiwa umekubali kwenye fomu.
+Thank you for registering with us. Our team supports you throughout your maternity journey.
 
-${credentialsBlock}
-
-Kama una swali lolote, pigia au tembelea kliniki yako.
+Reply to this chat if you'd like guided information, or speak with your care team for urgent concerns.
 
 — MamaSafe`;
 
@@ -95,8 +93,7 @@ Kama una swali lolote, pigia au tembelea kliniki yako.
         patientId: options?.patientId,
         logSource: 'enrollment_welcome',
         enrollmentPatientFirstName: firstName,
-        enrollmentPin: pin,
-        enrollmentPortalUrl: portalUrl,
+        enrollmentFacilityName: facility || undefined,
       };
       results.whatsapp = await this.sendWhatsApp(phone, whatsappWelcomeBody, ctx);
     } catch (error) {
@@ -127,8 +124,7 @@ Kama una swali lolote, pigia au tembelea kliniki yako.
           relatedReminderId: context?.relatedReminderId,
           logSource: context?.logSource,
           enrollmentPatientFirstName: context?.enrollmentPatientFirstName,
-          enrollmentPin: context?.enrollmentPin,
-          enrollmentPortalUrl: context?.enrollmentPortalUrl,
+          enrollmentFacilityName: context?.enrollmentFacilityName,
         }),
       });
 
