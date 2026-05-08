@@ -36,7 +36,9 @@ export async function authorizeReminderDispatch(event, createSupabaseAdmin) {
     if (fromJwt.ok) return fromJwt;
   }
 
-  if (isLikelyNetlifyScheduledInvocation(event)) {
+  // When auth is enforced, do NOT trust schedule heuristics (headers/UA are spoofable).
+  // Use `REMINDER_DISPATCH_SECRET` via the cron proxy function instead.
+  if (!enforce && isLikelyNetlifyScheduledInvocation(event)) {
     return { ok: true, kind: "schedule", role: null };
   }
 

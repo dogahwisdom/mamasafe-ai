@@ -52,6 +52,23 @@ function createSupabaseAdmin() {
   return createClient(url, serviceRole, { auth: { persistSession: false } });
 }
 
+async function logSystemEvent(client, eventType, facilityId, meta) {
+  if (!client) return;
+  try {
+    const payload = {
+      event_type: String(eventType || "unknown"),
+      facility_id: facilityId || null,
+      meta: meta && typeof meta === "object" ? meta : {},
+    };
+    const { error } = await client.from("system_events").insert(payload);
+    if (error) {
+      console.warn("system_events insert failed:", error.message);
+    }
+  } catch (e) {
+    console.warn("system_events insert threw:", e instanceof Error ? e.message : String(e));
+  }
+}
+
 async function getPreferredChannel(client, patientId) {
   if (!patientId) return "both";
   const { data, error } = await client
@@ -259,10 +276,6 @@ async function processDueReminders(options = {}) {
   return { ok: true, scanned: (reminders || []).length, sent, failed, skipped };
 }
 
-export const config = {
-  schedule: "*/15 * * * *",
-};
-
 function parseDispatchRequestBody(eventBody) {
   if (!eventBody || typeof eventBody !== "string") {
     return { reminderIds: [], facilityScopeId: null, includeTestPatientsRequest: false };
@@ -292,6 +305,10 @@ export async function handler(event) {
 
   const auth = await authorizeReminderDispatch(event, createSupabaseAdmin);
   if (!auth.ok) {
+    const admin = createSupabaseAdmin();
+    await logSystemEvent(admin, "reminder_dispatch_unauthorized", null, {
+      reason: auth.reason || "unauthorized",
+    });
     return json(401, {
       ok: false,
       reason: auth.reason || "unauthorized_reminder_dispatch",
@@ -341,6 +358,24 @@ export async function handler(event) {
       facilityScopeId,
       includeTestPatients,
     });
+    const admin = createSupabaseAdmin();
+    await logSystemEvent(
+      admin,
+      result.ok ? "reminder_dispatch_run" : "reminder_dispatch_error",
+      facilityScopeId || null,
+      {
+        ok: !!result.ok,
+        reason: result.reason || null,
+        scanned: result.scanned ?? null,
+        sent: result.sent ?? null,
+        failed: result.failed ?? null,
+        skipped: result.skipped ?? null,
+        manualSelect,
+        includeTestPatients,
+        authKind: auth.kind || null,
+        authRole: auth.role || null,
+      }
+    );
     let statusCode = 200;
     if (!result.ok) {
       if (result.reason === "invalid_facility_scope") statusCode = 400;
