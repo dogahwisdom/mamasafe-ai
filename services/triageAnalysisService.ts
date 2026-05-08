@@ -58,10 +58,11 @@ class TriageAnalysisService {
             resolve({
               riskLevel: RiskLevel.MEDIUM,
               reasoning:
-                "Demo Mode: Secure triage engine key missing. Simulating analysis. Please add your triage engine key to environment variables.",
-              recommendedAction: "Check system configuration.",
+                "Automated triage is temporarily unavailable. This assessment is provided using a safety-first fallback and should be confirmed by a clinician.",
+              recommendedAction:
+                "Use clinical judgment and standard maternal danger-sign screening; escalate if symptoms suggest pre-eclampsia, bleeding, fever, severe abdominal pain, reduced fetal movement, or seizures.",
               draftResponse:
-                "System notification: The automated assessment system is currently unavailable. Please contact your healthcare provider or visit the clinic if you are experiencing symptoms.",
+                "Please visit your healthcare provider or clinic for assessment. If symptoms worsen or you have severe headache with blurred vision, bleeding, fever, severe pain, reduced fetal movement, or seizures, seek urgent care immediately.",
             }),
           1000
         )
