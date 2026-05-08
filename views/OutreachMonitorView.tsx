@@ -62,6 +62,8 @@ export const OutreachMonitorView: React.FC<OutreachMonitorViewProps> = ({ user, 
   );
 
   const displayTimeZone = useMemo(() => {
+    const facilityTz = user.facilityData?.timeZone;
+    if (facilityTz && String(facilityTz).trim()) return String(facilityTz).trim();
     const cc = String(user.countryCode || "").toUpperCase();
     if (cc === "KE" || cc === "UG" || cc === "TZ" || cc === "RW") return "Africa/Nairobi";
     if (cc === "ET") return "Africa/Addis_Ababa";
@@ -69,7 +71,7 @@ export const OutreachMonitorView: React.FC<OutreachMonitorViewProps> = ({ user, 
     if (cc === "NG") return "Africa/Lagos";
     if (cc === "ZA") return "Africa/Johannesburg";
     return undefined;
-  }, [user.countryCode]);
+  }, [user.countryCode, user.facilityData?.timeZone]);
 
   const load = useCallback(async () => {
     setLoading(true);

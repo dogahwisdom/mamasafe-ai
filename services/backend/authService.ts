@@ -16,6 +16,16 @@ import { supabase, isSupabaseConfigured } from "../supabaseClient";
 import { MessagingService } from "./messagingService";
 
 export class AuthService {
+  private defaultTimeZoneForCountry(countryCode: string | null | undefined): string | undefined {
+    const cc = String(countryCode || "").toUpperCase();
+    if (cc === "KE" || cc === "UG" || cc === "TZ" || cc === "RW") return "Africa/Nairobi";
+    if (cc === "ET") return "Africa/Addis_Ababa";
+    if (cc === "GH") return "Africa/Accra";
+    if (cc === "NG") return "Africa/Lagos";
+    if (cc === "ZA") return "Africa/Johannesburg";
+    return undefined;
+  }
+
   private normalizeEmail(email: string | null | undefined): string | null {
     if (!email) return null;
     const e = email.trim().toLowerCase();
@@ -43,18 +53,20 @@ export class AuthService {
     role: UserRole,
     managerName: string,
     existing?: UserProfile["facilityData"],
-    employerFacilityId?: string | null
+    employerFacilityId?: string | null,
+    countryCode?: string | null
   ): UserProfile["facilityData"] | null {
     if (role === "patient") return null;
 
     // Staff invited into an existing facility should not be auto-promoted.
     if (employerFacilityId) {
-      return existing || { managerName };
+      return existing || { managerName, timeZone: this.defaultTimeZoneForCountry(countryCode) };
     }
 
     return {
       ...(existing || {}),
       managerName: existing?.managerName || managerName,
+      timeZone: existing?.timeZone || this.defaultTimeZoneForCountry(countryCode),
       permissionRole: "owner",
       permissions: {
         overview: true,
@@ -389,7 +401,10 @@ export class AuthService {
               facility_data: JSON.parse(JSON.stringify(
                 this.defaultFacilitySignupData(
                   role,
-                  googleUser.user_metadata?.full_name || "Manager"
+                  googleUser.user_metadata?.full_name || "Manager",
+                  undefined,
+                  null,
+                  "KE"
                 )
               )),
               employer_facility_id: null,
@@ -473,7 +488,7 @@ export class AuthService {
       location: "Nairobi, Kenya",
       countryCode: "KE",
       avatar: providerUser.avatar,
-      facilityData: this.defaultFacilitySignupData(role, providerUser.name) || undefined,
+      facilityData: this.defaultFacilitySignupData(role, providerUser.name, undefined, null, "KE") || undefined,
       patientData:
         role === "patient"
           ? {
@@ -747,7 +762,8 @@ export class AuthService {
         user.role,
         user.facilityData?.managerName || user.name,
         user.facilityData,
-        user.employerFacilityId
+          user.employerFacilityId,
+          user.countryCode || "KE"
       );
 
       // Check if user exists
@@ -841,7 +857,8 @@ export class AuthService {
           user.role,
           user.facilityData?.managerName || user.name,
           user.facilityData,
-          user.employerFacilityId
+          user.employerFacilityId,
+          user.countryCode || "KE"
         ) || undefined,
       pin: Security.hash(user.pin),
     };

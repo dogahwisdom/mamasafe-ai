@@ -40,6 +40,8 @@ export interface PatientExtension {
 export interface FacilityExtension {
   managerName: string;
   licenseNumber?: string;
+  /** IANA timezone string for displaying timestamps consistently (e.g. "Africa/Nairobi"). */
+  timeZone?: string;
   /** Fine-grained staff role inside a facility (not the top-level app role). */
   permissionRole?: 'owner' | 'admin' | 'tech' | 'attendant';
   /** Page-level permissions for staff accounts. */
