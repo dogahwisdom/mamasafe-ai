@@ -2,6 +2,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { UserProfile } from '../types';
 import { ChevronLeft, CreditCard, Shield, Bell, Globe, Moon, LogOut, User, Check, Smartphone, Mail, MapPin, Zap, Edit2, Save, X, ExternalLink, AlertTriangle, CheckCircle, Camera, UploadCloud, Star, Sun, Monitor, Lock, Loader2 } from 'lucide-react';
+import { ClinicTimezoneCard } from '../components/settings/ClinicTimezoneCard';
+import { SubscriptionModal } from '../components/settings/SubscriptionModal';
+import { SubscriptionSummaryCard } from '../components/settings/SubscriptionSummaryCard';
 
 interface SettingsViewProps {
   user: UserProfile | null;
@@ -44,6 +47,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ user, onBack, onUpda
   const [language, setLanguage] = useState(() => localStorage.getItem('mamasafe_pref_language') || 'English');
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [savingTimeZone, setSavingTimeZone] = useState(false);
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -102,6 +106,25 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ user, onBack, onUpda
               setIsSaving(false);
           }
       }
+  };
+
+  const handleSaveTimeZone = async (nextTz: string) => {
+    if (!user || user.role === 'patient' || user.role === 'superadmin') return;
+    setSavingTimeZone(true);
+    try {
+      await onUpdateUser({
+        ...user,
+        facilityData: user.facilityData
+          ? { ...user.facilityData, ...(nextTz ? { timeZone: nextTz } : { timeZone: undefined }) }
+          : { managerName: user.name, ...(nextTz ? { timeZone: nextTz } : {}) },
+      });
+      setFormData((p) => ({ ...p, timeZone: nextTz }));
+      showToast('Clinic timezone updated');
+    } catch (e) {
+      showToast('Failed to update clinic timezone');
+    } finally {
+      setSavingTimeZone(false);
+    }
   };
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -180,90 +203,23 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ user, onBack, onUpda
       )}
 
       {/* Subscription Modal */}
-      {canManageSubscription && showSubscriptionModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fade-in">
-           <div className="bg-white dark:bg-[#1c1c1e] w-full max-w-2xl rounded-[2.5rem] p-8 shadow-2xl relative animate-scale-in max-h-[90vh] overflow-y-auto no-scrollbar">
-              <div className="flex justify-between items-center mb-6">
-                 <div>
-                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Upgrade Plan</h2>
-                    <p className="text-slate-500 text-sm">Choose a plan that fits your needs</p>
-                 </div>
-                 <button onClick={() => setShowSubscriptionModal(false)} className="p-2 bg-slate-100 dark:bg-[#2c2c2e] rounded-full hover:bg-slate-200 dark:hover:bg-[#3a3a3c] transition-colors">
-                    <X size={20} />
-                 </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                 {PLANS.map(plan => (
-                    <div 
-                        key={plan.id} 
-                        className={`
-                            relative p-6 rounded-3xl border-2 cursor-pointer transition-all hover:scale-[1.02]
-                            ${currentPlan.id === plan.id 
-                                ? 'border-brand-500 bg-brand-50/50 dark:bg-brand-900/10' 
-                                : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-[#2c2c2e] hover:border-slate-300 dark:hover:border-slate-700'}
-                        `}
-                        onClick={() => handlePlanChange(plan.id)}
-                    >
-                        {currentPlan.id === plan.id && (
-                            <div className="absolute top-4 right-4 text-brand-500">
-                                <CheckCircle size={24} fill="currentColor" className="text-white dark:text-black" />
-                            </div>
-                        )}
-                        <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">{plan.name}</h3>
-                        <div className="flex items-baseline gap-1 mb-4">
-                            <span className="text-2xl font-bold">{plan.price}</span>
-                            <span className="text-sm text-slate-500">{plan.period}</span>
-                        </div>
-                        <ul className="space-y-3 mb-6">
-                            {plan.features.map((feature, i) => (
-                                <li key={i} className="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
-                                    <Check size={16} className="text-brand-500 mt-0.5 shrink-0" />
-                                    <span className="leading-tight">{feature}</span>
-                                </li>
-                            ))}
-                        </ul>
-                        <button 
-                            className={`w-full py-3 rounded-xl font-bold text-sm transition-colors ${currentPlan.id === plan.id ? 'bg-brand-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-700'}`}
-                        >
-                            {currentPlan.id === plan.id ? 'Current Plan' : 'Select Plan'}
-                        </button>
-                    </div>
-                 ))}
-              </div>
-           </div>
-        </div>
-      )}
+      {canManageSubscription ? (
+        <SubscriptionModal
+          open={showSubscriptionModal}
+          plans={PLANS}
+          currentPlanId={currentPlan.id}
+          onClose={() => setShowSubscriptionModal(false)}
+          onSelectPlan={handlePlanChange}
+        />
+      ) : null}
 
       {/* Facility timezone (clinics/pharmacies) */}
       {!isPatient && user?.role !== 'superadmin' ? (
-        <div className="mt-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#1c1c1e] overflow-hidden">
-          <div className="p-4 border-b border-slate-50 dark:border-slate-800">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                  <Globe size={18} />
-                </div>
-                <div>
-                  <div className="font-semibold text-slate-900 dark:text-white">Clinic timezone</div>
-                  <div className="text-xs text-slate-500 dark:text-slate-400">
-                    Controls how dates/times appear in Outreach and reminders.
-                  </div>
-                </div>
-              </div>
-              <select
-                disabled={!isEditing}
-                value={formData.timeZone}
-                onChange={(e) => setFormData((p) => ({ ...p, timeZone: e.target.value }))}
-                className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#2c2c2e] text-sm disabled:opacity-60"
-              >
-                <option value="">Auto (from country)</option>
-                <option value="Africa/Nairobi">Africa/Nairobi (KE)</option>
-                <option value="Africa/Accra">Africa/Accra (GH)</option>
-              </select>
-            </div>
-          </div>
-        </div>
+        <ClinicTimezoneCard
+          value={formData.timeZone}
+          saving={savingTimeZone}
+          onChange={handleSaveTimeZone}
+        />
       ) : null}
 
       {/* Header */}
@@ -486,72 +442,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ user, onBack, onUpda
           </div>
 
           {/* Right Col: Subscription - hidden for patients and superadmin */}
-          {canManageSubscription && (
+          {canManageSubscription ? (
             <div className="space-y-6">
-                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-0 px-2 md:hidden">Subscription</h3>
-                <div className={`
-                    relative overflow-hidden flex flex-col h-full min-h-[400px] rounded-[2rem] p-6 shadow-xl transition-all duration-500
-                    ${currentPlan.id === 'enterprise' 
-                        ? 'bg-gradient-to-br from-amber-900 to-slate-900 text-white' 
-                        : 'bg-slate-900 dark:bg-white text-white dark:text-black'}
-                `}>
-                  
-                  <div className="relative z-10 flex-1">
-                      <div className="flex justify-between items-start mb-6">
-                          <div className={`p-3 rounded-xl backdrop-blur-md ${currentPlan.id === 'enterprise' ? 'bg-black/20 text-amber-400' : 'bg-white/10 dark:bg-black/5'}`}>
-                              {currentPlan.id === 'enterprise' ? <Star size={24} fill="currentColor" /> : <CreditCard size={24} />}
-                          </div>
-                          <span className={`
-                              px-3 py-1 rounded-full text-xs font-bold border capitalize
-                              ${currentPlan.id === 'enterprise' 
-                                  ? 'bg-amber-400/20 text-amber-300 border-amber-400/30' 
-                                  : 'bg-green-500/20 text-green-400 dark:text-green-600 border-green-500/20'}
-                          `}>
-                              {currentPlan.id === 'basic' ? 'Active' : 'Premium'}
-                          </span>
-                      </div>
-
-                      <h3 className={`font-medium text-sm ${currentPlan.id === 'enterprise' ? 'text-amber-200' : 'text-slate-400 dark:text-slate-500'}`}>Current Plan</h3>
-                      <h2 className="text-3xl font-bold mt-1 mb-4">{currentPlan.name}</h2>
-                      
-                      <div className="flex items-baseline gap-1 mb-8">
-                          <span className="text-2xl font-bold">{currentPlan.price}</span>
-                          <span className={`text-sm ${currentPlan.id === 'enterprise' ? 'text-amber-200/60' : 'text-slate-400 dark:text-slate-500'}`}>{currentPlan.period}</span>
-                      </div>
-
-                      <div className="space-y-4 mb-8">
-                          {currentPlan.features.slice(0, 4).map(f => (
-                              <div key={f} className="flex items-start gap-3">
-                                  <div className={`mt-0.5 p-0.5 rounded-full shrink-0 ${currentPlan.id === 'enterprise' ? 'bg-amber-400 text-amber-900' : 'bg-brand-500'}`}>
-                                      <Check size={10} className={currentPlan.id === 'enterprise' ? 'text-black' : 'text-white'} strokeWidth={3} />
-                                  </div>
-                                  <span className={`text-sm font-medium leading-tight ${currentPlan.id === 'enterprise' ? 'text-amber-100' : 'text-slate-300 dark:text-slate-600'}`}>{f}</span>
-                              </div>
-                          ))}
-                      </div>
-                  </div>
-                  
-                  <div className="relative z-10 mt-auto">
-                      <button 
-                          onClick={() => setShowSubscriptionModal(true)}
-                          className={`
-                              w-full py-3 rounded-xl font-bold text-sm hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2
-                              ${currentPlan.id === 'enterprise' 
-                                  ? 'bg-amber-400 text-black hover:bg-amber-300' 
-                                  : 'bg-white dark:bg-black text-black dark:text-white'}
-                          `}
-                      >
-                          {currentPlan.id === 'basic' ? <Star size={16} /> : <Edit2 size={16} />} 
-                          {currentPlan.id === 'basic' ? 'Upgrade Plan' : 'Manage Subscription'}
-                      </button>
-                  </div>
-
-                  {/* Decorative Elements */}
-                  <div className={`absolute top-0 right-0 w-48 h-48 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none ${currentPlan.id === 'enterprise' ? 'bg-amber-500/30' : 'bg-brand-500/20'}`} />
-                  <div className={`absolute bottom-0 left-0 w-32 h-32 rounded-full blur-3xl -ml-10 -mb-10 pointer-events-none ${currentPlan.id === 'enterprise' ? 'bg-orange-500/30' : 'bg-blue-500/20'}`} />
-                </div>
+              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-0 px-2 md:hidden">
+                Subscription
+              </h3>
+              <SubscriptionSummaryCard
+                plan={currentPlan}
+                onManage={() => setShowSubscriptionModal(true)}
+              />
             </div>
-          )}
+          ) : null}
       </div>
     </div>
   );
