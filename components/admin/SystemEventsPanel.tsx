@@ -12,6 +12,9 @@ const EVENT_TYPES = [
   "reminder_dispatch_run",
   "reminder_dispatch_error",
   "reminder_dispatch_unauthorized",
+  "whatsapp_checkup_run",
+  "whatsapp_checkup_error",
+  "whatsapp_checkup_skipped",
 ] as const;
 
 export const SystemEventsPanel: React.FC<Props> = ({ timeZone }) => {
@@ -58,15 +61,19 @@ export const SystemEventsPanel: React.FC<Props> = ({ timeZone }) => {
         const failed = r.meta?.failed;
         const skipped = r.meta?.skipped;
         const scanned = r.meta?.scanned;
+        const pagesRun = r.meta?.pagesRun;
+        const skippedQuietHours = r.meta?.skippedQuietHours;
         const reason = r.meta?.reason;
         const manual = r.meta?.manualSelect;
         const authKind = r.meta?.authKind;
         const parts = [
           typeof ok === "boolean" ? `ok=${ok}` : null,
+          typeof pagesRun === "number" ? `pages=${pagesRun}` : null,
           typeof scanned === "number" ? `scanned=${scanned}` : null,
           typeof sent === "number" ? `sent=${sent}` : null,
           typeof failed === "number" ? `failed=${failed}` : null,
           typeof skipped === "number" ? `skipped=${skipped}` : null,
+          typeof skippedQuietHours === "number" ? `quiet=${skippedQuietHours}` : null,
           typeof manual === "boolean" ? `manual=${manual}` : null,
           typeof authKind === "string" ? `auth=${authKind}` : null,
           typeof reason === "string" && reason ? `reason=${reason}` : null,
@@ -109,6 +116,9 @@ export const SystemEventsPanel: React.FC<Props> = ({ timeZone }) => {
           <option value="reminder_dispatch_run">Dispatch runs</option>
           <option value="reminder_dispatch_error">Dispatch errors</option>
           <option value="reminder_dispatch_unauthorized">Unauthorized</option>
+          <option value="whatsapp_checkup_run">Checkup runs</option>
+          <option value="whatsapp_checkup_error">Checkup errors</option>
+          <option value="whatsapp_checkup_skipped">Checkup skipped</option>
         </select>
       </div>
 

@@ -1,5 +1,6 @@
 import { WhatsAppCloudService } from "./whatsapp-cloud-service.js";
 import { WhatsAppRepository } from "./whatsapp-repository.js";
+import { createClient } from "@supabase/supabase-js";
 
 const OUTREACH_SOURCE = "whatsapp-system-checkup";
 
@@ -9,6 +10,30 @@ function json(statusCode, body) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   };
+}
+
+function createSupabaseAdmin() {
+  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
+  const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+  if (!url || !serviceRole) return null;
+  return createClient(url, serviceRole, { auth: { persistSession: false } });
+}
+
+async function logSystemEvent(eventType, meta) {
+  const admin = createSupabaseAdmin();
+  if (!admin) return;
+  try {
+    const { error } = await admin.from("system_events").insert({
+      event_type: String(eventType || "unknown"),
+      facility_id: null,
+      meta: meta && typeof meta === "object" ? meta : {},
+    });
+    if (error) {
+      console.warn("system_events insert failed:", error.message);
+    }
+  } catch (e) {
+    console.warn("system_events insert threw:", e instanceof Error ? e.message : String(e));
+  }
 }
 
 const DEFAULT_COOLDOWN_HOURS = 24 * 7;
@@ -80,12 +105,15 @@ export async function runWhatsAppSystemCheckup(event = {}) {
     return json(405, { error: "Method not allowed." });
   }
 
-  const repo = new WhatsAppRepository();
-  const cloud = new WhatsAppCloudService();
-  const enabled = String(process.env.WHATSAPP_SYSTEM_CHECKUP_ENABLED || "false").toLowerCase() === "true";
-  if (!enabled) {
-    return json(200, { ok: true, skipped: true, reason: "system_checkup_disabled" });
-  }
+  try {
+    const repo = new WhatsAppRepository();
+    const cloud = new WhatsAppCloudService();
+    const enabled = String(process.env.WHATSAPP_SYSTEM_CHECKUP_ENABLED || "false").toLowerCase() === "true";
+    if (!enabled) {
+      const payload = { ok: true, skipped: true, reason: "system_checkup_disabled" };
+      await logSystemEvent("whatsapp_checkup_skipped", payload);
+      return json(200, payload);
+    }
 
   const startHourLocal = Number(
     process.env.WHATSAPP_CHECKUP_LOCAL_START_HOUR || DEFAULT_START_HOUR_LOCAL
@@ -114,6 +142,7 @@ export async function runWhatsAppSystemCheckup(event = {}) {
     String(process.env.WHATSAPP_CHECKUP_TEMPLATE_INCLUDE_FACILITY ?? "false").toLowerCase() === "true";
 
   let sent = 0;
+  let failed = 0;
   let skipped = 0;
   let skippedQuietHours = 0;
   let scanned = 0;
@@ -186,6 +215,7 @@ export async function runWhatsAppSystemCheckup(event = {}) {
         sent += 1;
       } catch (error) {
         console.error("Failed to send system checkup:", patient.phone, error);
+        failed += 1;
       }
     }
 
@@ -204,12 +234,13 @@ export async function runWhatsAppSystemCheckup(event = {}) {
 
   const lastAllowedHour = Math.max(startHourLocal, endHourLocal - 1);
 
-  return json(200, {
+  const payload = {
     ok: true,
     pageAll,
     pagesRun,
     scanned,
     sent,
+    failed,
     skipped,
     skippedQuietHours,
     cooldownHours,
@@ -221,5 +252,13 @@ export async function runWhatsAppSystemCheckup(event = {}) {
     nowHourUtc,
     quietHoursPolicy: `patients only when local hour H satisfies ${startHourLocal} <= H < ${endHourLocal}`,
     quietHoursLocalInclusive: `${startHourLocal}:00 through ${lastAllowedHour}:59`,
-  });
+  };
+
+    await logSystemEvent("whatsapp_checkup_run", payload);
+    return json(200, payload);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    await logSystemEvent("whatsapp_checkup_error", { ok: false, error: message });
+    return json(500, { ok: false, error: message });
+  }
 }
