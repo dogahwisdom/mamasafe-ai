@@ -18,6 +18,7 @@ import { PharmacyReportsService } from "./backend/pharmacyReportsService";
 import { ExpenseService } from "./backend/expenseService";
 import { FacilityStaffService } from "./backend/facilityStaffService";
 import { OutreachMonitorService } from "./backend/outreachMonitorService";
+import { SystemEventsService } from "./backend/systemEventsService";
 
 class BackendFacade {
   public readonly auth: AuthService;
@@ -40,6 +41,7 @@ class BackendFacade {
   public readonly expenses: ExpenseService;
   public readonly facilityStaff: FacilityStaffService;
   public readonly outreachMonitor: OutreachMonitorService;
+  public readonly systemEvents: SystemEventsService;
 
   constructor() {
     this.auth = new AuthService();
@@ -62,6 +64,7 @@ class BackendFacade {
     this.expenses = new ExpenseService();
     this.facilityStaff = new FacilityStaffService();
     this.outreachMonitor = new OutreachMonitorService();
+    this.systemEvents = new SystemEventsService();
   }
 }
 

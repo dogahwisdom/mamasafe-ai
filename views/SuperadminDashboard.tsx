@@ -15,6 +15,7 @@ import { FacilityDetailsModal } from '../components/admin/FacilityDetailsModal';
 import { SubscriptionManagement } from '../components/admin/SubscriptionManagement';
 import { SupportManagement } from '../components/admin/SupportManagement';
 import { SOPsManagement } from '../components/admin/SOPsManagement';
+import { SystemEventsPanel } from '../components/admin/SystemEventsPanel';
 
 interface SuperadminDashboardProps {
   user: UserProfile;
@@ -29,7 +30,7 @@ export const SuperadminDashboard: React.FC<SuperadminDashboardProps> = ({ user, 
   const [geographicDistribution, setGeographicDistribution] = useState<GeographicDistribution[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'facilities' | 'analytics' | 'subscriptions' | 'support' | 'sops'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'facilities' | 'analytics' | 'subscriptions' | 'support' | 'sops' | 'ops'>('overview');
   const [showPatientSearch, setShowPatientSearch] = useState(false);
   const [selectedFacility, setSelectedFacility] = useState<FacilityMetrics | null>(null);
   const [showFacilityDetails, setShowFacilityDetails] = useState(false);
@@ -227,6 +228,16 @@ export const SuperadminDashboard: React.FC<SuperadminDashboardProps> = ({ user, 
           }`}
         >
           SOPs
+        </button>
+        <button
+          onClick={() => setActiveTab('ops')}
+          className={`flex-shrink-0 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all ${
+            activeTab === 'ops'
+              ? 'bg-white dark:bg-[#1c1c1e] text-slate-900 dark:text-white shadow-sm'
+              : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
+          }`}
+        >
+          Ops
         </button>
       </div>
 
@@ -458,6 +469,10 @@ export const SuperadminDashboard: React.FC<SuperadminDashboardProps> = ({ user, 
             )}
           </div>
         </>
+      )}
+
+      {activeTab === 'ops' && (
+        <SystemEventsPanel timeZone={user.facilityData?.timeZone} />
       )}
 
       {/* Facilities Tab */}
