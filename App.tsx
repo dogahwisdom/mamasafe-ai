@@ -35,6 +35,11 @@ export const App: React.FC = () => {
 
   // Centralized Patient State via Backend
   const [patients, setPatients] = useState<Patient[]>([]);
+  const [triagePrefill, setTriagePrefill] = useState<{
+    patientPhone?: string;
+    gestationalAge?: number;
+    patientName?: string;
+  } | null>(null);
 
   // Notification State
   const [showNotifications, setShowNotifications] = useState(false);
@@ -575,13 +580,21 @@ export const App: React.FC = () => {
           <ClinicWorkflow user={currentUser} onNavigate={setCurrentView} />
         )}
 
-        {currentView === 'triage' && <TriageView user={currentUser} />}
+        {currentView === 'triage' && <TriageView user={currentUser} prefill={triagePrefill} />}
 
         {currentView === 'patients' && (
           <PatientsView
             patients={patients}
             currentUser={currentUser}
             onNavigate={setCurrentView}
+            onRunTriageForPatient={(patient) => {
+              setTriagePrefill({
+                patientPhone: patient.phone,
+                gestationalAge: typeof patient.gestationalWeeks === 'number' ? patient.gestationalWeeks : undefined,
+                patientName: patient.name,
+              });
+              setCurrentView('triage');
+            }}
             onPatientPartialUpdate={(patientId, updates) => {
               setPatients((prev) =>
                 prev.map((p) => (p.id === patientId ? { ...p, ...updates } : p))

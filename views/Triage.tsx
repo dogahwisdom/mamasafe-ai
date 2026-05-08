@@ -7,9 +7,14 @@ import { Stethoscope, Send, Activity, MessageCircle, HeartPulse, ShieldCheck, Th
 
 interface TriageViewProps {
   user?: UserProfile | null;
+  prefill?: {
+    patientPhone?: string;
+    gestationalAge?: number;
+    patientName?: string;
+  } | null;
 }
 
-export const TriageView: React.FC<TriageViewProps> = ({ user }) => {
+export const TriageView: React.FC<TriageViewProps> = ({ user, prefill }) => {
   const [symptoms, setSymptoms] = useState('');
   const [gestationalAge, setGestationalAge] = useState(24);
   const [patientPhone, setPatientPhone] = useState('');
@@ -27,6 +32,18 @@ export const TriageView: React.FC<TriageViewProps> = ({ user }) => {
         setPatientPhone(user.phone);
     }
   }, [user]);
+
+  // Prefill for clinic/pharmacy workflows (e.g., patient profile -> triage)
+  useEffect(() => {
+    if (!prefill) return;
+    if (typeof prefill.gestationalAge === 'number' && Number.isFinite(prefill.gestationalAge)) {
+      setGestationalAge(prefill.gestationalAge);
+    }
+    if (typeof prefill.patientPhone === 'string') {
+      setPatientPhone(prefill.patientPhone);
+    }
+    // Keep symptoms/result as-is so staff can run multiple triages quickly.
+  }, [prefill?.gestationalAge, prefill?.patientPhone]);
 
   const handleAnalyze = async () => {
     if (!symptoms.trim()) return;

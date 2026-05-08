@@ -34,8 +34,11 @@ class TriageAnalysisService {
   };
 
   constructor() {
+    // Vite only exposes `VITE_*` by default, but we also support `TRIAGE_ENGINE_API_KEY`
+    // through `vite.config.ts` define replacement (process.env.*).
     const apiKey =
       (import.meta.env.VITE_TRIAGE_ENGINE_API_KEY as string) ||
+      ((process.env as any).TRIAGE_ENGINE_API_KEY as string) ||
       (import.meta.env.VITE_GEMINI_API_KEY as string) ||
       "";
     this.modelName =

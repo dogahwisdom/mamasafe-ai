@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Phone, Filter, ChevronRight, User, X, Calendar, MapPin, Activity, Clock, Pill, History, ArrowRightLeft, CheckCircle, MessageSquare, AlertTriangle, FileText, Download } from 'lucide-react';
+import { Search, Phone, Filter, ChevronRight, User, X, Calendar, MapPin, Activity, Clock, Pill, History, ArrowRightLeft, CheckCircle, MessageSquare, AlertTriangle, FileText, Download, Stethoscope } from 'lucide-react';
 import { Patient, RiskLevel, Referral, Task, Reminder, UserProfile } from '../types';
 import { MedicationPrescription } from '../components/MedicationPrescription';
 import { backend } from '../services/backend';
@@ -14,6 +14,8 @@ interface PatientsViewProps {
   onPatientPartialUpdate?: (patientId: string, updates: Partial<Patient>) => void;
   /** Logged-in facility (clinic/pharmacy) - used for PDF letterhead */
   currentUser?: UserProfile | null;
+  /** Start a triage flow for a specific patient (from patient profile). */
+  onRunTriageForPatient?: (patient: Patient) => void;
 }
 
 export const PatientsView: React.FC<PatientsViewProps> = ({
@@ -22,6 +24,7 @@ export const PatientsView: React.FC<PatientsViewProps> = ({
   onDeletePatient,
   onPatientPartialUpdate,
   currentUser,
+  onRunTriageForPatient,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState<'all' | 'high_risk'>('all');
@@ -295,6 +298,17 @@ export const PatientsView: React.FC<PatientsViewProps> = ({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="absolute top-6 right-6 flex items-center gap-2 z-10 flex-wrap justify-end max-w-[min(100%,22rem)]">
+              {onRunTriageForPatient && (
+                <button
+                  type="button"
+                  onClick={() => onRunTriageForPatient(selectedPatient)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-900 text-white hover:bg-slate-800 dark:bg-white dark:text-black dark:hover:bg-slate-100 border border-slate-900/20 dark:border-white/30 transition-colors shadow-sm"
+                  title="Run triage for this patient"
+                >
+                  <Stethoscope size={14} strokeWidth={2.5} />
+                  Run Triage
+                </button>
+              )}
               {currentUser && (
                 <button
                   type="button"
