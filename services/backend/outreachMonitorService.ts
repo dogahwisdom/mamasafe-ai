@@ -26,6 +26,12 @@ type MessageDbRow = {
   created_at: string;
 };
 
+function toIsoMs(iso: string | null | undefined): number {
+  if (!iso) return 0;
+  const ms = new Date(String(iso)).getTime();
+  return Number.isFinite(ms) ? ms : 0;
+}
+
 export class OutreachMonitorService {
   private assertPortalUser(user: UserProfile): void {
     if (user.role !== "clinic" && user.role !== "pharmacy") {
@@ -91,7 +97,7 @@ export class OutreachMonitorService {
       const current = byPatient.get(matched.id);
       if (!current) continue;
       current.checkupSentCount += 1;
-      if (!current.lastCheckupSentAt || row.created_at > current.lastCheckupSentAt) {
+      if (toIsoMs(row.created_at) > toIsoMs(current.lastCheckupSentAt)) {
         current.lastCheckupSentAt = row.created_at;
       }
     }
@@ -101,18 +107,16 @@ export class OutreachMonitorService {
       if (!matched) continue;
       const current = byPatient.get(matched.id);
       if (!current || !current.lastCheckupSentAt) continue;
-      if (row.created_at > current.lastCheckupSentAt) {
+      if (toIsoMs(row.created_at) > toIsoMs(current.lastCheckupSentAt)) {
         current.repliedAfterOutreach = true;
-        if (!current.lastReplyAt || row.created_at > current.lastReplyAt) {
+        if (toIsoMs(row.created_at) > toIsoMs(current.lastReplyAt)) {
           current.lastReplyAt = row.created_at;
         }
       }
     }
 
     const rows = [...byPatient.values()].sort((a, b) => {
-      const aKey = a.lastCheckupSentAt || "";
-      const bKey = b.lastCheckupSentAt || "";
-      return bKey.localeCompare(aKey);
+      return toIsoMs(b.lastCheckupSentAt) - toIsoMs(a.lastCheckupSentAt);
     });
 
     const patientsWithCheckupSent = rows.filter((r) => r.checkupSentCount > 0).length;

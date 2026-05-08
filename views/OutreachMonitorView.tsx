@@ -61,6 +61,16 @@ export const OutreachMonitorView: React.FC<OutreachMonitorViewProps> = ({ user, 
     "all"
   );
 
+  const displayTimeZone = useMemo(() => {
+    const cc = String(user.countryCode || "").toUpperCase();
+    if (cc === "KE" || cc === "UG" || cc === "TZ" || cc === "RW") return "Africa/Nairobi";
+    if (cc === "ET") return "Africa/Addis_Ababa";
+    if (cc === "GH") return "Africa/Accra";
+    if (cc === "NG") return "Africa/Lagos";
+    if (cc === "ZA") return "Africa/Johannesburg";
+    return undefined;
+  }, [user.countryCode]);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -108,11 +118,11 @@ export const OutreachMonitorView: React.FC<OutreachMonitorViewProps> = ({ user, 
         toCsvCell(row.patientName),
         toCsvCell(row.phone),
         toCsvCell(row.checkupSentCount),
-        toCsvCell(ClinicTimestampFormatter.formatDateTime(row.lastCheckupSentAt)),
+        toCsvCell(ClinicTimestampFormatter.formatDateTime(row.lastCheckupSentAt, { timeZone: displayTimeZone })),
         toCsvCell(row.repliedAfterOutreach ? "Yes" : "No"),
-        toCsvCell(ClinicTimestampFormatter.formatDateTime(row.lastReplyAt)),
+        toCsvCell(ClinicTimestampFormatter.formatDateTime(row.lastReplyAt, { timeZone: displayTimeZone })),
         toCsvCell(row.optedOut ? "Yes" : "No"),
-        toCsvCell(ClinicTimestampFormatter.formatDateTime(row.optedOutAt)),
+        toCsvCell(ClinicTimestampFormatter.formatDateTime(row.optedOutAt, { timeZone: displayTimeZone })),
       ].join(",")
     );
     const csv = `${header.join(",")}\n${lines.join("\n")}`;
@@ -135,9 +145,9 @@ export const OutreachMonitorView: React.FC<OutreachMonitorViewProps> = ({ user, 
         type: "Missed Visit",
         deadline: "Follow up within 24h",
         resolved: false,
-        notes: `No reply after outreach checkup. Last sent: ${ClinicTimestampFormatter.formatDateTime(
-          row.lastCheckupSentAt
-        )} · Phone: ${row.phone}`,
+        notes: `No reply after outreach checkup. Last sent: ${ClinicTimestampFormatter.formatDateTime(row.lastCheckupSentAt, {
+          timeZone: displayTimeZone,
+        })} · Phone: ${row.phone}`,
         timestamp: Date.now(),
       };
       await backend.clinic.addTask(task);
@@ -310,12 +320,12 @@ export const OutreachMonitorView: React.FC<OutreachMonitorViewProps> = ({ user, 
                       <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{row.phone}</td>
                       <td className="px-4 py-3">{row.checkupSentCount}</td>
                       <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-                        {ClinicTimestampFormatter.formatDateTime(row.lastCheckupSentAt)}
+                        {ClinicTimestampFormatter.formatDateTime(row.lastCheckupSentAt, { timeZone: displayTimeZone })}
                       </td>
                       <td className="px-4 py-3">
                         {row.repliedAfterOutreach ? (
                           <span className="text-green-700 dark:text-green-300 font-semibold">
-                            Replied ({ClinicTimestampFormatter.formatDateTime(row.lastReplyAt)})
+                            Replied ({ClinicTimestampFormatter.formatDateTime(row.lastReplyAt, { timeZone: displayTimeZone })})
                           </span>
                         ) : (
                           <span className="text-slate-500 dark:text-slate-400">No reply yet</span>
@@ -324,7 +334,7 @@ export const OutreachMonitorView: React.FC<OutreachMonitorViewProps> = ({ user, 
                       <td className="px-4 py-3">
                         {row.optedOut ? (
                           <span className="text-amber-700 dark:text-amber-300 font-semibold">
-                            Yes ({ClinicTimestampFormatter.formatDateTime(row.optedOutAt)})
+                            Yes ({ClinicTimestampFormatter.formatDateTime(row.optedOutAt, { timeZone: displayTimeZone })})
                           </span>
                         ) : (
                           <span className="text-slate-500 dark:text-slate-400">No</span>

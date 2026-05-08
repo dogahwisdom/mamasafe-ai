@@ -3,7 +3,10 @@
  */
 export class ClinicTimestampFormatter {
   /** Medium date + short time in the user's locale (e.g. "29 Apr 2026, 18:35"). */
-  static formatDateTime(iso: string | undefined | null): string {
+  static formatDateTime(
+    iso: string | undefined | null,
+    options?: { timeZone?: string }
+  ): string {
     if (iso == null || String(iso).trim() === "") return "—";
     const s = String(iso).trim();
     if (s === "n/a" || s === "N/A") return "—";
@@ -15,17 +18,21 @@ export class ClinicTimestampFormatter {
       year: "numeric",
       hour: "2-digit",
       minute: "2-digit",
+      ...(options?.timeZone ? { timeZone: options.timeZone } : {}),
     });
   }
 
   /**
    * Replaces embedded ISO-8601 fragments in stored task copy (e.g. outreach follow-up notes).
    */
-  static formatNotesWithEmbeddedIso(notes: string | undefined): string {
+  static formatNotesWithEmbeddedIso(
+    notes: string | undefined,
+    options?: { timeZone?: string }
+  ): string {
     if (!notes) return "";
     return notes.replace(
       /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})/g,
-      (match) => ClinicTimestampFormatter.formatDateTime(match)
+      (match) => ClinicTimestampFormatter.formatDateTime(match, options)
     );
   }
 }
