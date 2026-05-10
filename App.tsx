@@ -20,8 +20,9 @@ import { ClinicWorkflow } from './views/ClinicWorkflow';
 import { FacilityStaffView } from './views/FacilityStaffView';
 import { OutreachMonitorView } from './views/OutreachMonitorView';
 import { TopNav } from './components/navigation/TopNav';
+import { ClinicIdentityBadge } from './components/dashboard/ClinicIdentityBadge';
 import { backend } from './services/backend';
-import { ViewState, Alert, Patient, UserProfile } from './types';
+import { ViewState, Alert, Patient, UserProfile, UserRole } from './types';
 import { Permissions } from './services/permissions';
 import { LayoutDashboard, UserPlus, Stethoscope, Sun, Moon, Bell, LogOut, Users, X, HelpCircle, Book, ExternalLink, MessageSquare, Phone, Clock, FileText, Settings, Loader2, CheckCircle, Workflow, BarChart2, Package, Receipt, UserCog, Radar } from 'lucide-react';
 
@@ -219,9 +220,19 @@ export const App: React.FC = () => {
     }
   };
 
-  const getInitials = () => {
-    if (!currentUser?.name) return 'MS';
-    return currentUser.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  const navAccountLabel = (role: UserRole | undefined): string => {
+    switch (role) {
+      case 'clinic':
+        return 'Clinic';
+      case 'pharmacy':
+        return 'Pharmacy';
+      case 'patient':
+        return 'Patient';
+      case 'superadmin':
+        return 'Operations';
+      default:
+        return '';
+    }
   };
 
   if (isLoading) {
@@ -453,16 +464,21 @@ export const App: React.FC = () => {
               {darkMode ? <Sun size={20} /> : <Moon size={20} />}
             </button>
 
-            <div className="flex items-center gap-3 pl-2 border-l border-slate-200 dark:border-slate-800">
-              <div
-                className="w-9 h-9 rounded-full bg-gradient-to-tr from-brand-500 to-blue-500 text-white flex items-center justify-center font-bold text-xs shadow-md shadow-brand-500/20 cursor-default ring-2 ring-white dark:ring-black"
-                title={currentUser?.name}
-              >
-                {getInitials()}
-              </div>
-              <div className="hidden lg:block text-right leading-tight">
-                <p className="text-sm font-bold text-slate-900 dark:text-white">{currentUser?.name}</p>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{currentUser?.role}</p>
+            <div className="flex items-center gap-3 pl-2 border-l border-slate-200 dark:border-slate-800 min-w-0">
+              <span className="shrink-0 cursor-default" title={currentUser?.name}>
+                <ClinicIdentityBadge
+                  size="nav"
+                  facilityName={currentUser?.name || 'MamaSafe'}
+                  imageUrl={currentUser?.avatar}
+                />
+              </span>
+              <div className="hidden lg:block text-right leading-tight min-w-0">
+                <p className="text-sm font-bold text-slate-900 dark:text-white truncate max-w-[200px]">
+                  {currentUser?.name}
+                </p>
+                <p className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+                  {navAccountLabel(currentUser?.role)}
+                </p>
               </div>
 
               {/* Settings Button */}
