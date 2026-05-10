@@ -62,8 +62,8 @@ export const DashboardView: React.FC<DashboardProps> = ({ onNavigate, user }) =>
   const [totalLabTests, setTotalLabTests] = useState<number>(0);
   const [todayPayments, setTodayPayments] = useState<number>(0);
   const [activeVisits, setActiveVisits] = useState<ClinicVisit[]>([]);
-  const [totalDiagnoses, setTotalDiagnoses] = useState<number>(0);
-  const [completedVisits, setCompletedVisits] = useState<number>(0);
+  const [diagnosesToday, setDiagnosesToday] = useState<number>(0);
+  const [completedVisitsToday, setCompletedVisitsToday] = useState<number>(0);
   const [aiConversationsToday, setAiConversationsToday] = useState<number>(0);
   const [resolvedTasksToday, setResolvedTasksToday] = useState<number>(0);
   const [totalAiCost, setTotalAiCost] = useState<number>(0);
@@ -106,8 +106,8 @@ export const DashboardView: React.FC<DashboardProps> = ({ onNavigate, user }) =>
           setCompletedLabTests(0);
           setTotalLabTests(0);
           setTodayPayments(0);
-          setTotalDiagnoses(0);
-          setCompletedVisits(0);
+          setDiagnosesToday(0);
+          setCompletedVisitsToday(0);
         }
         
         // Calculate workflow metrics
@@ -121,7 +121,11 @@ export const DashboardView: React.FC<DashboardProps> = ({ onNavigate, user }) =>
         // Get lab requests and payments for today (more efficient query)
         const todayVisitIds = visits.filter(v => v.visitDate.startsWith(today)).map(v => v.id);
         const allVisitIds = visits.map(v => v.id);
-        
+
+        setCompletedVisitsToday(
+          visits.filter((v) => v.visitDate.startsWith(today) && v.status === 'completed').length
+        );
+
         if (isSupabaseConfigured() && todayVisitIds.length > 0) {
           try {
             const { data: labRequestsData } = await supabase
@@ -207,26 +211,24 @@ export const DashboardView: React.FC<DashboardProps> = ({ onNavigate, user }) =>
           }
         }
 
-        // Get total diagnoses and completed visits
+        // Diagnoses recorded on today's visits (aligns with "Visits Today" in this section)
         if (isSupabaseConfigured() && allVisitIds.length > 0) {
           try {
             const { data: diagnosesData } = await supabase
               .from('diagnoses')
-              .select('id')
+              .select('id, visit_id')
               .in('visit_id', allVisitIds);
-            
-            setTotalDiagnoses(diagnosesData?.length || 0);
-
-            const completed = visits.filter(v => v.status === 'completed').length;
-            setCompletedVisits(completed);
+            const todayIdSet = new Set(todayVisitIds);
+            const dxToday = (diagnosesData || []).filter((d: { visit_id: string }) =>
+              todayIdSet.has(d.visit_id)
+            ).length;
+            setDiagnosesToday(dxToday);
           } catch (error) {
             console.warn('Error loading diagnoses:', error);
-            setTotalDiagnoses(0);
-            setCompletedVisits(0);
+            setDiagnosesToday(0);
           }
         } else {
-          setTotalDiagnoses(0);
-          setCompletedVisits(0);
+          setDiagnosesToday(0);
         }
 
         if (patients.length) {
@@ -572,8 +574,8 @@ export const DashboardView: React.FC<DashboardProps> = ({ onNavigate, user }) =>
                 <Stethoscope className="text-indigo-600 dark:text-indigo-400" size={20} />
               </div>
               <div>
-                <div className="text-2xl font-bold text-slate-900 dark:text-white">{totalDiagnoses}</div>
-                <div className="text-xs text-slate-500 dark:text-slate-400">Total Diagnoses</div>
+                <div className="text-2xl font-bold text-slate-900 dark:text-white">{diagnosesToday}</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">Diagnoses Today</div>
               </div>
             </div>
           </div>
@@ -584,8 +586,8 @@ export const DashboardView: React.FC<DashboardProps> = ({ onNavigate, user }) =>
                 <CheckCircle className="text-teal-600 dark:text-teal-400" size={20} />
               </div>
               <div>
-                <div className="text-2xl font-bold text-slate-900 dark:text-white">{completedVisits}</div>
-                <div className="text-xs text-slate-500 dark:text-slate-400">Completed Visits</div>
+                <div className="text-2xl font-bold text-slate-900 dark:text-white">{completedVisitsToday}</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">Completed Today</div>
               </div>
             </div>
           </div>
