@@ -9,6 +9,7 @@ import {
 } from "./shared";
 import { supabase, isSupabaseConfigured } from "../supabaseClient";
 import { MessagingService } from "./messagingService";
+import { PatientRecordPurgeCoordinator } from "./patientRecordPurgeCoordinator";
 
 export class PatientService {
   public async getAll(options?: { includeTestPatients?: boolean }): Promise<Patient[]> {
@@ -110,48 +111,8 @@ export class PatientService {
   public async delete(id: string): Promise<void> {
     // Use Supabase if configured
     if (isSupabaseConfigured()) {
-      try {
-        // Clean up related records first to avoid orphans.
-        // Each operation is isolated so that a missing table/column
-        // does not block the core patient deletion.
-        await supabase.from("medications").delete().eq("patient_id", id);
-      } catch (error) {
-        console.warn("Error deleting medications for patient:", error);
-      }
-
-      try {
-        await supabase.from("tasks").delete().eq("patient_id", id);
-      } catch (error) {
-        console.warn("Error deleting tasks for patient:", error);
-      }
-
-      try {
-        await supabase.from("referrals").delete().eq("patient_id", id);
-      } catch (error) {
-        console.warn("Error deleting referrals for patient:", error);
-      }
-
-      try {
-        await supabase.from("reminders").delete().eq("patient_id", id);
-      } catch (error) {
-        console.warn("Error deleting reminders for patient:", error);
-      }
-
-      try {
-        // Delete user account linked to this patient
-        await supabase.from("users").delete().eq("id", id);
-      } catch (error) {
-        console.warn("Error deleting user for patient:", error);
-      }
-
-      try {
-        // Finally delete the patient record
-        await supabase.from("patients").delete().eq("id", id);
-      } catch (error) {
-        console.error("Error deleting patient:", error);
-        throw error;
-      }
-
+      const phone = await PatientRecordPurgeCoordinator.fetchPatientPhone(supabase, id);
+      await PatientRecordPurgeCoordinator.purgeByPatientId(supabase, id, phone);
       return;
     }
 

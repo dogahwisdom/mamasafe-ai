@@ -68,6 +68,11 @@ export const phoneLookupVariants = (phone: string): string[] => {
     v.add("254" + rest);
     v.add("0" + rest);
   }
+  if (n.startsWith("+233") && n.length >= 12) {
+    const rest = n.slice(4);
+    v.add("233" + rest);
+    v.add("0" + rest);
+  }
   return [...v];
 };
 

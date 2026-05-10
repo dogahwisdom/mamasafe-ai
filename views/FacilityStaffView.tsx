@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import type { CreateFacilityStaffInput, FacilityStaffSummary, UserProfile } from "../types";
 import { backend } from "../services/backend";
 import { Permissions } from "../services/permissions";
-import { ArrowLeft, Loader2, UserMinus, UserPlus, Users } from "lucide-react";
+import { ArrowLeft, Loader2, Trash2, UserMinus, UserPlus, Users } from "lucide-react";
 
 interface FacilityStaffViewProps {
   user: UserProfile;
@@ -14,6 +14,7 @@ export const FacilityStaffView: React.FC<FacilityStaffViewProps> = ({ user, onBa
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const [purgingId, setPurgingId] = useState<string | null>(null);
   const [form, setForm] = useState<CreateFacilityStaffInput>({
     name: "",
     phone: "",
@@ -77,6 +78,24 @@ export const FacilityStaffView: React.FC<FacilityStaffViewProps> = ({ user, onBa
     }
   };
 
+  const permanentlyDeleteStaff = async (staffUserId: string, displayName: string) => {
+    if (!canManage) return;
+    const ok = window.confirm(
+      `Permanently delete login for ${displayName}?\n\nThis removes their MamaSafe account, PIN, reset tokens, and team link. They will not be able to sign in anymore.`
+    );
+    if (!ok) return;
+    setPurgingId(staffUserId);
+    try {
+      await backend.facilityStaff.permanentlyDeleteStaffUser(user, staffUserId);
+      await load();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Could not delete this account.";
+      alert(msg);
+    } finally {
+      setPurgingId(null);
+    }
+  };
+
   const removeStaff = async (staffUserId: string, displayName: string) => {
     if (!canManage) return;
     const ok = window.confirm(
@@ -132,8 +151,8 @@ export const FacilityStaffView: React.FC<FacilityStaffViewProps> = ({ user, onBa
           </h1>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
             Staff listed here have their own login (phone or email + PIN). Grant modules in Settings →
-            Permissions. Use Remove to unlink someone who has left; their account stays, but they lose
-            access to this facility until you add them again.
+            Permissions. Remove unlinks someone from your facility while keeping their account. Delete
+            account removes them from MamaSafe entirely (credentials cannot be recovered).
           </p>
         </div>
       </div>
@@ -253,19 +272,34 @@ export const FacilityStaffView: React.FC<FacilityStaffViewProps> = ({ user, onBa
                       )}
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => removeStaff(s.id, s.name)}
-                    disabled={removingId === s.id}
-                    className="shrink-0 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border border-red-200 dark:border-red-900/50 text-red-700 dark:text-red-300 bg-red-50/80 dark:bg-red-950/30 hover:bg-red-100 dark:hover:bg-red-950/50 disabled:opacity-50"
-                  >
-                    {removingId === s.id ? (
-                      <Loader2 className="animate-spin" size={14} />
-                    ) : (
-                      <UserMinus size={14} />
-                    )}
-                    Remove
-                  </button>
+                  <div className="flex flex-wrap gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => removeStaff(s.id, s.name)}
+                      disabled={removingId === s.id || purgingId === s.id}
+                      className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border border-amber-200 dark:border-amber-900/50 text-amber-900 dark:text-amber-200 bg-amber-50/90 dark:bg-amber-950/30 hover:bg-amber-100 dark:hover:bg-amber-950/50 disabled:opacity-50"
+                    >
+                      {removingId === s.id ? (
+                        <Loader2 className="animate-spin" size={14} />
+                      ) : (
+                        <UserMinus size={14} />
+                      )}
+                      Remove
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => permanentlyDeleteStaff(s.id, s.name)}
+                      disabled={purgingId === s.id || removingId === s.id}
+                      className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border border-red-200 dark:border-red-900/50 text-red-700 dark:text-red-300 bg-red-50/80 dark:bg-red-950/30 hover:bg-red-100 dark:hover:bg-red-950/50 disabled:opacity-50"
+                    >
+                      {purgingId === s.id ? (
+                        <Loader2 className="animate-spin" size={14} />
+                      ) : (
+                        <Trash2 size={14} />
+                      )}
+                      Delete account
+                    </button>
+                  </div>
                 </li>
               ))}
             </ul>

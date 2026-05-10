@@ -277,4 +277,50 @@ export class FacilityStaffService {
 
     if (error) throw new Error(error.message);
   }
+
+  /**
+   * Removes a staff user's row and PIN reset tokens. They cannot sign in anymore.
+   * Only members of `employer_facility_id === facility root` can be deleted this way.
+   */
+  public async permanentlyDeleteStaffUser(
+    actor: UserProfile,
+    staffUserId: string
+  ): Promise<void> {
+    const facilityRootId = this.assertCanManageStaff(actor);
+    if (staffUserId === facilityRootId) {
+      throw new Error("You cannot delete the primary facility account.");
+    }
+
+    if (!isSupabaseConfigured()) {
+      const users = storage.get<UserProfile[]>(KEYS.USERS, []);
+      const idx = users.findIndex(
+        (u) => u.id === staffUserId && u.employerFacilityId === facilityRootId
+      );
+      if (idx === -1) throw new Error("User not found on this team.");
+      users.splice(idx, 1);
+      storage.set(KEYS.USERS, users);
+      return;
+    }
+
+    const { data: row, error: fetchErr } = await supabase
+      .from("users")
+      .select("id, employer_facility_id")
+      .eq("id", staffUserId)
+      .maybeSingle();
+
+    if (fetchErr) throw new Error(fetchErr.message);
+    if (!row) throw new Error("User not found.");
+    if (row.employer_facility_id !== facilityRootId) {
+      throw new Error("This person is not on your team.");
+    }
+
+    try {
+      await supabase.from("pin_reset_tokens").delete().eq("user_id", staffUserId);
+    } catch {
+      console.warn("[FacilityStaff] pin_reset_tokens delete skipped.");
+    }
+
+    const { error } = await supabase.from("users").delete().eq("id", staffUserId);
+    if (error) throw new Error(error.message);
+  }
 }

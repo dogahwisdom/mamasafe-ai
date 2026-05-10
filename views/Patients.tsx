@@ -326,7 +326,7 @@ export const PatientsView: React.FC<PatientsViewProps> = ({
                   onClick={async () => {
                     if (!selectedPatient) return;
                     const confirmed = window.confirm(
-                      `Remove ${selectedPatient.name} from this facility?\n\nThis will delete their patient record and login from MamaSafe.`
+                      `Remove ${selectedPatient.name} from this facility permanently?\n\nThis deletes their patient record, PIN/login, reminders, WhatsApp history in MamaSafe for this profile, clinic workflow visits, tasks, referrals, and related logs.`
                     );
                     if (!confirmed) return;
                     try {
