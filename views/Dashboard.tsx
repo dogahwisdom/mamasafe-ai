@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { ActionCard } from '../components/ActionCard';
 import { backend } from '../services/backend';
-import { Users, AlertTriangle, Calendar, Activity, ChevronRight, Building2, TrendingUp, CheckCircle, Clock, Workflow, FlaskConical, CreditCard, Stethoscope, FileText, Bot, DollarSign } from 'lucide-react';
+import { Users, AlertTriangle, Calendar, Activity, ChevronRight, TrendingUp, CheckCircle, Clock, Workflow, FlaskConical, CreditCard, Stethoscope, FileText, Bot, DollarSign } from 'lucide-react';
 import { AreaChart, Area, XAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { Patient, UserProfile, Task, ClinicVisit } from '../types';
 import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
@@ -15,6 +15,7 @@ import { FinancialReportsPanel } from '../components/reports/FinancialReportsPan
 import { PermissionsManager } from '../components/admin/PermissionsManager';
 import { ClinicTimestampFormatter } from '../services/formatClinicTimestamp';
 import { ReminderQueueModal } from '../components/dashboard/ReminderQueueModal';
+import { ClinicIdentityBadge } from '../components/dashboard/ClinicIdentityBadge';
 import { Permissions } from '../services/permissions';
 
 // Mock Data for Analytics
@@ -393,13 +394,10 @@ export const DashboardView: React.FC<DashboardProps> = ({ onNavigate, user }) =>
       {/* Header Greeting */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-4 border-b border-slate-200/50 dark:border-slate-800/50">
         <div className="flex items-center gap-5">
-           <div className="hidden md:flex h-16 w-16 bg-white dark:bg-[#2c2c2e] rounded-2xl items-center justify-center shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden relative">
-             {user?.avatar ? (
-                <img src={user.avatar} alt="Clinic Logo" className="w-full h-full object-cover" />
-             ) : (
-                <Building2 size={32} className="text-brand-600 dark:text-brand-500" />
-             )}
-           </div>
+           <ClinicIdentityBadge
+             facilityName={user?.name || 'MamaSafe Clinic'}
+             imageUrl={user?.avatar}
+           />
            <div>
               <h1 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white tracking-tight">
                 {user?.name || 'MamaSafe Clinic'}

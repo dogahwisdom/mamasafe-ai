@@ -272,7 +272,6 @@ export class AuthService {
         email: "admin@mamasafe.ai",
         location: "Nairobi",
         countryCode: "KE",
-        avatar: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80",
       };
       storage.set(KEYS.CURRENT_USER, superadmin);
       storage.set(KEYS.SESSION, "true");
@@ -293,8 +292,6 @@ export class AuthService {
           permissionRole: "owner",
           permissions: { overview: true, inventory: true, expenses: true },
         },
-        avatar:
-          "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80",
       };
       storage.set(KEYS.CURRENT_USER, admin);
       storage.set(KEYS.SESSION, "true");
@@ -466,8 +463,6 @@ export class AuthService {
     const providerUser = {
       email: "user@example.com",
       name: "Provisioned User",
-      avatar:
-        "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80",
     };
 
     const users = storage.get<UserProfile[]>(KEYS.USERS, []);
@@ -487,7 +482,6 @@ export class AuthService {
       phone: "",
       location: "Nairobi, Kenya",
       countryCode: "KE",
-      avatar: providerUser.avatar,
       facilityData: this.defaultFacilitySignupData(role, providerUser.name, undefined, null, "KE") || undefined,
       patientData:
         role === "patient"
@@ -642,8 +636,6 @@ export class AuthService {
             permissionRole: "owner",
             permissions: { overview: true, inventory: true, expenses: true },
           },
-          avatar:
-            "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80",
         };
         storage.set(KEYS.CURRENT_USER, admin);
         storage.set(KEYS.SESSION, "true");

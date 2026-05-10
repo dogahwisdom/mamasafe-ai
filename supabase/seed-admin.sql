@@ -21,7 +21,7 @@ INSERT INTO users (
   'admin@mamasafe.ai',
   'Nairobi',
   'KE',
-  'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80',
+  NULL,
   '73facc41c0704fddfd11c5512b56544eff4e0583b000a919c584f8581fab0728', -- SHA256 hash of "salt_1234_secure"
   '{"managerName": "System Admin"}'::jsonb
 ) ON CONFLICT (id) DO UPDATE SET
@@ -115,7 +115,7 @@ INSERT INTO users (
   'superadmin@mamasafe.ai',
   'Nairobi',
   'KE',
-  'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80',
+  NULL,
   '73facc41c0704fddfd11c5512b56544eff4e0583b000a919c584f8581fab0728', -- SHA256 hash of "salt_1234_secure"
   '{"managerName": "System Administrator"}'::jsonb
 ) ON CONFLICT (id) DO UPDATE SET
