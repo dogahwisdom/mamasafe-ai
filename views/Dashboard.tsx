@@ -599,9 +599,13 @@ export const DashboardView: React.FC<DashboardProps> = ({ onNavigate, user }) =>
               </div>
               <div>
                 <div className="text-2xl font-bold text-slate-900 dark:text-white">
-                  {totalLabTests > 0 ? Math.round((completedLabTests / totalLabTests) * 100) : 0}%
+                  {totalLabTests > 0
+                    ? `${Math.round((completedLabTests / totalLabTests) * 100)}%`
+                    : "—"}
                 </div>
-                <div className="text-xs text-slate-500 dark:text-slate-400">Test Completion Rate</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">
+                  {totalLabTests > 0 ? "Test Completion Rate" : "No tests today"}
+                </div>
               </div>
             </div>
           </div>

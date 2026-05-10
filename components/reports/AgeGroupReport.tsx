@@ -180,9 +180,7 @@ export const AgeGroupReport: React.FC<AgeGroupReportProps> = ({
       )}
 
       <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-4">
-        Note: “35+” is a subset of “Above 18”. If you need mutually exclusive age buckets, we can
-        change this to 19–34 and 35+. Card totals count workflow visits; the list shows unique
-        patients and how many of their visits fall in each band.
+        Note: “35+” overlaps with “Above 18”. Totals are visit-counts; lists show unique patients.
       </p>
     </div>
   );
