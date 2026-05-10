@@ -173,21 +173,12 @@ export class WhatsAppInboundOrchestrator {
     const facilityDisplayName = patient ? await this.repo.resolveFacilityDisplayName(patient) : null;
 
     if (!patient && !activeSession) {
-      const responseText = [
-        "Hello, welcome to MamaSafe AI. I can guide a quick health check to support safe next steps.",
-        "",
-        "Please reply with one option:",
-        "1. Pregnant mother",
-        "2. Baby (0-12 months)",
-        "3. General patient",
-        "",
-        "Reply with 1, 2, or 3, or send 'end' to stop.",
-      ].join("\n");
+      const responseText = this.questionnaire.startMessage("there", null, false);
       const welcomeUpsert = await this.repo.upsertSession({
         phone,
         patientId: null,
         flowType: "intake",
-        stepKey: "choose_profile",
+        stepKey: "hub_menu",
         stepIndex: 0,
         answers: [],
         status: "active",
@@ -219,6 +210,7 @@ export class WhatsAppInboundOrchestrator {
         session: activeSession,
         patientName: this.getDisplayName(patient),
         facilityName: facilityDisplayName || undefined,
+        isRegisteredPatient: isRegisteredPatient,
       });
       responseText = flow.responseText;
       source = "whatsapp-webhook-questionnaire";

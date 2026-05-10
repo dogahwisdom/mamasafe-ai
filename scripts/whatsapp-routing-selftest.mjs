@@ -237,7 +237,10 @@ const cloud = new MockCloud();
   const repo = new StatefulRecordingRepo(patient);
   const orch = new WhatsAppInboundOrchestrator({ repo, cloud, questionnaire });
   await orch.handleInboundMessage({ id: "r1", from: "233241234567", type: "text", text: { body: "hi" } });
-  assert.ok(repo.outbounds.at(-1).body.includes("Who is this check"));
+  assert.ok(
+    /Guided health check|Visit & scheduling|Contact a care team/i.test(repo.outbounds.at(-1).body),
+    "registered hi should open main hub menu"
+  );
 
   const patientWithFacility = {
     ...patient,

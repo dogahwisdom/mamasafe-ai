@@ -1,3 +1,7 @@
+import { formatHubWelcome, parseMainMenuChoice } from "./whatsapp-hub-menu.js";
+import { routeActiveIntakeMenu } from "./whatsapp-intake-menu-router.js";
+import { FLOW_QUESTION_BANK } from "./whatsapp-flow-question-bank.js";
+
 const RISK = {
   LOW: "Low",
   HIGH: "High",
@@ -18,69 +22,6 @@ const DANGER_KEYWORDS = [
   "reduced movement",
 ];
 
-const FLOW_QUESTION_BANK = {
-  pregnancy: [
-    {
-      key: "preg_danger_signs",
-      text: "Are you having severe headache, blurred vision, bleeding, or fever?",
-      options: ["Yes", "No"],
-      criticalOn: [1],
-    },
-    {
-      key: "preg_appointment",
-      text: "Have you missed your recent antenatal check-up?",
-      options: ["Yes", "No"],
-      riskOn: [1],
-    },
-    {
-      key: "preg_diabetes",
-      text: "Hello Mum, have you tested for diabetes in this pregnancy?",
-      options: ["Yes", "No"],
-      riskOn: [2],
-    },
-  ],
-  baby: [
-    {
-      key: "baby_feeding",
-      text: "Is your baby feeding every 2-3 hours?",
-      options: ["Yes", "No"],
-      criticalOn: [2],
-    },
-    {
-      key: "baby_fever",
-      text: "Does your baby have fever, difficulty breathing, or convulsions?",
-      options: ["Yes", "No"],
-      criticalOn: [1],
-    },
-    {
-      key: "baby_diarrhea",
-      text: "Has your baby had diarrhea or vomiting since morning?",
-      options: ["Yes", "No"],
-      riskOn: [1],
-    },
-  ],
-  general: [
-    {
-      key: "gen_danger",
-      text: "Do you have severe pain, bleeding, breathing difficulty, or very high fever?",
-      options: ["Yes", "No"],
-      criticalOn: [1],
-    },
-    {
-      key: "gen_chronic",
-      text: "Do you have diabetes, hypertension, or another chronic condition?",
-      options: ["Yes", "No"],
-      riskOn: [1],
-    },
-    {
-      key: "gen_duration",
-      text: "Have these symptoms lasted for more than 48 hours?",
-      options: ["Yes", "No"],
-      riskOn: [1],
-    },
-  ],
-};
-
 /**
  * Handles reply-in-thread and quoted lines: users often put "1" on the last line after a quote block.
  */
@@ -94,7 +35,7 @@ function sanitizeQuestionnaireInput(raw) {
   if (nonempty.length === 0) return "";
   const last = nonempty[nonempty.length - 1];
   if (nonempty.length >= 2) {
-    if (/^[1-3]([\s.\)]|$)/.test(last)) return last;
+    if (/^[1-6]([\s.\)]|$)/.test(last)) return last;
     if (/^(yes|no)\b/i.test(last) || /^[yn]\b/i.test(last)) return last;
   }
   return nonempty.join(" ");
@@ -188,30 +129,53 @@ export class WhatsAppQuestionnaireService {
     const normalized = normalizeText(sanitized);
     if (!normalized) return true;
     if (this.startKeywords.has(normalized)) return true;
-    if (/^[1-3]$/.test(normalized)) return true;
+    if (/^[1-6]$/.test(normalized)) return true;
     if (parseIntakeChoice(sanitized)) return true;
+    if (parseMainMenuChoice(sanitized)) return true;
     if (
       normalized.includes("pregnant") ||
       normalized.includes("baby") ||
       /\bgeneral\b/.test(normalized) ||
-      /\bgeneral\s+patient\b/.test(normalized)
+      /\bgeneral\s+patient\b/.test(normalized) ||
+      /schedul|appointment|visit|book|pay|payment|human|staff|nurse|doctor/i.test(normalized)
     ) {
       return true;
     }
     return false;
   }
 
-  startMessage(patientName = "Mum/Patient", facilityName) {
-    return [
-      `Hello ${patientName}, we have 3 quick questions to support your care.`,
-      privacyLine(facilityName),
-      "",
-      renderQuestion("Who is this check for today?", [
-        "Pregnant mother",
-        "Baby (0-12 months)",
-        "General patient",
-      ]),
-    ].join("\n");
+  shortNameForMenu(displayName) {
+    const s = String(displayName || "").trim();
+    if (!s) return "";
+    return s.split(/\s+/)[0].slice(0, 40);
+  }
+
+  /** Hub session after info replies (4–6): user stays on the main menu. */
+  preserveHubSession(session) {
+    const ownerId = this.ownerPatientId(session);
+    return {
+      patient_id: ownerId,
+      patientId: ownerId,
+      flow_type: "intake",
+      flowType: "intake",
+      step_key: "hub_menu",
+      stepKey: "hub_menu",
+      step_index: 0,
+      stepIndex: 0,
+      answers: [],
+      status: "active",
+      completed_at: null,
+      completedAt: null,
+    };
+  }
+
+  startMessage(patientName = "Mum/Patient", facilityName, isRegistered = true) {
+    const first = this.shortNameForMenu(patientName === "Mum/Patient" ? "" : patientName);
+    return formatHubWelcome({
+      firstName: first,
+      facilityLabel: facilityName,
+      isRegistered,
+    });
   }
 
   buildStartSession(flowOwnerPatientId) {
@@ -222,8 +186,8 @@ export class WhatsAppQuestionnaireService {
       patient_id: id,
       flowType: "intake",
       flow_type: "intake",
-      stepKey: "choose_profile",
-      step_key: "choose_profile",
+      stepKey: "hub_menu",
+      step_key: "hub_menu",
       stepIndex: 0,
       step_index: 0,
       answers: [],
@@ -261,13 +225,18 @@ export class WhatsAppQuestionnaireService {
     };
   }
 
-  handleMessage({ messageText, session: sessionRow, patientName, facilityName }) {
+  handleMessage({ messageText, session: sessionRow, patientName, facilityName, isRegisteredPatient = true }) {
     const session = normalizeSessionRecord(sessionRow);
     const sanitized = sanitizeQuestionnaireInput(messageText);
     const normalizedMessage = normalizeText(sanitized);
 
     if (session?.status === "active" && this.startKeywords.has(normalizedMessage)) {
-      const resume = this.resumePromptForActiveSession(session, patientName, facilityName);
+      const resume = this.resumePromptForActiveSession(
+        session,
+        patientName,
+        facilityName,
+        isRegisteredPatient
+      );
       return {
         kind: "resume",
         responseText: resume,
@@ -278,7 +247,7 @@ export class WhatsAppQuestionnaireService {
     if (this.restartKeywords.has(normalizedMessage)) {
       return {
         kind: "restart",
-        responseText: this.startMessage(patientName, facilityName),
+        responseText: this.startMessage(patientName, facilityName, isRegisteredPatient),
         nextSession: this.buildStartSession(this.ownerPatientId(session)),
       };
     }
@@ -299,28 +268,28 @@ export class WhatsAppQuestionnaireService {
     const inactive = !session || session.status !== "active";
 
     if (inactive) {
-      const intakePick = parseIntakeChoice(sanitized);
-      if (intakePick >= 1 && intakePick <= 3) {
-        return this.transitionIntakeToBranch(intakePick, session);
+      const hubPick = parseMainMenuChoice(sanitized);
+      if (hubPick >= 1 && hubPick <= 3) {
+        return this.transitionIntakeToBranch(hubPick, session);
       }
       return {
         kind: "start",
-        responseText: this.startMessage(patientName, facilityName),
+        responseText: this.startMessage(patientName, facilityName, isRegisteredPatient),
         nextSession: this.buildStartSession(this.ownerPatientId(session)),
       };
     }
 
     if (session.flow_type === "intake") {
-      if (!option) {
-        return {
-          kind: "invalid",
-          responseText:
-            "Please choose one option by sending 1, 2, or 3.\n\nYou can also type words like 'pregnant mother', 'baby', or 'general patient'.",
-          nextSession: session,
-        };
-      }
-
-      return this.transitionIntakeToBranch(option, session);
+      return routeActiveIntakeMenu({
+        session,
+        sanitized,
+        first: this.shortNameForMenu(patientName),
+        facilityName,
+        isRegisteredPatient,
+        parseIntakeChoice,
+        transitionIntakeToBranch: (n, s) => this.transitionIntakeToBranch(n, s),
+        preserveHubSession: (s) => this.preserveHubSession(s),
+      });
     }
 
     const questions = FLOW_QUESTION_BANK[session.flow_type] || [];
@@ -385,13 +354,23 @@ export class WhatsAppQuestionnaireService {
     };
   }
 
-  resumePromptForActiveSession(session, patientName, facilityName) {
+  resumePromptForActiveSession(session, patientName, facilityName, isRegisteredPatient = true) {
     const s = normalizeSessionRecord(session);
     if (!s || s.status !== "active") {
-      return this.startMessage(patientName, facilityName);
+      return this.startMessage(patientName, facilityName, isRegisteredPatient);
     }
     if (s.flow_type === "intake") {
-      return `${this.startMessage(patientName, facilityName)}\n\nReply with 1, 2, or 3, or send 'end' to stop.`;
+      const step = s.step_key || s.stepKey || "hub_menu";
+      if (step === "hub_menu") {
+        return `${formatHubWelcome({
+          firstName: this.shortNameForMenu(patientName),
+          facilityLabel: facilityName,
+          isRegistered: isRegisteredPatient,
+        })}\n\nSend 1–6 to choose, or *end* to stop.`;
+      }
+      if (step === "choose_profile") {
+        return `${this.startMessage(patientName, facilityName, isRegisteredPatient)}\n\nReply with 1, 2, or 3.`;
+      }
     }
     const questions = FLOW_QUESTION_BANK[s.flow_type] || [];
     const ridx = Number(s.step_index);
@@ -441,7 +420,7 @@ export class WhatsAppQuestionnaireService {
       riskLevel: RISK.LOW,
       reasoning: "No immediate danger keywords found in free-text input.",
       recommendedAction: "Continue monitoring and complete guided questionnaire.",
-      draftResponse: `${helloLead}To support safe care, please type 'hello' to begin our 3-question health check.`,
+      draftResponse: `${helloLead}To support safe care, send *hello* to open the MamaSafe menu and start a short guided check.`,
     };
   }
 
