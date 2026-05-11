@@ -26,6 +26,7 @@ export interface Database {
           pin_hash: string | null
           patient_data: Json | null
           facility_data: Json | null
+          auth_user_id: string | null
           created_at: string
           updated_at: string
         }
@@ -42,6 +43,7 @@ export interface Database {
           pin_hash?: string | null
           patient_data?: Json | null
           facility_data?: Json | null
+          auth_user_id?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -58,6 +60,7 @@ export interface Database {
           pin_hash?: string | null
           patient_data?: Json | null
           facility_data?: Json | null
+          auth_user_id?: string | null
           created_at?: string
           updated_at?: string
         }

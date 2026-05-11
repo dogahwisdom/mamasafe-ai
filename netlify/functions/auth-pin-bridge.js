@@ -1,7 +1,9 @@
 import { createClient } from "@supabase/supabase-js";
+import { createHash } from "node:crypto";
 import {
   hashPinForCompare,
   pinBridgeEmail,
+  pinBridgeEmailStable,
   syntheticPasswordForPinBridge,
 } from "./lib/pin-bridge-core.js";
 
@@ -25,6 +27,17 @@ function json(statusCode, body) {
 function isUuidLike(id) {
   const s = String(id || "").trim();
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s);
+}
+
+/** Stable auth.users id for legacy non-UUID public.users.id (same input → same UUID). */
+function deterministicLegacyAuthId(publicUserId) {
+  const hash = createHash("sha256").update(`mamasafe:legacy_auth:${String(publicUserId)}`).digest();
+  const b = Buffer.alloc(16);
+  hash.copy(b, 0, 0, 16);
+  b[6] = (b[6] & 0x0f) | 0x50;
+  b[8] = (b[8] & 0x3f) | 0x80;
+  const h = b.toString("hex");
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20, 32)}`;
 }
 
 function parseHostname(urlish) {
@@ -140,12 +153,8 @@ export async function handler(event) {
   if (!pin) {
     return json(400, { ok: false, error: "PIN is required." });
   }
-  if (!isUuidLike(userId)) {
-    return json(400, {
-      ok: false,
-      error:
-        "This facility account must be updated before automated reminders can run. Please contact MamaSafe support.",
-    });
+  if (!userId) {
+    return json(400, { ok: false, error: "User id is required." });
   }
 
   const admin = createServiceClient();
@@ -154,7 +163,11 @@ export async function handler(event) {
     return json(500, { ok: false, error: "Supabase is not configured on the server." });
   }
 
-  const { data: row, error: rowErr } = await admin.from("users").select("id, pin_hash").eq("id", userId).maybeSingle();
+  const { data: row, error: rowErr } = await admin
+    .from("users")
+    .select("id, pin_hash, auth_user_id")
+    .eq("id", userId)
+    .maybeSingle();
   if (rowErr || !row?.pin_hash) {
     return json(401, { ok: false, error: "Invalid credentials." });
   }
@@ -162,18 +175,30 @@ export async function handler(event) {
     return json(401, { ok: false, error: "Invalid credentials." });
   }
 
-  const emailDomain = String(process.env.AUTH_PIN_BRIDGE_EMAIL_DOMAIN || "pin-bridge.local").trim() || "pin-bridge.local";
-  const email = pinBridgeEmail(userId, emailDomain);
-  const synthetic = syntheticPasswordForPinBridge(userId, pin, pepper);
+  const publicId = String(row.id);
+  const storedAuth = row.auth_user_id != null ? String(row.auth_user_id).trim() : "";
+  let authUserId = null;
+  if (storedAuth && isUuidLike(storedAuth)) {
+    authUserId = storedAuth;
+  } else if (isUuidLike(publicId)) {
+    authUserId = publicId;
+  } else {
+    authUserId = deterministicLegacyAuthId(publicId);
+  }
 
-  const up = await admin.auth.admin.updateUserById(userId, {
+  const emailDomain = String(process.env.AUTH_PIN_BRIDGE_EMAIL_DOMAIN || "pin-bridge.local").trim() || "pin-bridge.local";
+  const useLegacyPinEmail = isUuidLike(publicId);
+  const email = useLegacyPinEmail ? pinBridgeEmail(publicId, emailDomain) : pinBridgeEmailStable(publicId, emailDomain);
+  const synthetic = syntheticPasswordForPinBridge(publicId, pin, pepper);
+
+  const up = await admin.auth.admin.updateUserById(authUserId, {
     email,
     password: synthetic,
     email_confirm: true,
   });
   if (up.error) {
     const cr = await admin.auth.admin.createUser({
-      id: userId,
+      id: authUserId,
       email,
       password: synthetic,
       email_confirm: true,
@@ -184,7 +209,7 @@ export async function handler(event) {
         console.error("auth-pin-bridge createUser:", cr.error);
         return json(500, { ok: false, error: "Could not create auth session user." });
       }
-      const up2 = await admin.auth.admin.updateUserById(userId, {
+      const up2 = await admin.auth.admin.updateUserById(authUserId, {
         email,
         password: synthetic,
         email_confirm: true,
@@ -194,6 +219,20 @@ export async function handler(event) {
         return json(500, { ok: false, error: "Could not sync auth credentials." });
       }
     }
+  }
+
+  try {
+    const { error: linkErr } = await admin.from("users").update({ auth_user_id: authUserId }).eq("id", publicId);
+    if (linkErr) {
+      const msg = String(linkErr.message || "").toLowerCase();
+      if (msg.includes("auth_user_id") || msg.includes("column")) {
+        console.warn("auth-pin-bridge: auth_user_id column missing — run Supabase migration 20260511140000_users_auth_user_id.sql");
+      } else {
+        console.warn("auth-pin-bridge: could not persist auth_user_id:", linkErr.message);
+      }
+    }
+  } catch (e) {
+    console.warn("auth-pin-bridge: auth_user_id update threw:", e instanceof Error ? e.message : String(e));
   }
 
   const { data: signData, error: signErr } = await anon.auth.signInWithPassword({
