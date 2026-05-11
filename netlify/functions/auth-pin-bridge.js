@@ -27,12 +27,42 @@ function isUuidLike(id) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s);
 }
 
+function parseHostname(urlish) {
+  try {
+    const u = String(urlish || "").trim();
+    if (!u) return "";
+    const withProto = /^https?:\/\//i.test(u) ? u : `https://${u}`;
+    return new URL(withProto).hostname.toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
+function stripLeadingWww(hostname) {
+  const h = String(hostname || "").toLowerCase();
+  return h.startsWith("www.") ? h.slice(4) : h;
+}
+
+/** deploy-preview-12--mysite.netlify.app → mysite.netlify.app */
+function deployNormalizedHost(hostname) {
+  const h = String(hostname || "").toLowerCase();
+  const m = h.match(/^deploy-(?:preview-\d+|[^-]+)--(.+)$/);
+  return m ? m[1] : h;
+}
+
+function normalizedSiteHost(hostname) {
+  return deployNormalizedHost(stripLeadingWww(hostname));
+}
+
 function originLikelyFirstParty(event) {
-  const origin = String(headerGet(event?.headers || {}, "origin") || "").replace(/\/+$/, "");
-  const referer = String(headerGet(event?.headers || {}, "referer") || "");
+  const originRaw = String(headerGet(event?.headers || {}, "origin") || "").trim();
+  const refererRaw = String(headerGet(event?.headers || {}, "referer") || "").trim();
+  const origin = originRaw.replace(/\/+$/, "");
+
   if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin)) return true;
-  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\//i.test(referer)) return true;
-  const candidates = [
+  if (refererRaw && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\//i.test(refererRaw)) return true;
+
+  const candidateUrls = [
     process.env.URL,
     process.env.DEPLOY_PRIME_URL,
     process.env.DEPLOY_URL,
@@ -40,12 +70,26 @@ function originLikelyFirstParty(event) {
   ]
     .filter(Boolean)
     .flatMap((x) => String(x).split(","))
-    .map((x) => x.trim().replace(/\/+$/, ""))
+    .map((x) => x.trim())
     .filter(Boolean);
 
-  if (candidates.length === 0) return true;
-  if (origin && candidates.some((c) => origin === c || origin.startsWith(`${c}/`))) return true;
-  if (referer && candidates.some((c) => referer.startsWith(`${c}/`) || referer === c)) return true;
+  const originHost = origin ? normalizedSiteHost(parseHostname(origin)) : "";
+  const refHost = refererRaw ? normalizedSiteHost(parseHostname(refererRaw)) : "";
+  const probe = originHost || refHost;
+
+  if (candidateUrls.length === 0) return true;
+
+  const allowedHosts = new Set(
+    candidateUrls.map((c) => normalizedSiteHost(parseHostname(c))).filter(Boolean)
+  );
+
+  if (!probe) return false;
+
+  for (const ah of allowedHosts) {
+    if (!ah) continue;
+    if (probe === ah) return true;
+    if (probe.endsWith(`--${ah}`)) return true;
+  }
   return false;
 }
 

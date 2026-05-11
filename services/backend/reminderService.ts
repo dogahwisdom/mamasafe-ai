@@ -74,10 +74,17 @@ export class ReminderService {
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) {
+        const reason = payload?.reason || payload?.error || `http_${response.status}`;
+        const detail = typeof payload?.detail === "string" ? payload.detail.trim() : "";
+        const baseErr =
+          typeof payload?.error === "string" && payload.error.trim()
+            ? payload.error.trim()
+            : "Reminder dispatch failed.";
+        const combined = [baseErr, `(${reason})`, detail].filter(Boolean).join(" ");
         return {
           ok: false,
-          reason: payload?.reason || payload?.error || `http_${response.status}`,
-          error: payload?.error,
+          reason,
+          error: combined,
           scanned: payload?.scanned,
           sent: payload?.sent,
           failed: payload?.failed,

@@ -24,22 +24,27 @@ export async function authorizeReminderDispatch(event, createSupabaseAdmin) {
   const sharedSecret = String(process.env.REMINDER_DISPATCH_SECRET || "").trim();
 
   const headers = event?.headers || {};
-  const authHeader = String(headerGet(headers, "authorization"));
+  const authHeader = String(headerGet(headers, "authorization")).trim();
+  const bearer = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
 
-  if (sharedSecret && authHeader === `Bearer ${sharedSecret}`) {
+  if (sharedSecret && bearer === sharedSecret) {
     return { ok: true, kind: "shared_secret", role: null };
   }
 
-  const bearer = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
   if (bearer && bearer !== sharedSecret) {
     const fromJwt = await validateSupabaseUserToken(bearer, createSupabaseAdmin);
     if (fromJwt.ok) return fromJwt;
+    return { ok: false, reason: fromJwt.reason || "invalid_reminder_dispatch_token" };
   }
 
   // When auth is enforced, do NOT trust schedule heuristics (headers/UA are spoofable).
   // Use `REMINDER_DISPATCH_SECRET` via the cron proxy function instead.
   if (!enforce && isLikelyNetlifyScheduledInvocation(event)) {
     return { ok: true, kind: "schedule", role: null };
+  }
+
+  if (sharedSecret && !bearer) {
+    return { ok: false, reason: "missing_authorization" };
   }
 
   if (!enforce && !sharedSecret) {
@@ -94,7 +99,10 @@ async function validateSupabaseUserToken(accessToken, createSupabaseAdmin) {
     }
 
     if (!profile) {
-      return { ok: false, reason: profileErr ? "profile_lookup_error" : "profile_not_found" };
+      return {
+        ok: false,
+        reason: profileErr ? "profile_lookup_error" : "profile_not_found",
+      };
     }
 
     const role = String(profile.role || "");

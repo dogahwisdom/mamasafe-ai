@@ -276,6 +276,23 @@ async function processDueReminders(options = {}) {
   return { ok: true, scanned: (reminders || []).length, sent, failed, skipped };
 }
 
+function dispatchAuthDetail(reason) {
+  const r = String(reason || "");
+  const hints = {
+    missing_authorization:
+      "Sign out, then sign in again with your PIN so the app can attach a Supabase session (auth-pin-bridge).",
+    invalid_token: "Session expired or invalid — sign out and sign in again.",
+    profile_not_found:
+      "Your Supabase Auth user is not linked to a MamaSafe users row. Contact support or re-register the facility user.",
+    forbidden_role: "This account role cannot send reminders (clinic, pharmacy, or superadmin only).",
+    missing_supabase_or_token:
+      "Netlify Functions need SUPABASE_ANON_KEY or VITE_SUPABASE_ANON_KEY available at runtime.",
+    service_role_missing: "Netlify needs SUPABASE_SERVICE_ROLE_KEY for reminder dispatch.",
+    profile_lookup_error: "Could not read your user profile from the database.",
+  };
+  return hints[r] || null;
+}
+
 function parseDispatchRequestBody(eventBody) {
   if (!eventBody || typeof eventBody !== "string") {
     return { reminderIds: [], facilityScopeId: null, includeTestPatientsRequest: false };
@@ -309,9 +326,11 @@ export async function handler(event) {
     await logSystemEvent(admin, "reminder_dispatch_unauthorized", null, {
       reason: auth.reason || "unauthorized",
     });
+    const reason = auth.reason || "unauthorized_reminder_dispatch";
     return json(401, {
       ok: false,
-      reason: auth.reason || "unauthorized_reminder_dispatch",
+      reason,
+      detail: dispatchAuthDetail(reason),
       error: "Reminder dispatch is not authorized for this caller.",
       scanned: 0,
       sent: 0,
