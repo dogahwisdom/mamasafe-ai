@@ -280,15 +280,15 @@ function dispatchAuthDetail(reason) {
   const r = String(reason || "");
   const hints = {
     missing_authorization:
-      "Sign out, then sign in again with your PIN so the app can attach a Supabase session (auth-pin-bridge).",
-    invalid_token: "Session expired or invalid — sign out and sign in again.",
+      "Please sign out and sign in again with your facility PIN, then try sending reminders.",
+    invalid_token: "Your session has expired. Sign out and sign in again.",
     profile_not_found:
-      "Your Supabase Auth user is not linked to a MamaSafe users row. Contact support or re-register the facility user.",
-    forbidden_role: "This account role cannot send reminders (clinic, pharmacy, or superadmin only).",
+      "We couldn’t match your login to your facility profile. Please contact MamaSafe support.",
+    forbidden_role: "This type of account can’t send facility reminders from here.",
     missing_supabase_or_token:
-      "Netlify Functions need SUPABASE_ANON_KEY or VITE_SUPABASE_ANON_KEY available at runtime.",
-    service_role_missing: "Netlify needs SUPABASE_SERVICE_ROLE_KEY for reminder dispatch.",
-    profile_lookup_error: "Could not read your user profile from the database.",
+      "A server setting is incomplete. Please contact MamaSafe support.",
+    service_role_missing: "A server setting is incomplete. Please contact MamaSafe support.",
+    profile_lookup_error: "We couldn’t load your profile. Try again in a moment or contact support.",
   };
   return hints[r] || null;
 }
@@ -331,7 +331,7 @@ export async function handler(event) {
       ok: false,
       reason,
       detail: dispatchAuthDetail(reason),
-      error: "Reminder dispatch is not authorized for this caller.",
+      error: "We couldn’t authorize sending reminders from this session.",
       scanned: 0,
       sent: 0,
       failed: 0,

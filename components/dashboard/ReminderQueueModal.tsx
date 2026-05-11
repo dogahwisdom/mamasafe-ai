@@ -3,6 +3,7 @@ import { X, Send, RefreshCw } from 'lucide-react';
 import { backend } from '../../services/backend';
 import { supabase, isSupabaseConfigured } from '../../services/supabaseClient';
 import type { Reminder } from '../../types';
+import { reminderQueueModalSessionHint } from '../../services/userFacingReminderSession';
 
 type Props = {
   open: boolean;
@@ -88,9 +89,7 @@ export const ReminderQueueModal: React.FC<Props> = ({
       const { data } = await supabase.auth.getSession();
       if (cancelled) return;
       if (!data.session?.access_token) {
-        setDispatchSessionHint(
-          'No Supabase session in this browser — sign out, then sign in with your PIN. If you already did, open DevTools → Network and inspect the auth-pin-bridge response.'
-        );
+        setDispatchSessionHint(reminderQueueModalSessionHint());
       } else {
         setDispatchSessionHint('');
       }

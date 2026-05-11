@@ -6,6 +6,10 @@ import { EnrollmentView } from './views/Enrollment';
 import { TriageView } from './views/Triage';
 import { PatientsView } from './views/Patients';
 import { AuthView, type AuthSuccessMeta } from './views/Auth';
+import {
+  reminderSessionBannerAfterPinFailure,
+  reminderSessionBannerColdStart,
+} from './services/userFacingReminderSession';
 import { PatientDashboard } from './views/PatientDashboard';
 import { PharmacyDashboard } from './views/PharmacyDashboard';
 import { PharmacyReports } from './views/PharmacyReports';
@@ -140,9 +144,7 @@ export const App: React.FC = () => {
         setPinSessionNotice(null);
       } else {
         setPinSessionNotice(
-          (prev) =>
-            prev ??
-            'No Supabase session on this browser — sign out and sign in with your PIN so WhatsApp reminders can authorize.'
+          (prev) => prev ?? reminderSessionBannerColdStart()
         );
       }
     })();
@@ -153,12 +155,11 @@ export const App: React.FC = () => {
 
   const handleLoginSuccess = (user: UserProfile, meta?: AuthSuccessMeta) => {
     if (meta?.pinSessionSyncFailed) {
-      const detail = [meta.pinSessionSyncHttpStatus, meta.pinSessionSyncError]
+      const technical = [meta.pinSessionSyncHttpStatus, meta.pinSessionSyncError]
         .filter((x) => x !== undefined && x !== '')
-        .join(' — ');
-      setPinSessionNotice(
-        `Reminders need a Supabase login session. auth-pin-bridge failed: ${detail || 'unknown error'}. Check Netlify function logs and Supabase Auth (synthetic email domain).`
-      );
+        .join(" — ");
+      console.warn("[MamaSafe] Reminder session sync (for support):", technical);
+      setPinSessionNotice(reminderSessionBannerAfterPinFailure(meta.pinSessionSyncError));
     } else {
       setPinSessionNotice(null);
     }

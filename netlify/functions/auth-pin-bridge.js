@@ -144,7 +144,7 @@ export async function handler(event) {
     return json(400, {
       ok: false,
       error:
-        "users.id must be a UUID to link Supabase Auth. If this account was created with a legacy id, create a new facility user or migrate the row to a UUID id.",
+        "This facility account must be updated before automated reminders can run. Please contact MamaSafe support.",
     });
   }
 
