@@ -3,7 +3,20 @@
  */
 
 export function reminderSessionBannerAfterPinFailure(error?: string): string {
-  const e = String(error || "").toLowerCase();
+  const raw = String(error || "").trim();
+  if (
+    raw.startsWith("Reminders ") ||
+    raw.startsWith("Too many sign-in") ||
+    raw.startsWith("Your PIN worked") ||
+    raw.startsWith("The sign-in email format")
+  ) {
+    return raw;
+  }
+
+  const e = raw.toLowerCase();
+  if (e.includes("jwt") || e.includes("refresh token") || e.includes("invalid refresh")) {
+    return "Your secure session could not be applied in this browser. Sign out, sign in with your PIN again, or contact MamaSafe support if this continues.";
+  }
   if (
     e.includes("uuid") ||
     e.includes("legacy") ||

@@ -241,8 +241,27 @@ export async function handler(event) {
   });
 
   if (signErr || !signData?.session?.access_token) {
-    console.error("auth-pin-bridge signInWithPassword:", signErr?.message);
-    return json(500, { ok: false, error: "Could not start Supabase session." });
+    const raw = String(signErr?.message || "unknown_sign_in_error");
+    console.error("auth-pin-bridge signInWithPassword:", raw, signErr?.status);
+    const lower = raw.toLowerCase();
+    let userError =
+      "Reminders could not start a secure browser session. Please contact MamaSafe support if this continues.";
+    if (lower.includes("email not confirmed") || lower.includes("confirm your email")) {
+      userError =
+        "Reminders are blocked until email sign-in is adjusted in the MamaSafe backend (confirmation policy). Please contact MamaSafe support.";
+    } else if (lower.includes("signup") && lower.includes("disabled")) {
+      userError =
+        "Reminders need the Email sign-in option turned on in the MamaSafe backend. Please contact MamaSafe support.";
+    } else if (lower.includes("invalid login") || lower.includes("invalid grant") || lower.includes("wrong")) {
+      userError =
+        "Your PIN worked, but the secure follow-up step did not match. Sign out, sign in again, then contact MamaSafe support if it repeats.";
+    } else if (lower.includes("email") && (lower.includes("invalid") || lower.includes("format"))) {
+      userError =
+        "The sign-in email format was rejected by the MamaSafe backend. Ask support to set AUTH_PIN_BRIDGE_EMAIL_DOMAIN to a valid domain.";
+    } else if (lower.includes("rate limit") || lower.includes("too many")) {
+      userError = "Too many sign-in attempts. Please wait a few minutes and try again.";
+    }
+    return json(500, { ok: false, error: userError, diagnostic: raw });
   }
 
   const s = signData.session;

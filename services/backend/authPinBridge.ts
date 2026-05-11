@@ -34,13 +34,15 @@ export async function syncSupabaseSessionAfterPinLogin(
       access_token?: string;
       refresh_token?: string;
       error?: string;
+      diagnostic?: string;
     };
     if (!res.ok || !payload.access_token || !payload.refresh_token) {
       const errMsg =
         typeof payload.error === "string" && payload.error.trim()
           ? payload.error.trim()
           : `HTTP ${res.status}`;
-      console.warn("[MamaSafe] auth-pin-bridge failed:", errMsg);
+      const diag = typeof payload.diagnostic === "string" ? payload.diagnostic.trim() : "";
+      console.warn("[MamaSafe] auth-pin-bridge failed:", errMsg, diag ? `(diagnostic: ${diag})` : "");
       return { ok: false, error: errMsg, httpStatus: res.status };
     }
     const { error } = await supabase.auth.setSession({
