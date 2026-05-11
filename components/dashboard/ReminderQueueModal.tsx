@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { X, Send, RefreshCw } from 'lucide-react';
 import { backend } from '../../services/backend';
+import { supabase, isSupabaseConfigured } from '../../services/supabaseClient';
 import type { Reminder } from '../../types';
 
 type Props = {
@@ -45,6 +46,7 @@ export const ReminderQueueModal: React.FC<Props> = ({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [statusLine, setStatusLine] = useState('');
+  const [dispatchSessionHint, setDispatchSessionHint] = useState('');
   const [includeTestPatients, setIncludeTestPatients] = useState(false);
 
   const load = useCallback(async () => {
@@ -71,6 +73,32 @@ export const ReminderQueueModal: React.FC<Props> = ({
     if (!open) return;
     void load();
   }, [open, load]);
+
+  useEffect(() => {
+    if (!open) {
+      setDispatchSessionHint('');
+      return;
+    }
+    if (!isSupabaseConfigured()) {
+      setDispatchSessionHint('');
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const { data } = await supabase.auth.getSession();
+      if (cancelled) return;
+      if (!data.session?.access_token) {
+        setDispatchSessionHint(
+          'No Supabase session in this browser — sign out, then sign in with your PIN. If you already did, open DevTools → Network and inspect the auth-pin-bridge response.'
+        );
+      } else {
+        setDispatchSessionHint('');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
 
   const toggle = (id: string) => {
     setSelected((prev) => {
@@ -145,6 +173,12 @@ export const ReminderQueueModal: React.FC<Props> = ({
             <X size={20} />
           </button>
         </div>
+
+        {dispatchSessionHint ? (
+          <div className="border-b border-amber-200 bg-amber-50 px-5 py-2 text-xs text-amber-950 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-100">
+            {dispatchSessionHint}
+          </div>
+        ) : null}
 
         <div className="flex shrink-0 gap-2 border-b border-slate-100 px-5 py-2 dark:border-slate-800">
           <button

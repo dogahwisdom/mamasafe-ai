@@ -14,7 +14,7 @@ import {
 } from "./shared";
 import { supabase, isSupabaseConfigured } from "../supabaseClient";
 import { MessagingService } from "./messagingService";
-import { syncSupabaseSessionAfterPinLogin } from "./authPinBridge";
+import { syncSupabaseSessionAfterPinLogin, type PinSessionSyncResult } from "./authPinBridge";
 
 export class AuthService {
   private defaultTimeZoneForCountry(countryCode: string | null | undefined): string | undefined {
@@ -509,7 +509,7 @@ export class AuthService {
   public async login(
     identifier: string,
     password: string
-  ): Promise<{ user: UserProfile }> {
+  ): Promise<{ user: UserProfile; pinSessionSync?: PinSessionSyncResult }> {
     await delay(500);
 
     const rawInput = identifier.trim();
@@ -614,8 +614,11 @@ export class AuthService {
       // Store session
       storage.set(KEYS.CURRENT_USER, user);
       storage.set(KEYS.SESSION, "true");
-      await syncSupabaseSessionAfterPinLogin(String(dbUser.id), cleanPassword);
-      return { user };
+      const pinSessionSync = await syncSupabaseSessionAfterPinLogin(
+        String(dbUser.id),
+        cleanPassword
+      );
+      return { user, pinSessionSync };
     }
 
     // Fallback to localStorage
@@ -729,7 +732,7 @@ export class AuthService {
 
   public async register(
     user: UserProfile & { pin: string }
-  ): Promise<{ user: UserProfile }> {
+  ): Promise<{ user: UserProfile; pinSessionSync?: PinSessionSyncResult }> {
     await delay(500);
 
     const cleanPhone = normalizePhone(user.phone);
@@ -812,8 +815,11 @@ export class AuthService {
         const profile = this.dbRowToProfile(updated as Record<string, unknown>);
         storage.set(KEYS.CURRENT_USER, profile);
         storage.set(KEYS.SESSION, "true");
-        await syncSupabaseSessionAfterPinLogin(String(profile.id), user.pin);
-        return { user: profile };
+        const pinSessionSync = await syncSupabaseSessionAfterPinLogin(
+          String(profile.id),
+          user.pin
+        );
+        return { user: profile, pinSessionSync };
       } else {
         const insertPayload = {
           ...baseUserData,
@@ -830,8 +836,11 @@ export class AuthService {
         const profile = this.dbRowToProfile(newUser as Record<string, unknown>);
         storage.set(KEYS.CURRENT_USER, profile);
         storage.set(KEYS.SESSION, "true");
-        await syncSupabaseSessionAfterPinLogin(String(profile.id), user.pin);
-        return { user: profile };
+        const pinSessionSync = await syncSupabaseSessionAfterPinLogin(
+          String(profile.id),
+          user.pin
+        );
+        return { user: profile, pinSessionSync };
       }
     }
 

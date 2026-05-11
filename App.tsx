@@ -5,7 +5,7 @@ import { DashboardView } from './views/Dashboard';
 import { EnrollmentView } from './views/Enrollment';
 import { TriageView } from './views/Triage';
 import { PatientsView } from './views/Patients';
-import { AuthView } from './views/Auth';
+import { AuthView, type AuthSuccessMeta } from './views/Auth';
 import { PatientDashboard } from './views/PatientDashboard';
 import { PharmacyDashboard } from './views/PharmacyDashboard';
 import { PharmacyReports } from './views/PharmacyReports';
@@ -22,9 +22,10 @@ import { OutreachMonitorView } from './views/OutreachMonitorView';
 import { TopNav } from './components/navigation/TopNav';
 import { ClinicIdentityBadge } from './components/dashboard/ClinicIdentityBadge';
 import { backend } from './services/backend';
+import { supabase, isSupabaseConfigured } from './services/supabaseClient';
 import { ViewState, Alert, Patient, UserProfile, UserRole } from './types';
 import { Permissions } from './services/permissions';
-import { LayoutDashboard, UserPlus, Stethoscope, Sun, Moon, Bell, LogOut, Users, X, HelpCircle, Book, ExternalLink, MessageSquare, Phone, Clock, FileText, Settings, Loader2, CheckCircle, Workflow, BarChart2, Package, Receipt, UserCog, Radar } from 'lucide-react';
+import { LayoutDashboard, UserPlus, Stethoscope, Sun, Moon, Bell, LogOut, Users, X, HelpCircle, Book, ExternalLink, MessageSquare, Phone, Clock, FileText, Settings, Loader2, CheckCircle, Workflow, BarChart2, Package, Receipt, UserCog, Radar, AlertCircle } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -33,6 +34,8 @@ export const App: React.FC = () => {
   const [darkMode, setDarkMode] = useState(false);
   const [showResources, setShowResources] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  /** PIN login could not start Supabase Auth (auth-pin-bridge); reminders need Bearer JWT. */
+  const [pinSessionNotice, setPinSessionNotice] = useState<string | null>(null);
 
   // Centralized Patient State via Backend
   const [patients, setPatients] = useState<Patient[]>([]);
@@ -124,7 +127,41 @@ export const App: React.FC = () => {
     }
   }, [darkMode]);
 
-  const handleLoginSuccess = (user: UserProfile) => {
+  useEffect(() => {
+    if (!isAuthenticated || !currentUser) return;
+    const r = currentUser.role;
+    if (r !== 'clinic' && r !== 'pharmacy' && r !== 'superadmin') return;
+    if (!isSupabaseConfigured()) return;
+    let cancelled = false;
+    void (async () => {
+      const { data } = await supabase.auth.getSession();
+      if (cancelled) return;
+      if (data.session?.access_token) {
+        setPinSessionNotice(null);
+      } else {
+        setPinSessionNotice(
+          (prev) =>
+            prev ??
+            'No Supabase session on this browser — sign out and sign in with your PIN so WhatsApp reminders can authorize.'
+        );
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, currentUser?.id, currentUser?.role]);
+
+  const handleLoginSuccess = (user: UserProfile, meta?: AuthSuccessMeta) => {
+    if (meta?.pinSessionSyncFailed) {
+      const detail = [meta.pinSessionSyncHttpStatus, meta.pinSessionSyncError]
+        .filter((x) => x !== undefined && x !== '')
+        .join(' — ');
+      setPinSessionNotice(
+        `Reminders need a Supabase login session. auth-pin-bridge failed: ${detail || 'unknown error'}. Check Netlify function logs and Supabase Auth (synthetic email domain).`
+      );
+    } else {
+      setPinSessionNotice(null);
+    }
     setCurrentUser(user);
     setIsAuthenticated(true);
   };
@@ -133,6 +170,7 @@ export const App: React.FC = () => {
     await backend.auth.logout();
     setIsAuthenticated(false);
     setCurrentUser(null);
+    setPinSessionNotice(null);
     setCurrentView('dashboard');
   };
 
@@ -253,6 +291,26 @@ export const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#F5F5F7] dark:bg-black text-slate-900 dark:text-slate-50 font-sans transition-colors duration-500 relative selection:bg-brand-500/30">
+
+      {pinSessionNotice && (
+        <div
+          className="fixed left-0 right-0 top-14 sm:top-16 z-[56] border-b border-amber-200/80 dark:border-amber-800/50 bg-amber-100/95 dark:bg-amber-950/90 px-3 py-2 sm:px-4 flex items-start gap-2 shadow-sm"
+          role="status"
+        >
+          <AlertCircle className="text-amber-800 dark:text-amber-200 shrink-0 mt-0.5" size={18} />
+          <p className="text-xs sm:text-sm text-amber-950 dark:text-amber-100 flex-1 leading-snug">
+            {pinSessionNotice}
+          </p>
+          <button
+            type="button"
+            onClick={() => setPinSessionNotice(null)}
+            className="p-1 rounded-lg text-amber-900 dark:text-amber-200 hover:bg-amber-200/80 dark:hover:bg-amber-900/50 shrink-0"
+            aria-label="Dismiss notice"
+          >
+            <X size={18} />
+          </button>
+        </div>
+      )}
 
       {/* Help & Resources Modal */}
       {showResources && (

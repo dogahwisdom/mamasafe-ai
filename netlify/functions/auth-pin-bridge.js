@@ -137,8 +137,15 @@ export async function handler(event) {
 
   const userId = String(body.userId || "").trim();
   const pin = String(body.pin || "");
-  if (!isUuidLike(userId) || !pin) {
-    return json(400, { ok: false, error: "userId and pin are required." });
+  if (!pin) {
+    return json(400, { ok: false, error: "PIN is required." });
+  }
+  if (!isUuidLike(userId)) {
+    return json(400, {
+      ok: false,
+      error:
+        "users.id must be a UUID to link Supabase Auth. If this account was created with a legacy id, create a new facility user or migrate the row to a UUID id.",
+    });
   }
 
   const admin = createServiceClient();

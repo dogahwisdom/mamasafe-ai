@@ -3,6 +3,17 @@ import React, { useState } from 'react';
 import { Logo } from '../components/Logo';
 import { UserRole, UserProfile } from '../types';
 import { backend } from '../services/backend';
+import type { PinSessionSyncResult } from '../services/backend/authPinBridge';
+
+function roleNeedsDispatchSession(r: UserRole) {
+  return r === 'clinic' || r === 'pharmacy' || r === 'superadmin';
+}
+
+export type AuthSuccessMeta = {
+  pinSessionSyncFailed?: boolean;
+  pinSessionSyncError?: string;
+  pinSessionSyncHttpStatus?: number;
+};
 import { 
   Loader2, AlertCircle, ArrowRight, Eye, EyeOff, Globe, Check, ChevronDown, ChevronLeft, Mail, Building2, Pill, User, X
 } from 'lucide-react';
@@ -74,7 +85,7 @@ const GoogleButton = ({ onClick, loading }: { onClick: () => void, loading: bool
 );
 
 interface AuthProps {
-  onSuccess: (user: UserProfile) => void;
+  onSuccess: (user: UserProfile, meta?: AuthSuccessMeta) => void;
 }
 
 export const AuthView: React.FC<AuthProps> = ({ onSuccess }) => {
@@ -116,8 +127,24 @@ export const AuthView: React.FC<AuthProps> = ({ onSuccess }) => {
     setError('');
 
     try {
-      const { user } = await backend.auth.login(identifier.trim(), password.trim());
-      onSuccess(user);
+      const { user, pinSessionSync } = await backend.auth.login(
+        identifier.trim(),
+        password.trim()
+      );
+      let meta: AuthSuccessMeta | undefined;
+      if (
+        roleNeedsDispatchSession(user.role) &&
+        pinSessionSync &&
+        !pinSessionSync.ok
+      ) {
+        const p = pinSessionSync as Extract<PinSessionSyncResult, { ok: false }>;
+        meta = {
+          pinSessionSyncFailed: true,
+          pinSessionSyncError: p.error,
+          pinSessionSyncHttpStatus: p.httpStatus,
+        };
+      }
+      onSuccess(user, meta);
     } catch (err: any) {
       setError(err.message || 'Incorrect ID or Password.');
     } finally {
@@ -182,8 +209,21 @@ export const AuthView: React.FC<AuthProps> = ({ onSuccess }) => {
             }
           : undefined
       };
-      const { user } = await backend.auth.register(newUser as any);
-      onSuccess(user);
+      const { user, pinSessionSync } = await backend.auth.register(newUser as any);
+      let meta: AuthSuccessMeta | undefined;
+      if (
+        roleNeedsDispatchSession(user.role) &&
+        pinSessionSync &&
+        !pinSessionSync.ok
+      ) {
+        const p = pinSessionSync as Extract<PinSessionSyncResult, { ok: false }>;
+        meta = {
+          pinSessionSyncFailed: true,
+          pinSessionSyncError: p.error,
+          pinSessionSyncHttpStatus: p.httpStatus,
+        };
+      }
+      onSuccess(user, meta);
     } catch (err: any) {
       setError(err.message || 'Registration failed.');
     } finally {
