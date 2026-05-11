@@ -28,31 +28,44 @@ export function pharmacyInventoryStorageKey(facilityUserId: string): string {
 
 export const normalizePhone = (phone: string) => {
   if (!phone) return "";
-  let clean = phone.replace(/[^0-9+]/g, "");
+  const cleanedInput = phone.replace(/[^0-9+]/g, "");
+  if (!cleanedInput) return "";
 
-  if (!clean) return "";
+  let digits = cleanedInput.startsWith("+")
+    ? cleanedInput.slice(1)
+    : cleanedInput;
 
-  if (clean.startsWith("0") && clean.length === 10) {
-    return "+254" + clean.substring(1);
+  if (digits.startsWith("00254")) digits = digits.slice(2);
+  else if (digits.startsWith("00233")) digits = digits.slice(2);
+
+  // Common KE keypad mistake: dial as 254 07… so digits become 2540 + (7xxxxxxxx)
+  const kenyaExtraNationalZeroOn2547 = digits.match(/^2540(7\d{8})$/);
+  if (kenyaExtraNationalZeroOn2547)
+    digits = "254" + kenyaExtraNationalZeroOn2547[1];
+
+  if (digits.startsWith("0") && digits.length === 10) {
+    if (/^07\d{8}$/.test(digits))
+      return "+254" + digits.slice(1);
+    // Ghana mobiles often typed as 05… (Kenya avoids 05… for mobiles; Kenyan 020… stays +254.)
+    if (/^05\d{8}$/.test(digits))
+      return "+233" + digits.slice(1);
+    return "+254" + digits.slice(1);
   }
 
-  if (clean.startsWith("+2540")) {
-    return "+254" + clean.substring(5);
+  if (digits.startsWith("254"))
+    return "+" + digits;
+
+  if (digits.startsWith("233"))
+    return "+" + digits;
+
+  if (digits.startsWith("7") && digits.length === 9) {
+    return "+254" + digits;
   }
 
-  if (clean.startsWith("2540")) {
-    return "+254" + clean.substring(4);
-  }
+  if (/^\d{10,15}$/.test(digits))
+    return "+" + digits;
 
-  if (clean.startsWith("254") && !clean.startsWith("+")) {
-    return "+" + clean;
-  }
-
-  if (clean.startsWith("7") && clean.length === 9) {
-    return "+254" + clean;
-  }
-
-  return clean;
+  return cleanedInput;
 };
 
 /**
@@ -67,6 +80,11 @@ export const phoneLookupVariants = (phone: string): string[] => {
     const rest = n.slice(4);
     v.add("254" + rest);
     v.add("0" + rest);
+    // Mis-saved "+2540712345678" when WhatsApp/meta sender is "+254712345678"
+    if (/^7\d{8}$/.test(rest)) {
+      v.add("+2540" + rest);
+      v.add("2540" + rest);
+    }
   }
   if (n.startsWith("+233") && n.length >= 12) {
     const rest = n.slice(4);

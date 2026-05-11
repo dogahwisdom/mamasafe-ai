@@ -4,6 +4,7 @@ import { TestPatientVisibility } from "../testPatientVisibility";
 import {
   KEYS,
   normalizePhone,
+  phoneLookupVariants,
   storage,
   Security,
 } from "./shared";
@@ -128,6 +129,13 @@ export class PatientService {
 
   public async add(patient: Patient): Promise<Patient> {
     const cleanPhone = normalizePhone(patient.phone);
+    const phoneVariants = phoneLookupVariants(patient.phone);
+    const phoneLookupList =
+      cleanPhone && phoneVariants.length > 0
+        ? phoneVariants
+        : cleanPhone
+          ? [cleanPhone]
+          : [];
 
     // Use Supabase if configured
     if (isSupabaseConfigured()) {
@@ -138,12 +146,18 @@ export class PatientService {
           ? currentUser.id
           : null;
 
-      // Check if patient exists
-      const { data: existing } = await supabase
-        .from('patients')
-        .select('*')
-        .eq('phone', cleanPhone)
-        .single();
+      // Check if patient exists (all common KE/GH written forms + mis-saved +2540XXXXXXXXX)
+      let existing: { id: string; facility_id?: string | null; primary_facility_id?: string | null } | null =
+        null;
+      if (phoneLookupList.length > 0) {
+        const { data: found } = await supabase
+          .from('patients')
+          .select('*')
+          .in('phone', phoneLookupList)
+          .limit(1)
+          .maybeSingle();
+        existing = found ?? null;
+      }
 
       const patientData: any = {
         name: patient.name,
@@ -224,11 +238,16 @@ export class PatientService {
       const defaultPassword = "1234";
       const hashedPassword = Security.hash(defaultPassword);
 
-      const { data: existingUser } = await supabase
-        .from('users')
-        .select('*')
-        .eq('phone', cleanPhone)
-        .single();
+      let existingUser: { id: string } | null = null;
+      if (phoneLookupList.length > 0) {
+        const { data: foundUser } = await supabase
+          .from('users')
+          .select('*')
+          .in('phone', phoneLookupList)
+          .limit(1)
+          .maybeSingle();
+        existingUser = foundUser ?? null;
+      }
 
       const userData = {
         role: 'patient' as const,
@@ -287,12 +306,12 @@ export class PatientService {
       );
 
       let hasPriorEnrollmentWelcome = false;
-      if (existing) {
+      if (existing && phoneLookupList.length > 0) {
         const { data: taggedWelcomeRows } = await supabase
           .from('whatsapp_messages')
           .select('id')
           .eq('direction', 'outbound')
-          .eq('phone', cleanPhone)
+          .in('phone', phoneLookupList)
           .contains('raw_payload', { outboundSource: 'enrollment_welcome' })
           .limit(1);
         hasPriorEnrollmentWelcome = (taggedWelcomeRows?.length || 0) > 0;

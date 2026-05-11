@@ -14,6 +14,7 @@ import {
 } from "./shared";
 import { supabase, isSupabaseConfigured } from "../supabaseClient";
 import { MessagingService } from "./messagingService";
+import { syncSupabaseSessionAfterPinLogin } from "./authPinBridge";
 
 export class AuthService {
   private defaultTimeZoneForCountry(countryCode: string | null | undefined): string | undefined {
@@ -613,6 +614,7 @@ export class AuthService {
       // Store session
       storage.set(KEYS.CURRENT_USER, user);
       storage.set(KEYS.SESSION, "true");
+      await syncSupabaseSessionAfterPinLogin(String(dbUser.id), cleanPassword);
       return { user };
     }
 
@@ -810,6 +812,7 @@ export class AuthService {
         const profile = this.dbRowToProfile(updated as Record<string, unknown>);
         storage.set(KEYS.CURRENT_USER, profile);
         storage.set(KEYS.SESSION, "true");
+        await syncSupabaseSessionAfterPinLogin(String(profile.id), user.pin);
         return { user: profile };
       } else {
         const insertPayload = {
@@ -827,6 +830,7 @@ export class AuthService {
         const profile = this.dbRowToProfile(newUser as Record<string, unknown>);
         storage.set(KEYS.CURRENT_USER, profile);
         storage.set(KEYS.SESSION, "true");
+        await syncSupabaseSessionAfterPinLogin(String(profile.id), user.pin);
         return { user: profile };
       }
     }
@@ -880,6 +884,13 @@ export class AuthService {
   public async logout(): Promise<void> {
     storage.remove(KEYS.SESSION);
     storage.remove(KEYS.CURRENT_USER);
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.auth.signOut();
+      } catch {
+        /* non-fatal */
+      }
+    }
   }
 
   public async getSession(): Promise<UserProfile | null> {

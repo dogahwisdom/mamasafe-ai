@@ -16,6 +16,10 @@ assert.equal(WhatsAppPhoneNormalizer.canonicalFromMetaFrom(undefined), "");
 const kenyaVariants = WhatsAppPhoneNormalizer.variantsForQueries("+254712345678");
 assert.ok(kenyaVariants.includes("+254712345678"));
 assert.ok(kenyaVariants.includes("0712345678"), `expected Kenyan local 0-variant, got: ${kenyaVariants.join(",")}`);
+assert.ok(
+  kenyaVariants.includes("+2540712345678"),
+  `expected Kenyan mis-entered extra-0 variant, got: ${kenyaVariants.join(",")}`
+);
 
 const ghVariants = WhatsAppPhoneNormalizer.variantsForQueries("+233241234567");
 assert.ok(ghVariants.includes("+233241234567"));

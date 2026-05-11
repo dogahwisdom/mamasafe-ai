@@ -70,14 +70,31 @@ async function validateSupabaseUserToken(accessToken, createSupabaseAdmin) {
       return { ok: false, reason: "service_role_missing" };
     }
 
-    const { data: profile, error: profileErr } = await admin
+    let profile = null;
+    const { data: byId, error: profileErr } = await admin
       .from("users")
       .select("role")
       .eq("id", userData.user.id)
       .maybeSingle();
 
-    if (profileErr || !profile) {
-      return { ok: false, reason: "profile_not_found" };
+    if (!profileErr && byId) {
+      profile = byId;
+    } else {
+      const email = String(userData.user.email || "")
+        .trim()
+        .toLowerCase();
+      if (email) {
+        const { data: byEmail, error: emailErr } = await admin
+          .from("users")
+          .select("role")
+          .eq("email", email)
+          .maybeSingle();
+        if (!emailErr && byEmail) profile = byEmail;
+      }
+    }
+
+    if (!profile) {
+      return { ok: false, reason: profileErr ? "profile_lookup_error" : "profile_not_found" };
     }
 
     const role = String(profile.role || "");

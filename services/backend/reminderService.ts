@@ -58,8 +58,12 @@ export class ReminderService {
         'Content-Type': 'application/json',
       };
       if (isSupabaseConfigured()) {
-        const { data: sess } = await supabase.auth.getSession();
-        const token = sess.session?.access_token;
+        let { data: sess } = await supabase.auth.getSession();
+        let token = sess.session?.access_token;
+        if (!token) {
+          const { data: refreshed } = await supabase.auth.refreshSession();
+          token = refreshed.session?.access_token;
+        }
         if (token) headers.Authorization = `Bearer ${token}`;
       }
 

@@ -40,6 +40,13 @@ export class WhatsAppPhoneNormalizer {
     // Ghana (+233)
     withLocalLeadingZero("233", 12);
 
+    // Kenya: enrolment/UI sometimes persists "+2540712345678" (2540 + 7xxxxxxxx); Meta sends 254712345678.
+    if (d.startsWith("2547") && d.length === 12 && /^7\d{8}$/.test(d.slice(3))) {
+      const national = d.slice(3);
+      variants.add(`+2540${national}`);
+      variants.add(`2540${national}`);
+    }
+
     return [...variants];
   }
 
