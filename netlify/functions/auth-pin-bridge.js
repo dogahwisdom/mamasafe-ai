@@ -128,6 +128,21 @@ export async function handler(event) {
     return json(405, { ok: false, error: "Method not allowed." });
   }
 
+  try {
+    return await handlePinBridgePost(event);
+  } catch (err) {
+    const diagnostic = err instanceof Error ? err.message : String(err);
+    console.error("auth-pin-bridge unhandled:", diagnostic);
+    return json(500, {
+      ok: false,
+      error:
+        "Reminders hit an unexpected server error while starting your secure session. Please contact MamaSafe support.",
+      diagnostic,
+    });
+  }
+}
+
+async function handlePinBridgePost(event) {
   if (!originLikelyFirstParty(event)) {
     return json(403, { ok: false, error: "Origin not allowed for pin bridge." });
   }
@@ -207,7 +222,12 @@ export async function handler(event) {
       const msg = String(cr.error.message || "").toLowerCase();
       if (!msg.includes("already") && !msg.includes("registered")) {
         console.error("auth-pin-bridge createUser:", cr.error);
-        return json(500, { ok: false, error: "Could not create auth session user." });
+        return json(500, {
+          ok: false,
+          error:
+            "Reminders could not create the secure login link for this facility account. Please contact MamaSafe support.",
+          diagnostic: String(cr.error.message || cr.error),
+        });
       }
       const up2 = await admin.auth.admin.updateUserById(authUserId, {
         email,
@@ -216,7 +236,12 @@ export async function handler(event) {
       });
       if (up2.error) {
         console.error("auth-pin-bridge updateUserById after create:", up2.error);
-        return json(500, { ok: false, error: "Could not sync auth credentials." });
+        return json(500, {
+          ok: false,
+          error:
+            "Reminders could not update the secure login for this facility account. Please contact MamaSafe support.",
+          diagnostic: String(up2.error.message || up2.error),
+        });
       }
     }
   }
@@ -260,11 +285,26 @@ export async function handler(event) {
         "The sign-in email format was rejected by the MamaSafe backend. Ask support to set AUTH_PIN_BRIDGE_EMAIL_DOMAIN to a valid domain.";
     } else if (lower.includes("rate limit") || lower.includes("too many")) {
       userError = "Too many sign-in attempts. Please wait a few minutes and try again.";
+    } else if (lower.includes("database error") || lower.includes("saving new user")) {
+      userError =
+        "Reminders could not save the secure login in the database. Please contact MamaSafe support.";
+    } else if (lower.includes("api") && (lower.includes("invalid") || lower.includes("jwt"))) {
+      userError =
+        "Reminders could not validate the app keys against the MamaSafe backend. Ask support to verify SUPABASE_ANON_KEY on Netlify matches your project.";
     }
     return json(500, { ok: false, error: userError, diagnostic: raw });
   }
 
   const s = signData.session;
+  if (!s?.refresh_token) {
+    console.error("auth-pin-bridge: session missing refresh_token");
+    return json(500, {
+      ok: false,
+      error:
+        "Reminders received an incomplete secure session from the server. Please contact MamaSafe support.",
+      diagnostic: "missing_refresh_token",
+    });
+  }
   return json(200, {
     ok: true,
     access_token: s.access_token,

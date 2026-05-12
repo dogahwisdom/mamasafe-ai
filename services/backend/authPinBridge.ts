@@ -29,18 +29,40 @@ export async function syncSupabaseSessionAfterPinLogin(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userId, pin }),
     });
-    const payload = (await res.json().catch(() => ({}))) as {
+    const rawBody = await res.text();
+    let payload: {
       ok?: boolean;
       access_token?: string;
       refresh_token?: string;
       error?: string;
       diagnostic?: string;
-    };
+    } = {};
+    if (rawBody.trim()) {
+      try {
+        payload = JSON.parse(rawBody) as typeof payload;
+      } catch {
+        console.warn(
+          "[MamaSafe] auth-pin-bridge non-JSON body (HTTP",
+          res.status,
+          "):",
+          rawBody.slice(0, 400)
+        );
+        return {
+          ok: false,
+          error:
+            "Reminders service returned an invalid response (often a hosting or deploy issue). Please contact MamaSafe support.",
+          httpStatus: res.status,
+        };
+      }
+    }
     if (!res.ok || !payload.access_token || !payload.refresh_token) {
+      const fromPayload =
+        typeof payload.error === "string" && payload.error.trim() ? payload.error.trim() : "";
       const errMsg =
-        typeof payload.error === "string" && payload.error.trim()
-          ? payload.error.trim()
-          : `HTTP ${res.status}`;
+        fromPayload ||
+        (res.ok
+          ? "Reminders connection returned an empty session response. Please contact MamaSafe support."
+          : `HTTP ${res.status}`);
       const diag = typeof payload.diagnostic === "string" ? payload.diagnostic.trim() : "";
       console.warn("[MamaSafe] auth-pin-bridge failed:", errMsg, diag ? `(diagnostic: ${diag})` : "");
       return { ok: false, error: errMsg, httpStatus: res.status };

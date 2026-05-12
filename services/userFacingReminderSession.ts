@@ -8,13 +8,19 @@ export function reminderSessionBannerAfterPinFailure(error?: string): string {
     raw.startsWith("Reminders ") ||
     raw.startsWith("Too many sign-in") ||
     raw.startsWith("Your PIN worked") ||
-    raw.startsWith("The sign-in email format")
+    raw.startsWith("The sign-in email format") ||
+    raw.startsWith("Reminders connection returned")
   ) {
     return raw;
   }
 
   const e = raw.toLowerCase();
-  if (e.includes("jwt") || e.includes("refresh token") || e.includes("invalid refresh")) {
+  if (
+    e.includes("jwt") ||
+    e.includes("refresh token") ||
+    e.includes("invalid refresh") ||
+    (e.includes("invalid") && (e.includes("token") || e.includes("session")))
+  ) {
     return "Your secure session could not be applied in this browser. Sign out, sign in with your PIN again, or contact MamaSafe support if this continues.";
   }
   if (
@@ -33,6 +39,21 @@ export function reminderSessionBannerAfterPinFailure(error?: string): string {
   }
   if (e.includes("invalid credentials")) {
     return "We couldn’t refresh your secure session. Sign out, sign in with your PIN again, then try reminders once more.";
+  }
+  if (e.includes("failed to fetch") || e.includes("networkerror") || e.includes("load failed")) {
+    return "We could not reach the reminder connection service from this browser. Check your network, try again, or contact MamaSafe support.";
+  }
+  if (/\bhttp\s+(404|502|503|504)\b/.test(e) || e.includes("not found") && e.includes("http")) {
+    return "The reminder connection service is missing or unavailable on this site URL. Confirm you are on the official MamaSafe link, or contact MamaSafe support.";
+  }
+  if (/\bhttp\s+5\d\d\b/.test(e)) {
+    return "The reminder connection service returned a server error. Please try again shortly or contact MamaSafe support.";
+  }
+  if (e.includes("vite_supabase") || e.includes("missing user id")) {
+    return "This browser build is missing secure reminder settings. Contact MamaSafe support.";
+  }
+  if (e.includes("could not create auth session") || e.includes("could not sync auth credentials")) {
+    return "Reminders could not finish linking your facility login to the secure service. Please contact MamaSafe support.";
   }
   return "We couldn’t finish connecting automated reminders for this session. Sign out, sign in with your PIN again, or contact MamaSafe support if this continues.";
 }
